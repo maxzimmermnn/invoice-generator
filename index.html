@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E-Rechnung · ZUGFeRD / Factur-X</title>
+<link rel="stylesheet" href="/src/styles.css">
+<script>
+  // Instant theme application (before paint) — prevents flash of wrong theme
+  (function() {
+    var pref = localStorage.getItem('erechnung:theme');
+    var isDark = pref === 'dark' || (pref === null && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (isDark) document.documentElement.setAttribute('data-theme', 'dark');
+  })();
+</script>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div>
+    <h1 data-i18n="title">E-Rechnung Generator</h1>
+    <div class="sub" data-i18n="subtitle">ZUGFeRD 2.3 · Factur-X · EN 16931 (Comfort)</div>
+  </div>
+  <div style="display:flex; align-items:center; gap:12px;">
+    <select id="langSelect" class="lang-select" aria-label="Language">
+      <option value="en">EN</option>
+      <option value="de">DE</option>
+      <option value="fr">FR</option>
+    </select>
+    <button type="button" id="themeToggle" class="theme-toggle" title="Theme" aria-label="Theme"></button>
+    <div class="sub" id="version">v2.0</div>
+  </div>
+</header>
+
+<div class="intro">
+  <p style="margin: 0 0 10px" data-i18n="intro_main"></p>
+  <p style="margin: 0" data-i18n="intro_alt"></p>
+</div>
+
+<!-- VERKÄUFER -->
+<section class="block">
+  <h2 data-i18n="section_seller"></h2>
+  <div class="hint"><span data-i18n="section_seller_hint"></span> <button class="tiny-btn" id="saveSeller" type="button" data-i18n="btn_save_template"></button> <button class="tiny-btn" id="clearSeller" type="button" data-i18n="btn_reset"></button></div>
+  <div class="grid">
+    <label class="full"><span data-i18n="f_company"></span>
+      <input type="text" id="s_name" autocomplete="off">
+    </label>
+    <label class="full"><span data-i18n="f_address"></span>
+      <input type="text" id="s_line1" autocomplete="off">
+    </label>
+    <label><span data-i18n="f_zip"></span>
+      <input type="text" id="s_zip" autocomplete="off">
+    </label>
+    <label><span data-i18n="f_city"></span>
+      <input type="text" id="s_city" autocomplete="off">
+    </label>
+    <label><span data-i18n="f_country_de"></span>
+      <input type="text" id="s_country" value="DE" maxlength="2" autocomplete="off">
+    </label>
+    <label><span data-i18n="f_vat_de"></span>
+      <input type="text" id="s_vat" autocomplete="off">
+    </label>
+    <label><span data-i18n="f_siret"></span>
+      <input type="text" id="s_siret" autocomplete="off" data-i18n-placeholder="f_siret_placeholder">
+    </label>
+    <label><span data-i18n="f_email"></span>
+      <input type="email" id="s_email" autocomplete="off">
+    </label>
+    <label><span data-i18n="f_phone"></span>
+      <input type="text" id="s_phone" autocomplete="off">
+    </label>
+    <label class="half"><span data-i18n="f_iban"></span>
+      <input type="text" id="s_iban" autocomplete="off">
+    </label>
+    <label class="half"><span data-i18n="f_bic"></span>
+      <input type="text" id="s_bic" autocomplete="off">
+    </label>
+    <label class="full"><span data-i18n="f_bank"></span>
+      <input type="text" id="s_bank" autocomplete="off">
+    </label>
+  </div>
+</section>
+
+<!-- KÄUFER -->
+<section class="block">
+  <h2 data-i18n="section_buyer"></h2>
+  <div class="hint" data-i18n="section_buyer_hint"></div>
+  <div class="picker-row">
+    <select id="buyerPicker">
+      <option value="" data-i18n="f_buyer_picker"></option>
+    </select>
+    <button class="tiny-btn" id="saveBuyer" type="button" data-i18n="btn_save_buyer"></button>
+    <button class="tiny-btn" id="deleteBuyer" type="button" data-i18n="btn_delete_selected"></button>
+  </div>
+  <div class="grid">
+    <label class="full"><span data-i18n="f_company"></span>
+      <input type="text" id="b_name">
+    </label>
+    <label class="full"><span data-i18n="f_address"></span>
+      <input type="text" id="b_line1">
+    </label>
+    <label><span data-i18n="f_zip"></span>
+      <input type="text" id="b_zip">
+    </label>
+    <label><span data-i18n="f_city"></span>
+      <input type="text" id="b_city">
+    </label>
+    <label><span data-i18n="f_country"></span>
+      <input type="text" id="b_country" value="FR" maxlength="2">
+    </label>
+    <label><span data-i18n="f_vat_b2b"></span>
+      <input type="text" id="b_vat">
+    </label>
+    <label><span data-i18n="f_siret"></span>
+      <input type="text" id="b_siret" data-i18n-placeholder="f_siret_placeholder">
+    </label>
+    <label class="full"><span data-i18n="f_buyer_reference"></span>
+      <input type="text" id="b_reference">
+      <span class="note-small" data-i18n="f_buyer_reference_hint"></span>
+    </label>
+  </div>
+</section>
+
+<!-- RECHNUNG -->
+<section class="block">
+  <h2 data-i18n="section_invoice"></h2>
+  <div class="hint" data-i18n="section_invoice_hint"></div>
+  <div class="grid">
+    <label class="full"><span data-i18n="f_number"></span>
+      <input type="text" id="r_number">
+      <div class="number-pattern-row">
+        <button type="button" class="number-chip" id="suggestNumber" data-i18n="chip_next_number"></button>
+        <details class="number-pattern-details">
+          <summary data-i18n="f_number_pattern_summary"></summary>
+          <div class="number-pattern-body">
+            <input type="text" id="r_number_pattern" placeholder="{yyyy}-{counter:5}">
+            <button type="button" class="tiny-btn" id="saveNumberPattern" data-i18n="btn_save_pattern"></button>
+            <div class="due-chips" id="numberPatternChips">
+              <button type="button" data-token="{yyyy}" data-i18n="chip_year4"></button>
+              <button type="button" data-token="{yy}" data-i18n="chip_year2"></button>
+              <button type="button" data-token="{mm}" data-i18n="chip_month"></button>
+              <button type="button" data-token="{dd}" data-i18n="chip_day"></button>
+              <button type="button" data-token="{counter}" data-i18n="chip_counter"></button>
+              <button type="button" data-token="{counter:3}" data-i18n="chip_counter3"></button>
+              <button type="button" data-token="{counter:5}" data-i18n="chip_counter5"></button>
+            </div>
+            <p class="note-small" data-i18n="f_number_pattern_hint"></p>
+          </div>
+        </details>
+      </div>
+    </label>
+    <label><span data-i18n="f_date"></span>
+      <input type="date" id="r_date">
+    </label>
+    <label><span data-i18n="f_due"></span>
+      <input type="date" id="r_due">
+      <span class="due-chips">
+        <button type="button" data-days="14">+14 <span data-i18n="chip_days"></span></button>
+        <button type="button" data-days="30">+30 <span data-i18n="chip_days"></span></button>
+        <button type="button" data-days="60">+60 <span data-i18n="chip_days"></span></button>
+      </span>
+    </label>
+    <label><span data-i18n="f_delivery"></span>
+      <input type="date" id="r_delivery">
+    </label>
+    <label><span data-i18n="f_delivery_end"></span>
+  <span style="display:flex; gap:8px; align-items:center;">
+    <input type="date" id="r_delivery_end" style="flex:1;">
+    <button type="button" class="tiny-btn" id="clearDeliveryEnd" data-i18n="btn_clear"></button>
+  </span>
+</label>
+    <label><span data-i18n="f_currency"></span>
+      <select id="r_currency">
+        <option value="EUR">EUR</option>
+        <option value="USD">USD</option>
+        <option value="GBP">GBP</option>
+        <option value="CHF">CHF</option>
+      </select>
+    </label>
+    <label><span data-i18n="f_taxmode"></span>
+      <select id="r_taxmode">
+        <option value="AE" selected data-i18n="tax_AE"></option>
+        <option value="S" data-i18n="tax_S"></option>
+        <option value="Z" data-i18n="tax_Z"></option>
+        <option value="E" data-i18n="tax_E"></option>
+        <option value="O" data-i18n="tax_O"></option>
+      </select>
+    </label>
+    <label><span data-i18n="f_invoice_lang"></span>
+      <select id="invoiceLangSelect">
+        <option value="" data-i18n="invoice_lang_auto"></option>
+        <option value="en">English</option>
+        <option value="de">Deutsch</option>
+        <option value="fr">Français</option>
+      </select>
+      <span class="note-small" data-i18n="f_invoice_lang_hint"></span>
+    </label>
+    <label><span data-i18n="f_invoice_font"></span>
+      <select id="invoiceFontSelect">
+        <option value="courier-prime">Courier Prime</option>
+        <option value="ibm-plex-mono">IBM Plex Mono</option>
+        <option value="jetbrains-mono">JetBrains Mono</option>
+        <option value="inconsolata">Inconsolata</option>
+        <option value="space-mono">Space Mono</option>
+      </select>
+      <span class="note-small" data-i18n="f_invoice_font_hint"></span>
+    </label>
+    <label><span data-i18n="f_invoice_layout"></span>
+      <select id="invoiceLayoutSelect"></select>
+      <span class="note-small" data-i18n="f_invoice_layout_hint"></span>
+    </label>
+    <label class="full"><span data-i18n="f_project"></span>
+      <input type="text" id="r_project" data-i18n-placeholder="f_project_placeholder">
+    </label>
+    <label class="full"><span data-i18n="f_category"></span>
+      <input type="text" id="r_category" data-i18n-placeholder="f_category_placeholder">
+    </label>
+    <label class="full"><span data-i18n="f_intro"></span>
+      <textarea id="r_intro" rows="2" data-i18n-placeholder="f_intro_placeholder"></textarea>
+    </label>
+    <label class="full"><span data-i18n="f_payment_note"></span>
+      <textarea id="r_payment_note" rows="2" data-i18n-placeholder="f_payment_note_placeholder"></textarea>
+    </label>
+    <label><span data-i18n="f_greeting"></span>
+      <input type="text" id="r_greeting" data-i18n-placeholder="f_greeting_placeholder">
+    </label>
+    <label><span data-i18n="f_signature"></span>
+      <input type="text" id="r_signature" data-i18n-placeholder="f_signature_placeholder">
+    </label>
+    <label class="full"><span data-i18n="f_note"></span>
+      <textarea id="r_note" rows="2"></textarea>
+      <span class="note-small" id="taxNote"></span>
+    </label>
+    <label class="full"><span data-i18n="f_footnote"></span>
+      <div class="picker-row">
+        <select id="footnotePicker">
+          <option value="" data-i18n="f_footnote_picker"></option>
+        </select>
+        <button class="tiny-btn" id="saveFootnote" type="button" data-i18n="btn_save_footnote"></button>
+        <button class="tiny-btn" id="deleteFootnote" type="button" data-i18n="btn_delete_footnote"></button>
+      </div>
+      <textarea id="r_footnote" rows="3" data-i18n-placeholder="f_footnote_placeholder"></textarea>
+      <span class="note-small" data-i18n="f_footnote_hint"></span>
+    </label>
+  </div>
+</section>
+
+<!-- POSITIONEN -->
+<section class="block">
+  <h2 data-i18n="section_items"></h2>
+  <div class="hint" data-i18n="section_items_hint"></div>
+  <div class="items" id="items">
+    <div class="row head">
+      <div data-i18n="th_desc"></div>
+      <div class="num" data-i18n="th_qty"></div>
+      <div class="num" data-i18n="th_price"></div>
+      <div class="num" data-i18n="th_vat_pct"></div>
+      <div></div>
+    </div>
+  </div>
+  <button type="button" class="add-row" id="addItem" data-i18n="btn_add_item"></button>
+
+  <div class="totals">
+    <div class="label" data-i18n="total_net"></div>
+    <div class="val" id="t_net">0,00</div>
+    <div class="label" id="t_tax_label">MwSt</div>
+    <div class="val" id="t_tax">0,00</div>
+    <div class="label grand" data-i18n="total_grand"></div>
+    <div class="val grand" id="t_total">0,00</div>
+  </div>
+</section>
+
+<!-- AUSGABE -->
+<section class="block">
+  <h2 data-i18n="section_output"></h2>
+  <div class="hint" data-i18n="section_output_hint"></div>
+  <div class="mode-toggle">
+    <button class="mode-btn active" data-mode="generate" type="button" data-i18n="mode_generate"></button>
+    <button class="mode-btn" data-mode="upload" type="button" data-i18n="mode_upload"></button>
+  </div>
+  <div id="mode-generate">
+    <p class="note-small" data-i18n="mode_generate_hint"></p>
+  </div>
+  <div id="mode-upload" style="display:none">
+    <div class="drop" id="drop">
+      <div data-i18n="drop_pdf"></div>
+      <div class="fname" id="fname"></div>
+    </div>
+    <input type="file" id="file" accept="application/pdf,.pdf" style="display:none">
+  </div>
+</section>
+
+<!-- DATEINAME -->
+<section class="block">
+  <h2 data-i18n="section_filename"></h2>
+  <div class="hint"><span data-i18n="section_filename_hint"></span> <button class="tiny-btn" id="saveFilenamePattern" type="button" data-i18n="btn_save_filename"></button></div>
+  <div class="due-chips" id="filenameChips" style="margin-bottom: 8px">
+    <button type="button" data-token="{nr}" data-i18n="chip_nr"></button>
+    <button type="button" data-token="{project}" data-i18n="chip_project"></button>
+    <button type="button" data-token="{buyer}" data-i18n="chip_buyer"></button>
+    <button type="button" data-token="{date}" data-i18n="chip_date"></button>
+    <button type="button" data-token="{category}" data-i18n="chip_category"></button>
+    <button type="button" data-token="{seller}" data-i18n="chip_seller"></button>
+  </div>
+  <label class="full"><span data-i18n="f_filename_pattern"></span>
+    <input type="text" id="r_filename" placeholder="{nr}_{buyer}_{project}" value="{nr}_{buyer}_{project}">
+  </label>
+  <div class="note-small" id="filenamePreview" style="margin-top: 4px; font-family: 'Inconsolata', monospace;"></div>
+</section>
+
+<div class="actions">
+  <button type="button" class="primary" id="btnPDF" data-i18n="btn_create_pdf"></button>
+  <button type="button" class="secondary" id="btnXML" data-i18n="btn_xml_only"></button>
+  <button type="button" class="secondary" id="btnValidate" data-i18n="btn_validate"></button>
+</div>
+
+<div class="status" id="status"></div>
+
+<footer>
+  <p data-i18n="footer_main"></p>
+  <p class="footer-disclaimer" data-i18n="footer_disclaimer"></p>
+  <p class="footer-backup">
+    <span data-i18n="footer_backup"></span>
+    <button type="button" class="footer-link-btn" id="btnExport" data-i18n="btn_export_data"></button>
+    ·
+    <button type="button" class="footer-link-btn" id="btnImport" data-i18n="btn_import_data"></button>
+    <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+  </p>
+</footer>
+
+</div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

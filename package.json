@@ -1,0 +1,20 @@
+{
+  "name": "e-rechnung",
+  "private": true,
+  "version": "1.0.0",
+"description": "ZUGFeRD / Factur-X compliant invoice generator. Runs fully offline in the browser.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+},
+  "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
+    "pako": "^2.1.0",
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "vite": "^8.0.10",
+    "vite-plugin-singlefile": "^2.3.3"
+  }
+}
