@@ -2,23 +2,39 @@
 
 A self-contained, offline-first tool for creating ZUGFeRD- / Factur-X-compliant
 invoices. Runs fully offline in any modern browser, doesn't store anything on
-a server.
+a server. 
+
+The motivation to do this came from the frustration that basically all tool that
+can do this are paid. To add a xml file to a pdf and make it compliant with the 
+regulation did not seem to hard to tackle, so I created this. Trying to have all
+the features I could ever need and some customization options. 
+The tool can also retrofit already existing PDFs with an XML if you'd like to 
+use another application and have fancy layouts and whatnot.
+
+This is of course created with the use of AI and I am by any means not an expert 
+in finance so use at your own risk. The created files pass the current e-invoice
+viewers as well as the pretty strict verapdf validation. 
+
+Feel free to report any issues, I will try to keep this as up to date as I can 
+since I use the tool myself. 
+
 
 ---
+
 
 ## Short description
 
 Open the HTML in a browser, fill in the invoice data, generate a PDF. The PDF
 carries machine-readable XML data per EN 16931 (ZUGFeRD 2.3 / Factur-X 1.0,
-Comfort profile) embedded inside it — making it compliant with German
+Comfort profile) embedded inside it, making it compliant with German
 e-invoicing law (§14 UStG, in force since 2025) and valid as a Factur-X
 invoice for French customers. Three UI languages (German, English, French),
 five fonts, two layouts, per-language storage of default texts.
 
 ## Layouts
 
-- **Modern** — large headline, generous whitespace, prominent total block
-- **DIN 5008** — German business-letter standard with recipient address
+- **Modern** large headline, generous whitespace, prominent total block
+- **DIN 5008** German business-letter standard with recipient address
   top-left (window-envelope compatible) and a 3-column footer
 
 ## Quick start (no installation)
@@ -46,7 +62,7 @@ fields. Buyer reference / Leitweg-ID is stored as BT-10 in the XML
 (required for German government clients).
 
 ### Invoice number with pattern
-Default pattern: `{yyyy}-{counter:5}` — e.g. `2026-00042`. An internal
+Default pattern: `{yyyy}-{counter:5}` e.g. `2026-00042`. An internal
 counter increments by 1 after each invoice. Available tokens: `{yyyy}`,
 `{yy}`, `{mm}`, `{dd}`, `{counter}`, `{counter:N}`. The pattern is
 editable and persistent.
@@ -86,7 +102,7 @@ Two independent dropdowns:
 - **UI language**: the tool's interface language
 - **Invoice language**: language of the generated PDF / XML
 
-The two are independent — keep the UI in German and still generate
+The two are independent. you can keep the UI in German and still generate
 English invoices, for example.
 
 ### Fonts
@@ -115,7 +131,7 @@ Light / dark / auto (follows OS preference).
 ## Compliance & standards
 
 - **Format**: ZUGFeRD 2.3 / Factur-X 1.0
-- **Profile**: EN 16931 (Comfort) — `urn:cen.eu:en16931:2017`
+- **Profile**: EN 16931 (Comfort)  `urn:cen.eu:en16931:2017`
 - **Mandatory fields**: BT-1 (invoice number), BT-2 (date), BT-3 (type 380),
   BT-5 (currency), BT-9 (due date), BT-10 (buyer reference, optional),
   seller / buyer addresses, tax breakdown, delivery date (BT-72)
