@@ -39,7 +39,7 @@ five fonts, two layouts, per-language storage of default texts.
 
 ## Quick start (no installation)
 
-Download the latest `e-rechnung.html` from the
+Download the latest `invoice-generator.html` from the
 [Releases page](../../releases) and open it in a browser. That's it. The
 file is self-contained — works straight from the filesystem, no web server
 needed, no internet required at runtime.
@@ -113,7 +113,7 @@ Five monospace fonts for the PDF (all embedded, all with proper Bold weight):
 ### Filename pattern
 On download the filename is generated from a token pattern. Default:
 `{nr}_{buyer}_{project}`. Tokens: `{nr}`, `{date}`, `{buyer}`, `{seller}`,
-`{project}`, `{category}`. A live preview shows the resolved filename.
+`{project}`, `{category}`, {layout}. A live preview shows the resolved filename.
 
 ### XML validation
 The "Validate XML" button checks whether all EN 16931 mandatory fields
