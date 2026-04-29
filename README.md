@@ -44,7 +44,7 @@ invoice history with cloning and a statistics view.
 
 Download the latest `invoice-generator.html` from the
 [Releases page](../../releases) and open it in a browser. That's it. The
-file is self-contained — works straight from the filesystem, no web server
+file is self-contained and works straight from the filesystem, no web server
 needed, no internet required at runtime.
 
 The file is around 1.8 MB because pdf-lib, fontkit, five invoice fonts and
@@ -76,7 +76,7 @@ editable and persistent.
 - Invoice date
 - Due date (with quick chips +14 / +30 / +60 days)
 - Service date (required for e-invoicing)
-- Service date end (optional, for date ranges — encoded as
+- Service date end (optional, for date ranges; encoded as
   BillingSpecifiedPeriod in the XML)
 
 ### Tax modes
@@ -125,14 +125,14 @@ filename.
 Each generated invoice is automatically saved to a local history (up to
 1000 entries, oldest dropped first). From the history dropdown you can:
 
-- **Clone** any past invoice back into the form — all fields including
+- **Clone** any past invoice back into the form. All fields including
   the buyer, items, project, category, tax mode, language, font and
   layout are restored. Date fields stay empty so you fill them
   explicitly; the invoice number is auto-assigned to the next available
   one.
 - **Delete entry** to remove a single record.
 - **Delete all** to clear the history with a confirmation prompt.
-- **Save invoices to history** toggle — when off, new invoices won't be
+- **Save invoices to history** toggle. When off, new invoices won't be
   saved, but existing entries remain accessible.
 
 History is stored in `localStorage` like everything else and is included
@@ -151,7 +151,7 @@ Period filter: last 30 days, last 3 months, current year, last 12
 months, all time.
 
 Multi-currency invoices are kept in separate blocks so amounts stay
-honest — no offline FX guesswork.
+honest, with no offline FX guesswork.
 
 ### XML validation
 The "Validate XML" button checks whether all EN 16931 mandatory fields
@@ -188,7 +188,7 @@ Light / dark / auto (follows OS preference).
   all fonts and all UI assets are embedded into the built HTML file.
 - **No server component.** The file runs straight from the filesystem or
   from any static web server.
-- **Local data only**: All input — including the invoice history — is
+- **Local data only**: All input (including the invoice history) is
   stored in `localStorage`. Backup export produces a JSON file you
   download yourself; nothing is transmitted.
 
@@ -216,21 +216,21 @@ Hot-reload dev server.
 
 ### Project structure
 
-- `index.html` — markup shell
-- `src/main.js` — application logic
-- `src/utils.js` — shared helpers
-- `src/fonts.js` — embedded invoice fonts (base64)
-- `src/styles.css` — UI styling
-- `src/layouts.js` — invoice layout renderers
-- `vite.config.js` — Vite build config (single-file output)
+- `index.html` - markup shell
+- `src/main.js` - application logic
+- `src/utils.js` - shared helpers
+- `src/fonts.js` - embedded invoice fonts (base64)
+- `src/styles.css` - UI styling
+- `src/layouts.js` - invoice layout renderers
+- `vite.config.js` - Vite build config (single-file output)
 
 ## Example invoices
 
 Three PDFs built with this tool, all showing the same fictional invoice, one per layout:
 
-- `example_modern.pdf` — Modern layout
-- `example_din5008.pdf` — DIN 5008 layout
-- `example_typewriter.pdf` — Typewriter layout
+- `example_modern.pdf` - Modern layout
+- `example_din5008.pdf` - DIN 5008 layout
+- `example_typewriter.pdf` - Typewriter layout
 
 ---
 
@@ -238,8 +238,8 @@ Three PDFs built with this tool, all showing the same fictional invoice, one per
 
 Embedded fonts (all licensed under the SIL Open Font License):
 
-- [Fraunces](https://github.com/undercasetype/Fraunces) — UI serif
-- [Inconsolata](https://github.com/googlefonts/Inconsolata) — UI mono / invoice option
+- [Fraunces](https://github.com/undercasetype/Fraunces) - UI serif
+- [Inconsolata](https://github.com/googlefonts/Inconsolata) - UI mono / invoice option
 - [Courier Prime](https://github.com/quoteunquoteapps/CourierPrime)
 - [IBM Plex Mono](https://github.com/IBM/plex)
 - [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono)
@@ -263,4 +263,4 @@ and consult a tax advisor when in doubt.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).

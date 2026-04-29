@@ -1,4 +1,4 @@
-## [1.3.0] — 2026-04-29
+## [1.3.0] - 2026-04-29
 
 Adds invoice history with cloning and a statistics modal. The biggest
 practical change: any generated invoice is now saved to a local
@@ -14,12 +14,12 @@ down per currency.
   `erechnung:history:v1`. Hard cap of 1000 entries, oldest dropped
   first. New section in the UI between Buyer and Invoice with:
   - A picker showing each entry as `Number · Date · Buyer · Total`.
-  - **Clone** — restores the entry's full state into the form. Date
+  - **Clone**: restores the entry's full state into the form. Date
     fields are intentionally left empty (you fill them deliberately);
     the invoice number is auto-assigned to the next available one;
     the buyer is overwritten with the snapshot's buyer.
-  - **Delete entry** — removes a single record.
-  - **Delete all** — clears the history with a confirmation.
+  - **Delete entry**: removes a single record.
+  - **Delete all**: clears the history with a confirmation.
   - **Save invoices to history** opt-out toggle stored in
     `erechnung:history_enabled:v1`. When off, new invoices are not
     saved, but existing entries stay accessible.
@@ -37,7 +37,7 @@ down per currency.
   selected (or typed by name), a small caption shows when the last
   invoice to that buyer was, with its number and total. Localized in
   three flavors: today / yesterday / N days ago.
-- **`{layout}` filename token** — was already added in 1.1.0 but the
+- **`{layout}` filename token** was already added in 1.1.0, but the
   `chip_layout` button in the filename chips row is now wired and
   documented.
 
