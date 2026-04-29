@@ -172,7 +172,7 @@ async function renderInvoiceDIN5008(pdfDoc, ctx) {
     for (let i = 1; i < descLines.length; i++) { drawText(descLines[i], descX, y, mono, SIZE); y -= LINE; }
   }
   y -= LINE * 0.4;
-  drawRule(y, 0.4, M_L + mm(80), colRight);
+  drawRule(y, 0.4, M_L, colRight);
   y -= LINE * 1.2;
 
   // Totals — right-aligned block under the table
@@ -185,9 +185,10 @@ async function renderInvoiceDIN5008(pdfDoc, ctx) {
     drawTextRight(fmtMoney(totals.tax), cTotalRight, y, mono, SIZE);
     y -= LINE;
   }
-  // Divider sits ABOVE the grand total line (y is currently the next-line baseline)
-  drawRule(y + LINE * 0.7, 0.4, M_L + mm(80), colRight);
-  y -= LINE * 0.4;
+  // Divider sits exactly between the Sum/VAT row and the grand-total row,
+  // with a full LINE of breathing room on each side.
+  drawRule(y, 0.4, M_L + mm(80), colRight);
+  y -= LINE;
   drawTextRight(tI('pdf_grand_total') + ':', totalLabelX, y, monoBold, SIZE);
   drawTextRight(fmtMoney(totals.grand), cTotalRight, y, monoBold, SIZE);
   y -= LINE * 2;
@@ -498,7 +499,7 @@ async function renderInvoiceTypewriter(pdfDoc, ctx) {
   }
   // Intro
   if (intro) {
-    for (const ln of wrapText(intro, mono, SIZE_BODY, contentW)) { drawText(ln, M_L, y, mono, SIZE_BODY); y -= LINE_H; }
+    for (const ln of wrapText(intro, mono, 9, contentW)) { drawText(ln, M_L, y, mono, 9); y -= LINE_H * 0.85; }
     y -= LINE_H * 0.8;
   }
   // Category

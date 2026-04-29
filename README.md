@@ -29,13 +29,15 @@ carries machine-readable XML data per EN 16931 (ZUGFeRD 2.3 / Factur-X 1.0,
 Comfort profile) embedded inside it, making it compliant with German
 e-invoicing law (§14 UStG, in force since 2025) and valid as a Factur-X
 invoice for French customers. Three UI languages (German, English, French),
-five fonts, two layouts, per-language storage of default texts.
+five fonts, three layouts, per-language storage of default texts.
 
 ## Layouts
 
 - **Modern** large headline, generous whitespace, prominent total block
 - **DIN 5008** German business-letter standard with recipient address
   top-left (window-envelope compatible) and a 3-column footer
+- **Typewriter** centered two-column header (buyer left, seller right),
+  evenly-spaced meta row, single-line bank footer
 
 ## Quick start (no installation)
 
@@ -113,7 +115,8 @@ Five monospace fonts for the PDF (all embedded, all with proper Bold weight):
 ### Filename pattern
 On download the filename is generated from a token pattern. Default:
 `{nr}_{buyer}_{project}`. Tokens: `{nr}`, `{date}`, `{buyer}`, `{seller}`,
-`{project}`, `{category}`, {layout}. A live preview shows the resolved filename.
+`{project}`, `{category}`, `{layout}`. A live preview shows the resolved
+filename.
 
 ### XML validation
 The "Validate XML" button checks whether all EN 16931 mandatory fields
@@ -185,10 +188,11 @@ Hot-reload dev server.
 
 ## Example invoices
 
-Two PDFs built with this tool, both showing the same fictional invoice, one per layout:
+Three PDFs built with this tool, all showing the same fictional invoice, one per layout:
 
 - `example_modern.pdf` — Modern layout
 - `example_din5008.pdf` — DIN 5008 layout
+- `example_typewriter.pdf` — Typewriter layout
 
 ---
 

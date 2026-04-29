@@ -1,71 +1,34 @@
-## [1.2.0] — 2026-04-29
+## [1.2.1] — 2026-04-29
 
-This release adds a third invoice layout, completes the i18n sweep across
-the PDF renderers, and consolidates duplicated logic in `layouts.js` into
-shared helpers.
+Patch release: `README.md` catches up with the v1.2.0 layout additions,
+plus small visual fixes to the DIN 5008 totals block and the Typewriter
+intro paragraph.
 
 ### Added
 
-- **Typewriter layout.** A third option in the layout dropdown, alongside
-  Modern and DIN 5008. Centered monospace look with a two-column
-  buyer/seller header, a meta row (No. / Date / Service), and a
-  single-line bank footer.
-- **Two new i18n keys** (in `main.js`, used by `layouts.js`):
-  - `pdf_invoice_label` — `RECHNUNG` / `INVOICE` / `FACTURE`
-  - `pdf_vat_id_label` — `USt-IdNr.` / `VAT No.` / `N° TVA`
+- **`examples/example_typewriter.pdf`** alongside the existing Modern
+  and DIN 5008 examples. Modern and DIN 5008 example PDFs refreshed to
+  reflect the v1.2.0 visual changes.
 
 ### Changed
 
-- **PDF output now respects the invoice language across all layouts.**
-  Hardcoded German and English strings in the renderers were replaced with
-  i18n lookups:
-  - DIN 5008's `Rechnung` subject-fallback → `tI('pdf_invoice_label')`
-  - DIN 5008's `USt-IdNr.` (two places: info block, footer column) →
-    `tI('pdf_vat_id_label')`
-  - Modern's `INVOICE` top label → `tI('pdf_invoice_label')`
-  - Modern's `VAT` totals label → `tI('total_tax_S')`
-- **Data labels are now consistent across Modern and Typewriter.** All
-  inline labels in both layouts use the colon-separated form: `VAT: 123`,
-  `SIRET: 456`, `Ref: 789`, `IBAN: ...`, `BIC: ...`. Modern previously
-  rendered these without colons; Typewriter had an internal inconsistency
-  (`VAT No.:` for the seller, `VAT:` everywhere else) which is now
-  uniform `VAT:`.
-- **Bank-line separator unified.** Modern and Typewriter both use a
-  mid-dot (` · `) by default in `drawCenteredBankLine`. Typewriter
-  previously used hyphens (` - `).
-- **Address field order canonicalised** between Modern and Typewriter.
-  Both now use the same order: `line1, zip+city, country, [email,
-  phone], VAT, SIRET, [reference]`. Typewriter previously rendered SIRET
-  before VAT and phone before email.
-- **`layouts.js` deduplicated via three shared helpers:**
-  - `shrinkToFit(text, font, maxWidth, widthAt, start, min, step)` —
-    replaces four inline `while (widthAt(...) > max && size > floor)
-    size -= 0.25` loops in DIN 5008 and the Modern/Typewriter footers.
-  - `formatPartyAddress(party, cn, opts)` — builds the address line
-    array used by Modern and Typewriter from a single source.
-  - `drawCenteredBankLine(seller, kit, opts)` — wraps the
-    name/bank/IBAN/BIC join + auto-shrink + centered draw used by
-    Modern and Typewriter.
-- **DIN 5008 recipient block** rewritten as an array + loop instead of
-  four inline `if` statements. Postal-format logic (uppercase country
-  only when buyer is in a different country than seller) is preserved.
+- **`README.md`** updated to describe three layouts (was two), to add a
+  Typewriter entry to the layouts list, to format the `{layout}`
+  filename token consistently with the other tokens, and to add the
+  Typewriter example to the example-invoices section.
 
 ### Fixed
 
-- **Dead i18n fallbacks removed** from `layouts.js`. Three `||`
-  fallbacks (`tI('th_desc') || 'Beschreibung'` in DIN 5008,
-  `tI('th_desc') || 'Description'` in Modern, `tI('pdf_payment') ||
-  'PAYMENT'` in Modern) were unreachable since the corresponding keys
-  exist in all three languages after the v1.1.0 i18n sweep. They also
-  documented an old DE/EN inconsistency for `th_desc`.
-- **Indentation** of the `if (intro) { ... }` blocks in DIN 5008 and
-  Modern. Previously sat at zero indent inside the function body.
-
-### Removed
-
-- **Unused imports** from `layouts.js`: `rgb` (from `pdf-lib`) and
-  `countryName` (from `./main.js`). Renderers use `ctx.countryName`
-  via destructuring instead.
-- **Unused destructured variables** in all three renderers: `INK`,
-  `currency`, `due`. `currencySym` is kept (used in Typewriter's VAT
-  line).
+- **DIN 5008 totals divider** sat too close to the previous subtotal
+  row, visually pushing it against the grand-total text. Now sits
+  exactly one `LINE` below the subtotal/VAT row and one `LINE` above
+  the grand total, with adequate breathing room on both sides.
+- **DIN 5008 items-end rule** now spans the full content width
+  (parallel to the table's header rule) instead of the same short
+  range as the totals divider, restoring the visual hierarchy:
+  full-width rules frame the items table; a short rule sits inside
+  the totals block.
+- **Typewriter intro paragraph** now uses size 9 with `LINE_H × 0.85`
+  spacing, matching Modern and DIN 5008. Previously rendered at
+  `SIZE_BODY` (10.5) with full `LINE_H`, which looked oversized
+  relative to the other layouts.
