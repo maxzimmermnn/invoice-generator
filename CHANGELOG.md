@@ -1,110 +1,71 @@
-# Changelog
+## [1.2.0] — 2026-04-29
 
-All notable changes to this project are documented here.
-
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-
-## [Unreleased] — 2026-04-29
-
-This release covers the migration from a single inline-bundled HTML file to
-a Vite-based source layout, plus a code review pass over `index.html`,
-`styles.css`, and `main.js`.
+This release adds a third invoice layout, completes the i18n sweep across
+the PDF renderers, and consolidates duplicated logic in `layouts.js` into
+shared helpers.
 
 ### Added
 
-- **Build system: Vite + `vite-plugin-singlefile`.** Source is now split
-  across `src/index.html`, `src/styles.css`, `src/main.js`, `src/fonts.js`,
-  `src/utils.js`, and `src/layouts.js`. The production build still emits a
-  single self-contained HTML file, runnable offline.
-- **`pdf-lib`, `@pdf-lib/fontkit`, and `pako` are npm dependencies.**
-  Replaces the previously inlined UMD bundles in the HTML.
-- **Filename token `{layout}`.** Resolves to the currently-selected layout
-  key (e.g. `modern`). The filename preview updates live when the layout
-  dropdown changes. New i18n key `chip_layout` for de/en/fr.
-- **Print stylesheet.** `@media print` hides interactive controls (buttons,
-  toggles, drop zone, footer, status banner, line-item delete buttons) and
-  forces a clean black-on-white render of the form, with
-  `break-inside: avoid` on sections.
-- **Keyboard focus indicators.** `:focus-visible` outlines on buttons,
-  the theme toggle, the language select, footer link buttons, and the
-  number-pattern `<summary>`. Inputs/selects/textareas keep their existing
-  border-bottom focus style.
-- **i18n coverage for previously hardcoded strings (de/en/fr):**
-  - `xml_sepa_info`, `xml_payable_by` — XML output text (SEPA payment
-    description, due-date description) so non-German invoices stop
-    emitting German XML content.
-  - `err_no_number`, `err_no_date`, `err_no_seller_name`,
-    `err_no_buyer_name`, `err_no_items`, `err_country_required`,
-    `err_country_unknown`, `err_rc_seller_vat`, `err_rc_buyer_vat` —
-    validation errors thrown from `buildXML` and country normalization.
-  - `th_desc`, `th_qty`, `th_price`, `th_vat`, `aria_remove_item` —
-    line-item table column labels (visible on mobile via the
-    `data-label` CSS trick) and the remove-button aria-label.
+- **Typewriter layout.** A third option in the layout dropdown, alongside
+  Modern and DIN 5008. Centered monospace look with a two-column
+  buyer/seller header, a meta row (No. / Date / Service), and a
+  single-line bank footer.
+- **Two new i18n keys** (in `main.js`, used by `layouts.js`):
+  - `pdf_invoice_label` — `RECHNUNG` / `INVOICE` / `FACTURE`
+  - `pdf_vat_id_label` — `USt-IdNr.` / `VAT No.` / `N° TVA`
 
 ### Changed
 
-- **Bootstrap centralised in `async function init()`.** Replaces a mix of
-  scattered IIFEs, freestanding async loads, and a thenable without a
-  catch. Five ordered phases: render-blocking visual state → user-editable
-  defaults → layout dropdown → parallel `Promise.all` of persisted state →
-  invoice number autofill. Runs under a single `init().catch()` that flashes
-  errors via the status banner instead of swallowing them silently.
-- **Country normalization extracted to module top-level.**
-  `COUNTRY_ALIAS_MAP`, `normalizeCountry()`, and
-  `validateInvoiceForReverseCharge()` were declared inside `buildXML()`
-  due to mid-function indentation that hid the scoping. The frozen alias
-  map was being rebuilt on every invoice render. Now defined once at
-  module scope.
-- **`countryName()` consolidated into the country block** with a
-  module-level frozen `COUNTRY_NAMES` map. Previously lived next to
-  `makeDrawKit` at the bottom of the file.
-- **Storage key constants consolidated.** `THEME_KEY` lives next to
-  `LANG_KEY` and `INVOICE_LANG_KEY` at the top of the storage section.
-  The literal `'erechnung:theme'` previously sprinkled around now uses
-  the constant. The `store` wrapper has a comment explaining why theme
-  and language preferences read `localStorage` directly (sync needed at
-  init to avoid a flash of the wrong theme).
-- **Item IDs use `crypto.randomUUID()`.** Replaces
-  `Math.random().toString(36).slice(2, 9)`.
-- **`index.html`:**
-  - Version label corrected (`v2.0` → `v1.0`).
-  - `lang="en"` with English defaults for tag consistency.
-  - Meta description and Open Graph tags added.
-  - All inline `style="…"` attributes extracted into named CSS classes
-    (`.top-controls`, `.intro-line`, `.intro-line-last`,
-    `.input-with-action`, `.filename-chips`, `.filename-preview`,
-    `.hidden`, `.visually-hidden`).
-  - Two adjacent `<link>` tags split onto their own lines.
-- **`<noscript>` warning relocated** to the start of `<body>` with a
-  `noscript-warning` CSS class. Previously sat in `<head>` with an inline
-  style.
-- **CSS indentation normalized** to 2 spaces throughout `styles.css`
-  (was a mix of 2 and 4 due to the original `<style>` block being
-  embedded in HTML).
-- **`footer p` rules consolidated** to a single `:not(:last-child)`
-  selector.
+- **PDF output now respects the invoice language across all layouts.**
+  Hardcoded German and English strings in the renderers were replaced with
+  i18n lookups:
+  - DIN 5008's `Rechnung` subject-fallback → `tI('pdf_invoice_label')`
+  - DIN 5008's `USt-IdNr.` (two places: info block, footer column) →
+    `tI('pdf_vat_id_label')`
+  - Modern's `INVOICE` top label → `tI('pdf_invoice_label')`
+  - Modern's `VAT` totals label → `tI('total_tax_S')`
+- **Data labels are now consistent across Modern and Typewriter.** All
+  inline labels in both layouts use the colon-separated form: `VAT: 123`,
+  `SIRET: 456`, `Ref: 789`, `IBAN: ...`, `BIC: ...`. Modern previously
+  rendered these without colons; Typewriter had an internal inconsistency
+  (`VAT No.:` for the seller, `VAT:` everywhere else) which is now
+  uniform `VAT:`.
+- **Bank-line separator unified.** Modern and Typewriter both use a
+  mid-dot (` · `) by default in `drawCenteredBankLine`. Typewriter
+  previously used hyphens (` - `).
+- **Address field order canonicalised** between Modern and Typewriter.
+  Both now use the same order: `line1, zip+city, country, [email,
+  phone], VAT, SIRET, [reference]`. Typewriter previously rendered SIRET
+  before VAT and phone before email.
+- **`layouts.js` deduplicated via three shared helpers:**
+  - `shrinkToFit(text, font, maxWidth, widthAt, start, min, step)` —
+    replaces four inline `while (widthAt(...) > max && size > floor)
+    size -= 0.25` loops in DIN 5008 and the Modern/Typewriter footers.
+  - `formatPartyAddress(party, cn, opts)` — builds the address line
+    array used by Modern and Typewriter from a single source.
+  - `drawCenteredBankLine(seller, kit, opts)` — wraps the
+    name/bank/IBAN/BIC join + auto-shrink + centered draw used by
+    Modern and Typewriter.
+- **DIN 5008 recipient block** rewritten as an array + loop instead of
+  four inline `if` statements. Postal-format logic (uppercase country
+  only when buyer is in a different country than seller) is preserved.
 
 ### Fixed
 
-- **`buyer.siret` was silently dropped from XML output.** `buildXML()`
-  built its `buyer` object inline with seven fields, omitting `siret`,
-  even though `collectBuyer()` produces it and the XML template references
-  it. Replaced the inline literal with `const buyer = collectBuyer();`.
-- **Reverse-charge validation now correctly accepts SIRET as a fallback
-  for missing VAT ID.** Same root cause as the bug above — the buyer
-  passed into `validateInvoiceForReverseCharge` was missing `siret`, so
-  the `(!buyer.vat && !buyer.siret)` check effectively reduced to
-  `!buyer.vat`.
-- **1px layout shift when focusing a line-item cell.** `.items input,
-  .items select` now reserve a `border-bottom: 1px solid transparent;`
-  in the resting state, and focus only changes its color.
-- **Duplicate `clearDeliveryEnd` click listener removed.** Both fired on
-  every click.
-- **Triple-blank-line sequences collapsed** to single blank lines (a few
-  cropped up from earlier edits).
+- **Dead i18n fallbacks removed** from `layouts.js`. Three `||`
+  fallbacks (`tI('th_desc') || 'Beschreibung'` in DIN 5008,
+  `tI('th_desc') || 'Description'` in Modern, `tI('pdf_payment') ||
+  'PAYMENT'` in Modern) were unreachable since the corresponding keys
+  exist in all three languages after the v1.1.0 i18n sweep. They also
+  documented an old DE/EN inconsistency for `th_desc`.
+- **Indentation** of the `if (intro) { ... }` blocks in DIN 5008 and
+  Modern. Previously sat at zero indent inside the function body.
 
-### Notes for downstream
+### Removed
 
-If you have a saved filename pattern that uses `{layout}` already (you
-won't, this is a new token), it now resolves to the layout key. Existing
-patterns are unaffected.
+- **Unused imports** from `layouts.js`: `rgb` (from `pdf-lib`) and
+  `countryName` (from `./main.js`). Renderers use `ctx.countryName`
+  via destructuring instead.
+- **Unused destructured variables** in all three renderers: `INK`,
+  `currency`, `due`. `currencySym` is kept (used in Typewriter's VAT
+  line).
