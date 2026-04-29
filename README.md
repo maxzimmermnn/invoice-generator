@@ -29,7 +29,8 @@ carries machine-readable XML data per EN 16931 (ZUGFeRD 2.3 / Factur-X 1.0,
 Comfort profile) embedded inside it, making it compliant with German
 e-invoicing law (§14 UStG, in force since 2025) and valid as a Factur-X
 invoice for French customers. Three UI languages (German, English, French),
-five fonts, three layouts, per-language storage of default texts.
+five fonts, three layouts, per-language storage of default texts, an
+invoice history with cloning and a statistics view.
 
 ## Layouts
 
@@ -61,7 +62,9 @@ locally. A reset button clears everything.
 ### Customer database
 Add, select, delete customers. Selecting a saved customer fills all buyer
 fields. Buyer reference / Leitweg-ID is stored as BT-10 in the XML
-(required for German government clients).
+(required for German government clients). When you select a buyer the
+tool also shows the date and amount of the most recent invoice you sent
+them, so you have context without leaving the form.
 
 ### Invoice number with pattern
 Default pattern: `{yyyy}-{counter:5}` e.g. `2026-00042`. An internal
@@ -118,13 +121,47 @@ On download the filename is generated from a token pattern. Default:
 `{project}`, `{category}`, `{layout}`. A live preview shows the resolved
 filename.
 
+### Invoice history
+Each generated invoice is automatically saved to a local history (up to
+1000 entries, oldest dropped first). From the history dropdown you can:
+
+- **Clone** any past invoice back into the form — all fields including
+  the buyer, items, project, category, tax mode, language, font and
+  layout are restored. Date fields stay empty so you fill them
+  explicitly; the invoice number is auto-assigned to the next available
+  one.
+- **Delete entry** to remove a single record.
+- **Delete all** to clear the history with a confirmation prompt.
+- **Save invoices to history** toggle — when off, new invoices won't be
+  saved, but existing entries remain accessible.
+
+History is stored in `localStorage` like everything else and is included
+in the JSON backup export.
+
+### Statistics
+A **Statistics** button in the top bar opens a modal with a quick KPI
+overview computed from the history. For each currency separately
+(EUR / USD / GBP / CHF):
+
+- Gross total, net, VAT, average per invoice
+- A 12-month bar chart of monthly volume
+- Top 3 buyers with their share
+
+Period filter: last 30 days, last 3 months, current year, last 12
+months, all time.
+
+Multi-currency invoices are kept in separate blocks so amounts stay
+honest — no offline FX guesswork.
+
 ### XML validation
 The "Validate XML" button checks whether all EN 16931 mandatory fields
 are populated. "Download XML only" produces just the XML file, without a PDF.
 
 ### Backup
-Export / import the entire tool state as a JSON file. A migration path
-for older backup versions is built in.
+Export / import the entire tool state as a JSON file, including history.
+A migration path for older backup versions is built in (older backups
+without history are imported and the existing history is left
+untouched).
 
 ### Theme
 Light / dark / auto (follows OS preference).
@@ -151,8 +188,9 @@ Light / dark / auto (follows OS preference).
   all fonts and all UI assets are embedded into the built HTML file.
 - **No server component.** The file runs straight from the filesystem or
   from any static web server.
-- **Local data only**: All input is stored in `localStorage`. Backup export
-  produces a JSON file you download yourself — nothing is transmitted.
+- **Local data only**: All input — including the invoice history — is
+  stored in `localStorage`. Backup export produces a JSON file you
+  download yourself; nothing is transmitted.
 
 ---
 

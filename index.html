@@ -32,13 +32,16 @@
     <h1 data-i18n="title">E-Invoice Generator</h1>
     <div class="sub" data-i18n="subtitle">ZUGFeRD 2.3 · Factur-X · EN 16931 (Comfort)</div>
   </div>
-  <div class="top-controls">
+<div class="top-controls">
     <select id="langSelect" class="lang-select" aria-label="Language">
       <option value="en">EN</option>
       <option value="de">DE</option>
       <option value="fr">FR</option>
     </select>
     <button type="button" id="themeToggle" class="theme-toggle" title="Theme" aria-label="Theme"></button>
+    <button id="openStats" class="tiny-btn top-stats-btn" type="button" data-i18n-title="btn_open_stats" aria-label="Statistics">
+      <span aria-hidden="true">▤</span>
+    </button>
   </div>
 </header>
 
@@ -102,6 +105,7 @@
     <button class="tiny-btn" id="saveBuyer" type="button" data-i18n="btn_save_buyer"></button>
     <button class="tiny-btn" id="deleteBuyer" type="button" data-i18n="btn_delete_selected"></button>
   </div>
+  <div class="hint buyer-history-hint" id="buyerHistoryHint"></div>
   <div class="grid">
     <label class="full"><span data-i18n="f_company"></span>
       <input type="text" id="b_name">
@@ -130,6 +134,31 @@
     </label>
   </div>
 </section>
+
+
+<!-- HISTORY  -->
+
+<section class="block">
+  <h2 data-i18n="section_history"></h2>
+  <div class="hint" data-i18n="section_history_hint"></div>
+
+  <div class="input-with-action">
+    <select id="historyPicker">
+      <!-- Filled by renderHistoryPicker() -->
+    </select>
+    <button class="tiny-btn" id="historyClone" type="button" data-i18n="btn_history_clone"></button>
+  </div>
+
+  <div class="input-with-action history-bottom-row">
+    <label class="inline">
+      <input type="checkbox" id="historyEnable">
+      <span data-i18n="history_enable_label"></span>
+    </label>
+    <button class="tiny-btn" id="historyDelete" type="button" data-i18n="btn_history_delete"></button>
+    <button class="tiny-btn" id="historyClearAll" type="button" data-i18n="btn_history_clear_all"></button>
+  </div>
+</section>
+
 
 <!-- INVOICE -->
 <section class="block">
@@ -340,6 +369,33 @@
 </footer>
 
 </div>
+
+<div class="modal" id="statsModal" hidden>
+  <div class="modal-content">
+    <div class="modal-head">
+      <h2 data-i18n="stats_title"></h2>
+      <button id="statsClose" class="tiny-btn" type="button" data-i18n="stats_close"></button>
+    </div>
+
+    <div class="modal-controls">
+      <label class="inline">
+        <span data-i18n="stats_period_label"></span>
+          <select id="statsPeriod">
+            <option value="last_month" data-i18n="stats_period_last_month"></option>
+            <option value="last3"      data-i18n="stats_period_last3"></option>
+            <option value="ytd"        data-i18n="stats_period_ytd"></option>
+            <option value="last12"     data-i18n="stats_period_last12"></option>
+            <option value="all"        data-i18n="stats_period_all"></option>
+          </select>
+        </label>
+    </div>
+
+    <div id="statsBody" class="stats-body">
+      <!-- Filled by renderStatistics() -->
+    </div>
+  </div>
+</div>
+
 <script type="module" src="/src/main.js"></script>
 </body>
 </html>
