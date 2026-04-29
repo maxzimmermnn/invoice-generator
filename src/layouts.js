@@ -15,7 +15,7 @@ export const LAYOUTS = {
 async function renderInvoiceDIN5008(pdfDoc, ctx) {
   const kit = makeDrawKit(pdfDoc, ctx.fonts);
   const { mono, monoBold, INK, SOFT, PAGE_W, PAGE_H,
-          widthAt, wrapText, drawText, drawTextRight, drawRule } = kit;
+          widthAt, wrapText, drawText, drawTextRight, drawTextCenter, drawRule } = kit;
   const { seller, buyer, items, totals, mode, number, date, delivery, deliveryEnd, due,
           currency, currencySym, project, category, intro, paymentNote, greeting,
           signature, footnote, fmtDate, fmtMoney, countryName: cn, tInvoice: tI } = ctx;
@@ -189,7 +189,7 @@ if (category) { drawText(category, M_L, y, monoBold, SIZE); y -= LINE * 1.4; }
 async function renderInvoiceModern(pdfDoc, ctx) {
   const kit = makeDrawKit(pdfDoc, ctx.fonts);
   const { mono, monoBold, INK, SOFT, PAGE_W, PAGE_H,
-          widthAt, wrapText, drawText, drawTextRight, drawRule } = kit;
+          widthAt, wrapText, drawText, drawTextRight, drawTextCenter, drawRule } = kit;
   const { seller, buyer, items, totals, mode, number, date, delivery, deliveryEnd, due,
           currency, currencySym, project, category, intro, paymentNote, greeting,
           signature, footnote, fmtDate, fmtMoney, countryName: cn, tInvoice: tI } = ctx;
@@ -382,5 +382,5 @@ if (intro) {
   const bankLine = bankParts.join('  \u00b7  ');
   let bankSize = SIZE_TINY;
   while (widthAt(bankLine, mono, bankSize) > contentW && bankSize > 5) bankSize -= 0.25;
-  drawText(bankLine, M_L, footY, mono, bankSize, SOFT);
+  drawTextCenter(bankLine, footY, mono, bankSize, SOFT);
 }

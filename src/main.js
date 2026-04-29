@@ -10,8 +10,7 @@ import {
 import fontkit from '@pdf-lib/fontkit';
 import pako from 'pako';
 import { FONT_DATA } from './fonts.js';
-import { fmt, round2 } from './utils.js';
-
+import { fmt, fmtPDF, round2 } from './utils.js';
 
 // -------- State --------
 const STORAGE_KEY = 'erechnung:seller:v1';
@@ -30,15 +29,6 @@ const state = {
 
 // -------- Helpers --------
 const $ = (id) => document.getElementById(id);
-// PDF formatter without thousand separators, matching Max's invoice style ("1800,00" not "1.800,00")
-const fmtPDF = (n) => {
-  const v = Math.round(n * 100) / 100;
-  const sign = v < 0 ? '-' : '';
-  const abs = Math.abs(v);
-  const int = Math.floor(abs);
-  const dec = Math.round((abs - int) * 100);
-  return `${sign}${int},${String(dec).padStart(2, '0')}`;
-};
 const nz = (v, d = '') => (v === undefined || v === null) ? d : String(v);
 const esc = (s) => nz(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 const dateCompact = (iso) => iso ? iso.replace(/-/g, '') : '';
@@ -180,6 +170,7 @@ const I18N = {
     chip_date: 'Datum',
     chip_category: 'Kategorie',
     chip_seller: 'Verkäufer',
+    chip_layout: 'Layout',
     f_filename_pattern: 'Dateiname-Muster',
     // Footer
     footer_main: 'Format: ZUGFeRD 2.3 / Factur-X 1.0 · Profil: EN 16931 (Comfort) · Konform mit §14 UStG und deutscher E-Rechnungspflicht seit 2025. XML nach BT-Nummern der EN 16931. Validierung z.B. mit Quba-Viewer, Mustang oder ELSTER E-Rechnungsviewer.',
@@ -241,6 +232,23 @@ const I18N = {
     rc_note_Z: 'Steuersatz 0%.',
     rc_note_E: 'Umsatzsteuerbefreit.',
     rc_note_O: 'Nicht im Anwendungsbereich der Umsatzsteuer.',
+    // --- Errors / labels / XML output strings (added by review) ---
+    xml_sepa_info: 'SEPA-Überweisung',
+    xml_payable_by: 'Zahlbar bis {date}',
+    err_no_number: 'Rechnungsnummer fehlt.',
+    err_no_date: 'Rechnungsdatum fehlt.',
+    err_no_seller_name: 'Verkäufer-Name fehlt.',
+    err_no_buyer_name: 'Käufer-Name fehlt.',
+    err_no_items: 'Mindestens eine Position erforderlich.',
+    err_country_required: 'Land ist erforderlich (ISO-Code wie DE, FR, GB).',
+    err_country_unknown: 'Unbekanntes Land: "{input}". Bitte ISO 3166-1 alpha-2 verwenden (z.B. DE, FR, GB).',
+    err_rc_seller_vat: 'Reverse-Charge: Verkäufer benötigt eine USt-IdNr (oder Handelsregistereintragung / Steuervertreter).',
+    err_rc_buyer_vat: 'Reverse-Charge: Käufer benötigt eine USt-IdNr (oder Handelsregistereintragung).',
+    th_desc: 'Beschreibung',
+    th_qty: 'Menge',
+    th_price: 'Einzelpreis',
+    th_vat: 'MwSt %',
+    aria_remove_item: 'Position entfernen',
   },
   en: {
     title: 'E-Invoice Generator',
@@ -366,6 +374,7 @@ const I18N = {
     chip_date: 'Date',
     chip_category: 'Category',
     chip_seller: 'Seller',
+    chip_layout: 'Layout',
     f_filename_pattern: 'Filename pattern',
     footer_main: 'Format: ZUGFeRD 2.3 / Factur-X 1.0 · Profile: EN 16931 (Comfort) · Compliant with German e-invoicing law (§14 UStG, in force since 2025). XML follows EN 16931 BT numbering. Validate e.g. with Quba Viewer, Mustang, or ELSTER E-Rechnungsviewer.',
     footer_disclaimer: 'Free, vibe-coded tool. No warranty for correctness, completeness or legal compliance of generated documents. Use at your own risk. No liability for lost profit, damages or consequential damages from use. Always validate with a certified validator before production use, and consult a tax advisor when in doubt.',
@@ -423,6 +432,23 @@ const I18N = {
     rc_note_Z: 'VAT 0%.',
     rc_note_E: 'VAT exempt.',
     rc_note_O: 'Out of scope of VAT.',
+    // --- Errors / labels / XML output strings (added by review) ---
+    xml_sepa_info: 'SEPA credit transfer',
+    xml_payable_by: 'Payable by {date}',
+    err_no_number: 'Invoice number is missing.',
+    err_no_date: 'Invoice date is missing.',
+    err_no_seller_name: 'Seller name is missing.',
+    err_no_buyer_name: 'Buyer name is missing.',
+    err_no_items: 'At least one line item is required.',
+    err_country_required: 'Country is required (use ISO code like DE, FR, GB).',
+    err_country_unknown: 'Unknown country: "{input}". Use ISO 3166-1 alpha-2 (e.g. DE, FR, GB).',
+    err_rc_seller_vat: 'Reverse charge requires a Seller VAT ID (or legal registration / tax representative).',
+    err_rc_buyer_vat: 'Reverse charge requires a Buyer VAT ID (or legal registration ID).',
+    th_desc: 'Description',
+    th_qty: 'Qty',
+    th_price: 'Unit price',
+    th_vat: 'VAT %',
+    aria_remove_item: 'Remove item',
   },
   fr: {
     title: 'Générateur de factures',
@@ -548,6 +574,7 @@ const I18N = {
     chip_date: 'Date',
     chip_category: 'Catégorie',
     chip_seller: 'Vendeur',
+    chip_layout: 'Mise en page',
     f_filename_pattern: 'Modèle de nom de fichier',
     footer_main: 'Format : ZUGFeRD 2.3 / Factur-X 1.0 · Profil : EN 16931 (Comfort) · Conforme à la loi allemande sur la facture électronique (§14 UStG, en vigueur depuis 2025). XML suivant la numérotation BT de la EN 16931. Validation possible avec Quba Viewer, Mustang ou ELSTER E-Rechnungsviewer.',
     footer_disclaimer: 'Outil gratuit, vibecodé. Aucune garantie sur l\'exactitude, l\'exhaustivité ou la conformité légale des documents générés. Utilisation à vos propres risques. Aucune responsabilité pour pertes de profit, dommages ou dommages consécutifs résultant de l\'utilisation. Avant toute utilisation en production, valider avec un validateur certifié et consulter un conseiller fiscal en cas de doute.',
@@ -605,11 +632,29 @@ const I18N = {
     rc_note_Z: 'TVA 0%.',
     rc_note_E: 'Exonéré de TVA.',
     rc_note_O: 'Hors champ d\'application de la TVA.',
+    // --- Errors / labels / XML output strings (added by review) ---
+    xml_sepa_info: 'Virement SEPA',
+    xml_payable_by: 'À régler avant le {date}',
+    err_no_number: 'Numéro de facture manquant.',
+    err_no_date: 'Date de facture manquante.',
+    err_no_seller_name: 'Nom du vendeur manquant.',
+    err_no_buyer_name: 'Nom de l\'acheteur manquant.',
+    err_no_items: 'Au moins une ligne est requise.',
+    err_country_required: 'Pays requis (utilisez un code ISO tel que DE, FR, GB).',
+    err_country_unknown: 'Pays inconnu : « {input} ». Utilisez ISO 3166-1 alpha-2 (ex. DE, FR, GB).',
+    err_rc_seller_vat: 'Autoliquidation : le vendeur doit avoir un numéro de TVA (ou immatriculation légale / représentant fiscal).',
+    err_rc_buyer_vat: 'Autoliquidation : l\'acheteur doit avoir un numéro de TVA (ou immatriculation légale).',
+    th_desc: 'Description',
+    th_qty: 'Qté',
+    th_price: 'Prix unitaire',
+    th_vat: 'TVA %',
+    aria_remove_item: 'Supprimer la ligne',
   },
 };
 
 const LANG_KEY = 'erechnung:lang';
 const INVOICE_LANG_KEY = 'erechnung:invoice_lang';
+const THEME_KEY = 'erechnung:theme';
 let CURRENT_LANG = 'en';     // UI language
 let INVOICE_LANG = null;     // invoice output language; null = follow UI
 
@@ -673,7 +718,7 @@ function applyTranslations() {
   if (typeof renderItems === 'function') renderItems();
   if (typeof updateFilenamePreview === 'function') updateFilenamePreview();
   // re-apply theme so its title gets re-translated
-  if (typeof applyTheme === 'function') applyTheme(localStorage.getItem('erechnung:theme'));
+  if (typeof applyTheme === 'function') applyTheme(localStorage.getItem(THEME_KEY));
   if (typeof updateSuggestNumberChipPreview === 'function') updateSuggestNumberChipPreview();
 }
 
@@ -708,6 +753,12 @@ CURRENT_LANG = detectLang();
 INVOICE_LANG = detectInvoiceLang();
 
 // -------- Storage helpers (localStorage primary, Anthropic window.storage as fallback) --------
+// Used for application data (seller profile, buyers, footnotes, settings).
+//
+// Note: theme and language preferences (THEME_KEY, LANG_KEY, INVOICE_LANG_KEY)
+// are read directly with `localStorage.getItem(...)` at init time. They need a
+// synchronous answer before the first render to avoid a flash of the wrong
+// theme/language; `store.get` is async because of the window.storage fallback.
 const store = {
   async get(key) {
     try {
@@ -1047,6 +1098,7 @@ function resolveFilenamePattern(pattern) {
     '{date}':     $('r_date').value ? $('r_date').value.replace(/-/g, '') : '',
     '{category}': $('r_category').value.trim(),
     '{seller}':   $('s_name').value.trim(),
+    '{layout}':   $('invoiceLayoutSelect').value,
     // Backwards compatibility for legacy German tokens in saved patterns
     '{projekt}':   $('r_project').value.trim(),
     '{kunde}':     $('b_name').value.trim(),
@@ -1146,7 +1198,7 @@ async function deleteFootnote() {
 // -------- Items --------
 function addItem(data = {}) {
   const item = {
-    id: Math.random().toString(36).slice(2, 9),
+    id: crypto.randomUUID(),
     desc: data.desc || '',
     qty: data.qty ?? 1,
     unit: data.unit || 'C62',
@@ -1167,20 +1219,20 @@ function renderItems() {
     row.className = 'row';
     row.dataset.id = it.id;
     row.innerHTML = `
-      <div class="cell desc" data-label="Beschreibung">
+      <div class="cell desc" data-label="${esc(t('th_desc'))}">
         <input type="text" data-k="desc" value="${esc(it.desc)}" placeholder="${esc(t('item_placeholder'))}">
       </div>
-      <div class="cell num" data-label="Menge">
+      <div class="cell num" data-label="${esc(t('th_qty'))}">
         <input type="number" step="0.01" data-k="qty" value="${it.qty}">
       </div>
-      <div class="cell num" data-label="Einzelpreis">
+      <div class="cell num" data-label="${esc(t('th_price'))}">
         <input type="number" step="0.01" data-k="price" value="${it.price}">
       </div>
-      <div class="cell num" data-label="MwSt %">
+      <div class="cell num" data-label="${esc(t('th_vat'))}">
         <input type="number" step="0.1" data-k="vat" value="${it.vat}">
       </div>
       <div class="cell">
-        <button class="remove" data-remove aria-label="entfernen">×</button>
+        <button class="remove" data-remove aria-label="${esc(t('aria_remove_item'))}">×</button>
       </div>
     `;
     container.appendChild(row);
@@ -1247,51 +1299,10 @@ function setFile(f) {
   $('fname').textContent = f.name;
 }
 
-// -------- XML generation (Factur-X EN 16931 / Comfort) --------
-function buildXML() {
-  const seller = collectSeller();
-  const buyer = {
-    name: $('b_name').value.trim(),
-    line1: $('b_line1').value.trim(),
-    zip: $('b_zip').value.trim(),
-    city: $('b_city').value.trim(),
-    country: $('b_country').value.trim().toUpperCase(),
-    vat: $('b_vat').value.trim(),
-    reference: $('b_reference').value.trim(),
-  };
-  const number = $('r_number').value.trim();
-  const date = $('r_date').value;
-  const delivery = $('r_delivery').value || date;
-  const deliveryEnd = $('r_delivery_end').value;
-  const due = $('r_due').value;
-  const currency = $('r_currency').value;
-  const mode = $('r_taxmode').value;
-  const note = $('r_note').value.trim();
-
-  if (!number) throw new Error('Rechnungsnummer fehlt.');
-  if (!date) throw new Error('Rechnungsdatum fehlt.');
-  if (!seller.name) throw new Error('Verkäufer-Name fehlt.');
-  if (!buyer.name) throw new Error('Käufer-Name fehlt.');
-  if (state.items.length === 0) throw new Error('Mindestens eine Position erforderlich.');
-
-  const totals = calcTotals();
-
-  // Group items by VAT rate for tax breakdown
-  const taxGroups = {};
-  for (const it of state.items) {
-    const rate = mode === 'S' ? (Number(it.vat) || 0) : 0;
-    const key = rate.toFixed(2);
-    if (!taxGroups[key]) taxGroups[key] = { rate, basis: 0, amount: 0 };
-    const line = round2((Number(it.qty) || 0) * (Number(it.price) || 0));
-    taxGroups[key].basis = round2(taxGroups[key].basis + line);
-    if (mode === 'S') taxGroups[key].amount = round2(taxGroups[key].amount + line * rate / 100);
-  }
-
-  const reverseChargeNote = mode === 'S' ? '' : tInvoice('rc_note' + (mode === 'AE' ? '' : '_' + mode));
-
-  const guidelineID = 'urn:cen.eu:en16931:2017';
-
-  // -------- Country normalization (ISO 3166-1 alpha-2) --------
+// -------- Country normalization (ISO 3166-1 alpha-2) --------
+// Originally declared inside buildXML(), which meant the alias map was
+// rebuilt and re-frozen on every invoice render. They have no closure
+// dependencies, so they live here at module scope.
 const COUNTRY_ALIAS_MAP = Object.freeze({
   "ALLEMAGNE":"DE","AMERICA":"US","AMERIKA":"US","AT":"AT","AU":"AU",
   "AUSTRALIA":"AU","AUSTRALIE":"AU","AUSTRALIEN":"AU","AUSTRIA":"AT",
@@ -1346,13 +1357,27 @@ const COUNTRY_ALIAS_MAP = Object.freeze({
 
 function normalizeCountry(input) {
   if (!input || typeof input !== 'string') {
-    throw new Error('Country is required (use ISO code like DE, FR, GB)');
+    throw new Error(t('err_country_required'));
   }
   const key = input.trim().toUpperCase().replace(/\s+/g, ' ').replace(/\.$/, '');
   if (key in COUNTRY_ALIAS_MAP) return COUNTRY_ALIAS_MAP[key];
   // Fall through: any unknown 2-letter uppercase code (e.g. exotic ISO codes)
   if (/^[A-Z]{2}$/.test(key)) return key;
-  throw new Error(`Unknown country: "${input}". Use ISO 3166-1 alpha-2 (e.g. DE, FR, GB).`);
+  throw new Error(t('err_country_unknown', { input }));
+}
+
+// ISO code -> human-readable English name. Used by layout renderers to print
+// "Germany" rather than "DE" on invoices. Falls back to the input if unknown.
+const COUNTRY_NAMES = Object.freeze({
+  DE: 'Germany', FR: 'France', AT: 'Austria', CH: 'Switzerland',
+  IT: 'Italy', ES: 'Spain', NL: 'Netherlands', BE: 'Belgium',
+  GB: 'United Kingdom', US: 'United States', LU: 'Luxembourg',
+  DK: 'Denmark', SE: 'Sweden', NO: 'Norway', FI: 'Finland',
+  PL: 'Poland', CZ: 'Czech Republic', PT: 'Portugal', IE: 'Ireland',
+});
+
+export function countryName(code) {
+  return COUNTRY_NAMES[code?.toUpperCase()] || code;
 }
 
 // Validates business rules that depend on tax categories
@@ -1362,13 +1387,49 @@ function validateInvoiceForReverseCharge(seller, buyer, itemsXML, taxBreakdownXM
   if (!usesReverseCharge) return;
   // BR-AE-02: Seller side
   if (!seller.vat && !seller.siret) {
-    throw new Error('Reverse charge requires a Seller VAT ID (or legal registration / tax representative).');
+    throw new Error(t('err_rc_seller_vat'));
   }
   // BR-AE-02: Buyer side
   if (!buyer.vat && !buyer.siret) {
-    throw new Error('Reverse charge requires a Buyer VAT ID (or legal registration ID).');
+    throw new Error(t('err_rc_buyer_vat'));
   }
 }
+
+// -------- XML generation (Factur-X EN 16931 / Comfort) --------
+function buildXML() {
+  const seller = collectSeller();
+  const buyer = collectBuyer();
+  const number = $('r_number').value.trim();
+  const date = $('r_date').value;
+  const delivery = $('r_delivery').value || date;
+  const deliveryEnd = $('r_delivery_end').value;
+  const due = $('r_due').value;
+  const currency = $('r_currency').value;
+  const mode = $('r_taxmode').value;
+  const note = $('r_note').value.trim();
+
+  if (!number) throw new Error(t('err_no_number'));
+  if (!date) throw new Error(t('err_no_date'));
+  if (!seller.name) throw new Error(t('err_no_seller_name'));
+  if (!buyer.name) throw new Error(t('err_no_buyer_name'));
+  if (state.items.length === 0) throw new Error(t('err_no_items'));
+
+  const totals = calcTotals();
+
+  // Group items by VAT rate for tax breakdown
+  const taxGroups = {};
+  for (const it of state.items) {
+    const rate = mode === 'S' ? (Number(it.vat) || 0) : 0;
+    const key = rate.toFixed(2);
+    if (!taxGroups[key]) taxGroups[key] = { rate, basis: 0, amount: 0 };
+    const line = round2((Number(it.qty) || 0) * (Number(it.price) || 0));
+    taxGroups[key].basis = round2(taxGroups[key].basis + line);
+    if (mode === 'S') taxGroups[key].amount = round2(taxGroups[key].amount + line * rate / 100);
+  }
+
+  const reverseChargeNote = mode === 'S' ? '' : tInvoice('rc_note' + (mode === 'AE' ? '' : '_' + mode));
+
+  const guidelineID = 'urn:cen.eu:en16931:2017';
 
   // Build line items XML
   const itemsXML = state.items.map((it, i) => {
@@ -1426,7 +1487,7 @@ function validateInvoiceForReverseCharge(seller, buyer, itemsXML, taxBreakdownXM
   const paymentMeansXML = seller.iban ? `
       <ram:SpecifiedTradeSettlementPaymentMeans>
         <ram:TypeCode>58</ram:TypeCode>
-        <ram:Information>SEPA-Überweisung</ram:Information>
+        <ram:Information>${esc(tInvoice('xml_sepa_info'))}</ram:Information>
         <ram:PayeePartyCreditorFinancialAccount>
           <ram:IBANID>${esc(seller.iban)}</ram:IBANID>
           ${seller.bank ? `<ram:AccountName>${esc(seller.bank)}</ram:AccountName>` : ''}
@@ -1528,7 +1589,7 @@ function validateInvoiceForReverseCharge(seller, buyer, itemsXML, taxBreakdownXM
       </ram:BillingSpecifiedPeriod>` : ''}
       ${due ? `
       <ram:SpecifiedTradePaymentTerms>
-        <ram:Description>Zahlbar bis ${esc(due)}</ram:Description>
+        <ram:Description>${esc(tInvoice('xml_payable_by', { date: due }))}</ram:Description>
         <ram:DueDateDateTime>
           <udt:DateTimeString format="102">${dateCompact(due)}</udt:DateTimeString>
         </ram:DueDateDateTime>
@@ -1867,18 +1928,6 @@ export function makeDrawKit(pdfDoc, fonts, opts = {}) {
     widthAt, wrapText, drawText, drawTextRight, drawTextCenter, drawRule };
 }
 
-// Simple country code to name mapping for common cases
-export function countryName(code) {
-  const map = {
-    DE: 'Germany', FR: 'France', AT: 'Austria', CH: 'Switzerland',
-    IT: 'Italy', ES: 'Spain', NL: 'Netherlands', BE: 'Belgium',
-    GB: 'United Kingdom', US: 'United States', LU: 'Luxembourg',
-    DK: 'Denmark', SE: 'Sweden', NO: 'Norway', FI: 'Finland',
-    PL: 'Poland', CZ: 'Czech Republic', PT: 'Portugal', IE: 'Ireland',
-  };
-  return map[code?.toUpperCase()] || code;
-}
-
 // -------- PDF/A: sRGB ICC profile (IEC61966-2.1, 588 bytes) --------
 const SRGB_ICC_PROFILE_B64 =
   'AAACTGxjbXMEQAAAbW50clJHQiBYWVogB+oABAAcABEAHwAkYWNzcEFQUEwAAAAAAAAAAAAAAAAA' +
@@ -2182,10 +2231,6 @@ $('buyerPicker').addEventListener('change', (e) => {
 $('saveBuyer').addEventListener('click', saveBuyer);
 $('deleteBuyer').addEventListener('click', deleteBuyer);
 
-$('clearDeliveryEnd').addEventListener('click', () => {
-  $('r_delivery_end').value = '';
-});
-
 $('r_delivery_end').addEventListener('change', () => {
   const start = $('r_delivery').value;
   const end = $('r_delivery_end').value;
@@ -2207,7 +2252,6 @@ $('r_delivery').addEventListener('change', () => {
     $('r_delivery_end').value = '';
   }
 });
-
 
 // Backup events
 $('btnExport').addEventListener('click', exportData);
@@ -2296,9 +2340,8 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
     const mode = btn.dataset.mode;
     state.outputMode = mode;
     document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b === btn));
-    $('mode-generate').style.display = mode === 'generate' ? '' : 'none';
-    $('mode-upload').style.display = mode === 'upload' ? '' : 'none';
-  });
+$('mode-generate').classList.toggle('hidden', mode !== 'generate');
+$('mode-upload').classList.toggle('hidden', mode !== 'upload');  });
 });
 
 // Due-date quick-set chips: add N days to invoice date (or today if not set)
@@ -2323,7 +2366,6 @@ import { LAYOUTS, DEFAULT_LAYOUT } from './layouts.js';
 // === INVOICE LAYOUT END ===
 
 // Theme toggle: auto → light → dark → auto
-const THEME_KEY = 'erechnung:theme';
 function applyTheme(pref) {
   // pref: null = auto, 'light', 'dark'
   const isDark = pref === 'dark' || (pref === null && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -2348,47 +2390,64 @@ $('themeToggle').addEventListener('click', () => {
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
   if (!localStorage.getItem(THEME_KEY)) applyTheme(null);
 });
-applyTheme(localStorage.getItem(THEME_KEY));
 
 // Language switcher
-$('langSelect').value = CURRENT_LANG;
 $('langSelect').addEventListener('change', (e) => setLang(e.target.value));
 
 // Invoice output language — independent of UI
-$('invoiceLangSelect').value = INVOICE_LANG || '';
 $('invoiceLangSelect').addEventListener('change', (e) => setInvoiceLang(e.target.value));
 
 // Invoice font selector
-(async () => {
-  $('invoiceFontSelect').value = await getCurrentFontKey();
-})();
 $('invoiceFontSelect').addEventListener('change', async (e) => {
   await store.set(FONT_KEY, e.target.value);
 });
 
-// Invoice layout selector — populated from LAYOUTS map at runtime
-(async () => {
-  const sel = $('invoiceLayoutSelect');
-  sel.innerHTML = Object.entries(LAYOUTS)
-    .map(([k, v]) => `<option value="${esc(k)}">${esc(v.label)}</option>`)
-    .join('');
-  sel.value = await getCurrentLayout();
-})();
+// Invoice layout selector
 $('invoiceLayoutSelect').addEventListener('change', async (e) => {
   await store.set(LAYOUT_KEY, e.target.value);
+  updateFilenamePreview();
 });
-applyTranslations();
 
-// default date = today
-$('r_date').value = new Date().toISOString().slice(0, 10);
 
-// seed with one item
-addItem({ desc: '', qty: 1, price: 0, vat: 20 });
+// -------- Bootstrap --------
+// One place that wires up async startup work, in a defined order, with a
+// single error path. Everything that needs to be ready before the user
+// touches the UI happens here.
+async function init() {
+  // 1. Render-blocking visual state (no flash of wrong theme/language).
+  applyTheme(localStorage.getItem(THEME_KEY));
+  $('langSelect').value = CURRENT_LANG;
+  $('invoiceLangSelect').value = INVOICE_LANG || '';
+  applyTranslations();
 
-loadSeller();
-loadBuyers();
-loadFootnotes();
-loadFilenamePattern();
-updateSuggestNumberChipPreview();
-// Auto-fill invoice number on load if empty
-applyNextInvoiceNumber().then(() => updateFilenamePreview());
+  // 2. Defaults the user can immediately edit.
+  $('r_date').value = new Date().toISOString().slice(0, 10);
+  addItem({ desc: '', qty: 1, price: 0, vat: 20 });
+
+  // 3. Populate the layout dropdown (its options come from LAYOUTS at runtime).
+  const layoutSel = $('invoiceLayoutSelect');
+  layoutSel.innerHTML = Object.entries(LAYOUTS)
+    .map(([k, v]) => `<option value="${esc(k)}">${esc(v.label)}</option>`)
+    .join('');
+
+  // 4. Load persisted state in parallel — these are independent of each other.
+  await Promise.all([
+    loadSeller(),
+    loadBuyers(),
+    loadFootnotes(),
+    loadFilenamePattern(),
+    updateSuggestNumberChipPreview(),
+    (async () => { $('invoiceFontSelect').value = await getCurrentFontKey(); })(),
+    (async () => { layoutSel.value = await getCurrentLayout(); })(),
+  ]);
+
+  // 5. Auto-fill the invoice number if the field is still empty, then refresh
+  //    the filename preview (which depends on the number).
+  await applyNextInvoiceNumber();
+  updateFilenamePreview();
+}
+
+init().catch(err => {
+  console.error('Init failed:', err);
+  flash(t('msg_error') + ' ' + (err && err.message ? err.message : err), 'err');
+});
