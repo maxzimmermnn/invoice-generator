@@ -30,7 +30,8 @@ Comfort profile) embedded inside it, making it compliant with German
 e-invoicing law (§14 UStG, in force since 2025) and valid as a Factur-X
 invoice for French customers. Three UI languages (German, English, French),
 five fonts, three layouts, per-language storage of default texts, an
-invoice history with cloning and a statistics view.
+invoice history with cloning (and the option to backfill older invoices
+manually) plus a statistics view.
 
 ## Layouts
 
@@ -134,6 +135,11 @@ Each generated invoice is automatically saved to a local history (up to
 - **Delete all** to clear the history with a confirmation prompt.
 - **Save invoices to history** toggle. When off, new invoices won't be
   saved, but existing entries remain accessible.
+- **Add past invoice** to backfill older invoices that were generated
+  elsewhere, so the statistics view can cover a complete period. A
+  small form captures the minimum fields (date, buyer, total,
+  currency, tax mode); these entries are flagged as manual in the
+  picker. Cloning works partially since only basic fields are kept.
 
 History is stored in `localStorage` like everything else and is included
 in the JSON backup export.

@@ -209,7 +209,6 @@ const I18N = {
     msg_backup_seller: 'Verkäufer-Profil',
     msg_backup_buyers: 'Kunde(n)',
     msg_backup_footnotes: 'Fußnote(n)',
-    msg_backup_history: 'Verlaufseintrag/-einträge',
     msg_backup_import_done: 'Backup eingelesen:',
     msg_backup_import_confirm: 'Backup einlesen?\n\nEnthält: {seller} Verkäufer-Profil, {buyers} Kunde(n), {footnotes} Fußnote(n).\n\nAchtung: bestehende gespeicherte Daten werden überschrieben.',
     msg_backup_invalid: 'Datei ist kein E-Rechnung-Backup.',
@@ -272,13 +271,34 @@ const I18N = {
     msg_history_deleted: 'Eintrag gelöscht.',
     msg_history_no_select: 'Keinen Verlaufseintrag ausgewählt.',
     msg_history_cleared: 'Verlauf geleert.',
+    // --- Past invoice entry ---
+    btn_history_add_past: 'Alte Rechnung hinzufügen',
+    past_modal_title: 'Alte Rechnung hinzufügen',
+    past_modal_hint: 'Manuell erfasste Rechnungen erscheinen im Verlauf und in der Statistik. Klonen funktioniert eingeschränkt, da nur Grunddaten erfasst werden.',
+    past_field_date: 'Rechnungsdatum',
+    past_field_buyer: 'Käufer',
+    past_field_buyer_select: 'Aus Kunden wählen…',
+    past_field_buyer_new: 'Oder neuen Namen eingeben',
+    past_field_total: 'Gesamtbetrag (brutto)',
+    past_field_currency: 'Währung',
+    past_field_taxmode: 'Steuermodus',
+    past_field_vat_rate: 'USt-Satz (%)',
+    past_field_number: 'Rechnungsnr. (optional)',
+    past_field_project: 'Projekt (optional)',
+    past_field_category: 'Kategorie (optional)',
+    past_save: 'Hinzufügen',
+    past_cancel: 'Abbrechen',
+    past_err_no_buyer: 'Käufer-Name fehlt.',
+    past_err_no_total: 'Gesamtbetrag muss positiv sein.',
+    past_err_no_date: 'Rechnungsdatum fehlt.',
+    msg_history_added: 'Im Verlauf gespeichert.',
+    msg_history_clone_partial: 'Geklont – einige Felder leer (manueller Eintrag).',
+    history_imported_marker: 'manuell',
     // --- Statistics + buyer history hint ---
     btn_open_stats: 'Statistik',
     stats_title: 'Statistik',
     stats_close: 'Schließen',
     stats_period_label: 'Zeitraum',
-    stats_period_last_month: 'Letzte 30 Tage',
-    stats_period_last3: 'Letzte 3 Monate',
     stats_period_ytd: 'Aktuelles Jahr',
     stats_period_last12: 'Letzte 12 Monate',
     stats_period_all: 'Alles',
@@ -453,7 +473,6 @@ const I18N = {
     msg_backup_seller: 'seller profile',
     msg_backup_buyers: 'customer(s)',
     msg_backup_footnotes: 'footnote(s)',
-    msg_backup_history: 'history entry/entries',
     msg_backup_import_done: 'Backup imported:',
     msg_backup_import_confirm: 'Import backup?\n\nContains: {seller} seller profile, {buyers} customer(s), {footnotes} footnote(s).\n\nWarning: existing saved data will be overwritten.',
     msg_backup_invalid: 'File is not an e-invoice backup.',
@@ -514,13 +533,34 @@ const I18N = {
     msg_history_deleted: 'Entry deleted.',
     msg_history_no_select: 'No history entry selected.',
     msg_history_cleared: 'History cleared.',
+    // --- Past invoice entry ---
+    btn_history_add_past: 'Add past invoice',
+    past_modal_title: 'Add past invoice',
+    past_modal_hint: 'Manually entered invoices appear in history and statistics. Cloning works partially since only basic fields are captured.',
+    past_field_date: 'Invoice date',
+    past_field_buyer: 'Buyer',
+    past_field_buyer_select: 'Pick from customers…',
+    past_field_buyer_new: 'Or enter a new name',
+    past_field_total: 'Total (gross)',
+    past_field_currency: 'Currency',
+    past_field_taxmode: 'Tax mode',
+    past_field_vat_rate: 'VAT rate (%)',
+    past_field_number: 'Invoice no. (optional)',
+    past_field_project: 'Project (optional)',
+    past_field_category: 'Category (optional)',
+    past_save: 'Add',
+    past_cancel: 'Cancel',
+    past_err_no_buyer: 'Buyer name is missing.',
+    past_err_no_total: 'Total must be a positive number.',
+    past_err_no_date: 'Invoice date is missing.',
+    msg_history_added: 'Saved to history.',
+    msg_history_clone_partial: 'Cloned with partial data (manual entry).',
+    history_imported_marker: 'manual',
     // --- Statistics + buyer history hint ---
     btn_open_stats: 'Statistics',
     stats_title: 'Statistics',
     stats_close: 'Close',
     stats_period_label: 'Period',
-    stats_period_last_month: 'Last 30 days',
-    stats_period_last3: 'Last 3 months',
     stats_period_ytd: 'This year',
     stats_period_last12: 'Last 12 months',
     stats_period_all: 'All time',
@@ -695,7 +735,6 @@ const I18N = {
     msg_backup_seller: 'profil vendeur',
     msg_backup_buyers: 'client(s)',
     msg_backup_footnotes: 'note(s)',
-    msg_backup_history: 'entrée(s) d\'historique',
     msg_backup_import_done: 'Sauvegarde importée :',
     msg_backup_import_confirm: 'Importer la sauvegarde ?\n\nContient : {seller} profil vendeur, {buyers} client(s), {footnotes} note(s).\n\nAttention : les données existantes seront écrasées.',
     msg_backup_invalid: 'Le fichier n\'est pas une sauvegarde de l\'outil.',
@@ -756,13 +795,34 @@ const I18N = {
     msg_history_deleted: 'Entrée supprimée.',
     msg_history_no_select: 'Aucune entrée de l\'historique sélectionnée.',
     msg_history_cleared: 'Historique effacé.',
+    // --- Past invoice entry ---
+    btn_history_add_past: 'Ajouter ancienne facture',
+    past_modal_title: 'Ajouter ancienne facture',
+    past_modal_hint: 'Les factures saisies manuellement apparaissent dans l\'historique et les statistiques. Le clonage fonctionne partiellement car seuls les champs de base sont saisis.',
+    past_field_date: 'Date de facture',
+    past_field_buyer: 'Acheteur',
+    past_field_buyer_select: 'Choisir parmi les clients…',
+    past_field_buyer_new: 'Ou saisir un nouveau nom',
+    past_field_total: 'Total (TTC)',
+    past_field_currency: 'Devise',
+    past_field_taxmode: 'Mode de TVA',
+    past_field_vat_rate: 'Taux de TVA (%)',
+    past_field_number: 'N° de facture (facultatif)',
+    past_field_project: 'Projet (facultatif)',
+    past_field_category: 'Catégorie (facultatif)',
+    past_save: 'Ajouter',
+    past_cancel: 'Annuler',
+    past_err_no_buyer: 'Nom de l\'acheteur manquant.',
+    past_err_no_total: 'Le total doit être un nombre positif.',
+    past_err_no_date: 'Date de facture manquante.',
+    msg_history_added: 'Enregistré dans l\'historique.',
+    msg_history_clone_partial: 'Cloné avec données partielles (saisie manuelle).',
+    history_imported_marker: 'manuel',
     // --- Statistics + buyer history hint ---
     btn_open_stats: 'Statistiques',
     stats_title: 'Statistiques',
     stats_close: 'Fermer',
     stats_period_label: 'Période',
-    stats_period_last_month: '30 derniers jours',
-    stats_period_last3: '3 derniers mois',
     stats_period_ytd: 'Cette année',
     stats_period_last12: '12 derniers mois',
     stats_period_all: 'Tout',
@@ -853,12 +913,6 @@ function applyTranslations() {
   // re-apply theme so its title gets re-translated
   if (typeof applyTheme === 'function') applyTheme(localStorage.getItem(THEME_KEY));
   if (typeof updateSuggestNumberChipPreview === 'function') updateSuggestNumberChipPreview();
-  // If the stats modal is currently open, re-render its dynamic body so the
-  // KPI labels, period chips, and chart month abbreviations update too.
-  const sm = document.getElementById('statsModal');
-  if (sm && sm.classList.contains('open') && typeof renderStatistics === 'function') {
-    renderStatistics();
-  }
 }
 
 function setLang(lang) {
@@ -1457,6 +1511,7 @@ function renderHistoryPicker() {
       e.buyerName || '—',
       formatTotal(e.total, e.currency),
     ];
+    if (e.imported) parts.push(`(${t('history_imported_marker')})`);
     opts.push(`<option value="${i}">${esc(parts.join(' · '))}</option>`);
   }
   picker.innerHTML = opts.join('');
@@ -1522,7 +1577,7 @@ async function cloneFromHistory() {
   calcTotals();
   updateFilenamePreview();
   updateBuyerHistoryHint();
-  flash(t('msg_history_cloned'), 'ok');
+  flash(snap.imported ? t('msg_history_clone_partial') : t('msg_history_cloned'), 'ok');
 }
 
 async function deleteHistoryEntry() {
@@ -1547,6 +1602,133 @@ async function clearAllHistory() {
   flash(t('msg_history_cleared'), 'ok');
 }
 
+// -------- Past invoice entry (manual) --------
+// Lets a user add invoices to history that weren't generated by this tool
+// (e.g. older invoices created before adopting the tool, so statistics can
+// cover the full year). Snapshots are flagged with `imported: true` and
+// carry only the minimal fields needed for statistics + a partial clone.
+
+function openPastInvoiceModal() {
+  const modal = $('pastInvoiceModal');
+  if (!modal) return;
+
+  // Pre-fill defaults
+  $('past_date').value = new Date().toISOString().slice(0, 10);
+  $('past_buyer_text').value = '';
+  $('past_total').value = '';
+  $('past_currency').value = $('r_currency').value || 'EUR';
+  $('past_taxmode').value = $('r_taxmode').value || 'S';
+  $('past_vat_rate').value = '20';
+  $('past_number').value = '';
+  $('past_project').value = '';
+  $('past_category').value = '';
+
+  // Populate buyer dropdown from existing customers
+  const buyerSel = $('past_buyer_select');
+  const placeholder = t('past_field_buyer_select');
+  const opts = [`<option value="">${esc(placeholder)}</option>`];
+  for (let i = 0; i < state.buyers.length; i++) {
+    opts.push(`<option value="${i}">${esc(state.buyers[i].name || '—')}</option>`);
+  }
+  buyerSel.innerHTML = opts.join('');
+  buyerSel.value = '';
+
+  togglePastVatRateVisibility();
+
+  modal.classList.add('open');
+  modal.removeAttribute('hidden');
+}
+
+function closePastInvoiceModal() {
+  const modal = $('pastInvoiceModal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.setAttribute('hidden', '');
+}
+
+// Show/hide the VAT rate field based on tax mode (only relevant for 'S').
+function togglePastVatRateVisibility() {
+  const mode = $('past_taxmode').value;
+  const wrap = $('past_vat_rate_wrap');
+  if (!wrap) return;
+  wrap.style.display = mode === 'S' ? '' : 'none';
+}
+
+// Apply selected customer name into the free-text buyer field.
+function applyPastBuyerSelection() {
+  const idx = $('past_buyer_select').value;
+  if (idx === '' || !state.buyers[idx]) return;
+  $('past_buyer_text').value = state.buyers[idx].name || '';
+}
+
+async function savePastInvoice() {
+  const date = $('past_date').value;
+  const buyerName = $('past_buyer_text').value.trim();
+  const total = Number($('past_total').value);
+  const currency = $('past_currency').value || 'EUR';
+  const taxmode = $('past_taxmode').value;
+  const vatRate = taxmode === 'S' ? (Number($('past_vat_rate').value) || 0) : 0;
+  const number = $('past_number').value.trim();
+  const project = $('past_project').value.trim();
+  const category = $('past_category').value.trim();
+
+  if (!date)         { flash(t('past_err_no_date'), 'err'); return; }
+  if (!buyerName)    { flash(t('past_err_no_buyer'), 'err'); return; }
+  if (!Number.isFinite(total) || total <= 0) { flash(t('past_err_no_total'), 'err'); return; }
+
+  // Build a minimal-but-valid snapshot. To make statistics' net/tax math
+  // work, we synthesize a single line item that sums to the gross total.
+  // For mode 'S': net = gross / (1 + vatRate/100); for others: net = gross.
+  const net = taxmode === 'S' && vatRate > 0
+    ? round2(total / (1 + vatRate / 100))
+    : round2(total);
+
+  const buyerIdx = $('past_buyer_select').value;
+  const buyerData = (buyerIdx !== '' && state.buyers[buyerIdx])
+    ? { ...state.buyers[buyerIdx], name: buyerName }
+    : { name: buyerName };
+
+  const snap = {
+    v: 1,
+    ts: Date.now(),
+    imported: true,             // flag for UI marker + partial-clone warning
+    number: number || '',
+    date,
+    total: round2(total),
+    currency,
+    buyerName,
+    form: {
+      seller: collectSeller(),  // current seller as best-guess context
+      buyer: buyerData,
+      items: [{
+        desc: project || category || buyerName,
+        qty: 1,
+        unit: 'C62',
+        price: net,
+        vat: vatRate,
+      }],
+      number,
+      date,
+      delivery: '',
+      deliveryEnd: '',
+      due: '',
+      project,
+      category,
+      taxmode,
+      currency,
+      intro: '', paymentNote: '', greeting: '', signature: '', footnote: '',
+      invoiceLang: '', font: '', layout: '',
+    },
+  };
+
+  state.history.unshift(snap);
+  if (state.history.length > HISTORY_LIMIT) state.history.length = HISTORY_LIMIT;
+  await persistHistory();
+  renderHistoryPicker();
+  closePastInvoiceModal();
+  flash(t('msg_history_added'), 'ok');
+}
+
 // -------- Statistics --------
 // Statistics derived from history. Pure functions over state.history,
 // grouped per currency since invoices come in EUR/USD/GBP/CHF.
@@ -1555,26 +1737,15 @@ async function clearAllHistory() {
 // 'all' (everything). Per-currency results are returned as a Map keyed
 // by currency code.
 
-const STATS_PERIODS = ['last_month', 'last3', 'ytd', 'last12', 'all'];
+const STATS_PERIODS = ['ytd', 'last12', 'all'];
 
 // Filter snapshots by period. Uses snapshot.date (invoice date), falling
 // back to ts (timestamp of save) for entries without a date.
-//
-// Period semantics:
-//   last_month — rolling 30 days back from today
-//   last3      — the last 3 calendar months including the current one
-//   ytd        — start of current year through today
-//   last12     — the last 12 calendar months including the current one
-//   all        — everything
 function filterByPeriod(snapshots, period) {
   if (period === 'all') return snapshots.slice();
   const now = new Date();
   let cutoff;
-  if (period === 'last_month') {
-    cutoff = now.getTime() - 30 * 86400000;
-  } else if (period === 'last3') {
-    cutoff = new Date(now.getFullYear(), now.getMonth() - 2, 1).getTime();
-  } else if (period === 'ytd') {
+  if (period === 'ytd') {
     cutoff = new Date(now.getFullYear(), 0, 1).getTime();
   } else if (period === 'last12') {
     cutoff = new Date(now.getFullYear(), now.getMonth() - 11, 1).getTime();
@@ -2731,22 +2902,18 @@ async function exportData() {
   const boilerplateJSON = await store.get(BOILERPLATE_KEY);
   const buyersJSON = await store.get(BUYERS_KEY);
   const footnotesJSON = await store.get(FOOTNOTES_KEY);
-  const historyJSON = await store.get(HISTORY_KEY);
-  const historyEnabled = await store.get(HISTORY_ENABLED_KEY);
   const lastInvoice = await store.get(COUNTER_KEY);
   const filenamePattern = await store.get(FILENAME_KEY);
   const fontKey = await store.get(FONT_KEY);
   const layoutKey = await store.get(LAYOUT_KEY);
   const payload = {
     format: 'erechnung-backup',
-    version: 3,
+    version: 2,
     exported_at: new Date().toISOString(),
     seller: sellerJSON ? JSON.parse(sellerJSON) : null,
     boilerplate: boilerplateJSON ? JSON.parse(boilerplateJSON) : {},
     buyers: buyersJSON ? JSON.parse(buyersJSON) : [],
     footnotes: footnotesJSON ? JSON.parse(footnotesJSON) : [],
-    history: historyJSON ? JSON.parse(historyJSON) : [],
-    history_enabled: historyEnabled === null || historyEnabled === undefined ? true : historyEnabled !== 'false',
     last_invoice: lastInvoice || null,
     filename_pattern: filenamePattern || null,
     font: fontKey || null,
@@ -2755,7 +2922,7 @@ async function exportData() {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const ts = new Date().toISOString().slice(0, 10);
   downloadBlob(blob, `erechnung-backup-${ts}.json`);
-  flash(`${t('msg_backup_export')} 1 ${t('msg_backup_seller')}, ${payload.buyers.length} ${t('msg_backup_buyers')}, ${payload.footnotes.length} ${t('msg_backup_footnotes')}, ${payload.history.length} ${t('msg_backup_history')}.`, 'ok');
+  flash(`${t('msg_backup_export')} 1 ${t('msg_backup_seller')}, ${payload.buyers.length} ${t('msg_backup_buyers')}, ${payload.footnotes.length} ${t('msg_backup_footnotes')}.`, 'ok');
 }
 
 async function importData(file) {
@@ -2820,22 +2987,7 @@ async function importData(file) {
       await store.set(LAYOUT_KEY, payload.layout);
       $('invoiceLayoutSelect').value = payload.layout;
     }
-    // History — added in backup format v3. Older backups simply lack these
-    // fields, in which case we leave the existing history untouched.
-    let historyCount = 0;
-    if (Array.isArray(payload.history)) {
-      state.history = payload.history;
-      await store.set(HISTORY_KEY, JSON.stringify(state.history));
-      historyCount = state.history.length;
-      renderHistoryPicker();
-      updateBuyerHistoryHint();
-    }
-    if (payload.history_enabled !== undefined) {
-      state.historyEnabled = !!payload.history_enabled;
-      await store.set(HISTORY_ENABLED_KEY, String(state.historyEnabled));
-      $('historyEnable').checked = state.historyEnabled;
-    }
-    flash(`${t('msg_backup_import_done')} ${sellerCount} ${t('msg_backup_seller')}, ${buyerCount} ${t('msg_backup_buyers')}, ${footnoteCount} ${t('msg_backup_footnotes')}, ${historyCount} ${t('msg_backup_history')}.`, 'ok');
+    flash(`${t('msg_backup_import_done')} ${sellerCount} ${t('msg_backup_seller')}, ${buyerCount} ${t('msg_backup_buyers')}, ${footnoteCount} ${t('msg_backup_footnotes')}.`, 'ok');
   } catch (e) {
     flash(t('msg_backup_failed') + ' ' + e.message, 'err');
   }
@@ -2872,6 +3024,16 @@ $('historyEnable').addEventListener('change', async (e) => {
   await persistHistoryEnabled();
 });
 
+// Past-invoice modal events
+$('historyAddPast').addEventListener('click', openPastInvoiceModal);
+$('pastSave').addEventListener('click', savePastInvoice);
+$('pastCancel').addEventListener('click', closePastInvoiceModal);
+$('past_buyer_select').addEventListener('change', applyPastBuyerSelection);
+$('past_taxmode').addEventListener('change', togglePastVatRateVisibility);
+$('pastInvoiceModal').addEventListener('click', (e) => {
+  if (e.target === $('pastInvoiceModal')) closePastInvoiceModal();
+});
+
 // Statistics modal events
 $('openStats').addEventListener('click', openStatsModal);
 $('statsClose').addEventListener('click', closeStatsModal);
@@ -2881,9 +3043,11 @@ $('statsModal').addEventListener('click', (e) => {
   if (e.target === $('statsModal')) closeStatsModal();
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && $('statsModal') && $('statsModal').classList.contains('open')) {
-    closeStatsModal();
-  }
+  if (e.key !== 'Escape') return;
+  const sm = $('statsModal');
+  const pm = $('pastInvoiceModal');
+  if (sm && sm.classList.contains('open')) closeStatsModal();
+  if (pm && pm.classList.contains('open')) closePastInvoiceModal();
 });
 
 $('r_delivery_end').addEventListener('change', () => {
@@ -3105,7 +3269,6 @@ async function init() {
   // 6. History UI — populate after translations + load are done so labels are correct.
   $('historyEnable').checked = state.historyEnabled;
   renderHistoryPicker();
-  updateBuyerHistoryHint();
 }
 
 init().catch(err => {

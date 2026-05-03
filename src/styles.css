@@ -880,3 +880,23 @@ textarea:focus-visible {
   font-size: 12px;
   color: var(--ink-soft);
 }
+
+/* === Past-invoice modal grid === */
+.past-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+}
+.past-grid label.full { grid-column: 1 / -1; }
+@media (max-width: 600px) {
+  .past-grid { grid-template-columns: 1fr; }
+  .past-grid label.full { grid-column: auto; }
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--ink-soft);
+  padding-top: 16px;
+}

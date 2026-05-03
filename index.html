@@ -150,13 +150,14 @@
   </div>
 
   <div class="input-with-action history-bottom-row">
-    <label class="inline">
-      <input type="checkbox" id="historyEnable">
-      <span data-i18n="history_enable_label"></span>
-    </label>
-    <button class="tiny-btn" id="historyDelete" type="button" data-i18n="btn_history_delete"></button>
-    <button class="tiny-btn" id="historyClearAll" type="button" data-i18n="btn_history_clear_all"></button>
-  </div>
+  <label class="inline">
+    <input type="checkbox" id="historyEnable">
+    <span data-i18n="history_enable_label"></span>
+  </label>
+  <button class="tiny-btn" id="historyAddPast" type="button" data-i18n="btn_history_add_past"></button>
+  <button class="tiny-btn" id="historyDelete" type="button" data-i18n="btn_history_delete"></button>
+  <button class="tiny-btn" id="historyClearAll" type="button" data-i18n="btn_history_clear_all"></button>
+</div>
 </section>
 
 
@@ -395,6 +396,86 @@
     </div>
   </div>
 </div>
+
+<div class="modal" id="pastInvoiceModal" hidden>
+  <div class="modal-content">
+    <div class="modal-head">
+      <h2 data-i18n="past_modal_title"></h2>
+      <button id="pastCancel" class="tiny-btn" type="button" data-i18n="past_cancel"></button>
+    </div>
+
+    <div class="hint" data-i18n="past_modal_hint"></div>
+
+    <div class="past-grid">
+      <label>
+        <span data-i18n="past_field_date"></span>
+        <input type="date" id="past_date">
+      </label>
+
+      <label>
+        <span data-i18n="past_field_buyer"></span>
+        <select id="past_buyer_select"></select>
+      </label>
+
+      <label class="full">
+        <span data-i18n="past_field_buyer_new"></span>
+        <input type="text" id="past_buyer_text">
+      </label>
+
+      <label>
+        <span data-i18n="past_field_total"></span>
+        <input type="number" id="past_total" step="0.01" min="0">
+      </label>
+
+      <label>
+        <span data-i18n="past_field_currency"></span>
+        <select id="past_currency">
+          <option value="EUR">EUR</option>
+          <option value="USD">USD</option>
+          <option value="GBP">GBP</option>
+          <option value="CHF">CHF</option>
+        </select>
+      </label>
+
+      <label>
+        <span data-i18n="past_field_taxmode"></span>
+        <select id="past_taxmode">
+          <option value="S">Standard (VAT)</option>
+          <option value="AE">Reverse charge</option>
+          <option value="Z">Zero rate</option>
+          <option value="E">Exempt</option>
+          <option value="O">Out of scope</option>
+        </select>
+      </label>
+
+      <label id="past_vat_rate_wrap">
+        <span data-i18n="past_field_vat_rate"></span>
+        <input type="number" id="past_vat_rate" step="0.1" min="0" value="20">
+      </label>
+
+      <label>
+        <span data-i18n="past_field_number"></span>
+        <input type="text" id="past_number">
+      </label>
+
+      <label>
+        <span data-i18n="past_field_project"></span>
+        <input type="text" id="past_project">
+      </label>
+
+      <label>
+        <span data-i18n="past_field_category"></span>
+        <input type="text" id="past_category">
+      </label>
+    </div>
+
+    <div class="modal-actions">
+      <button class="tiny-btn" id="pastSave" type="button" data-i18n="past_save"></button>
+    </div>
+  </div>
+</div>
+
+
 
 <script type="module" src="/src/main.js"></script>
 </body>
