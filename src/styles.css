@@ -591,8 +591,8 @@ footer p:not(:last-child) { margin-bottom: 12px; }
   width: 32px;
   height: 32px;
   padding: 0;
-  margin-left: 0;            /* override .tiny-btn margin */
-  font-size: 16px;           /* glyph size */
+  margin-left: 0;
+  font-size: 16px;
   letter-spacing: 0;
   text-transform: none;
   display: inline-flex;
@@ -852,12 +852,31 @@ textarea:focus-visible {
 }
 
 .stats-chart-wrap { /* container */ }
+.stats-chart-wrap-inner {
+  position: relative;       /* anchor for absolutely-positioned tooltip */
+}
 .stats-chart {
   display: block;
   width: 100%;
   height: auto;
   color: var(--ink);
 }
+.stats-bar-hit {
+  cursor: default;
+}
+.stats-chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 4px 8px;
+  font-family: "Inconsolata", monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  border-radius: 2px;
+  z-index: 10;
+}
+.stats-chart-tooltip[hidden] { display: none; }
 
 .stats-tops ol {
   list-style: none;

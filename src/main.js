@@ -299,6 +299,8 @@ const I18N = {
     stats_title: 'Statistik',
     stats_close: 'Schließen',
     stats_period_label: 'Zeitraum',
+    stats_period_last_month: 'Letzte 30 Tage',
+    stats_period_last3: 'Letzte 3 Monate',
     stats_period_ytd: 'Aktuelles Jahr',
     stats_period_last12: 'Letzte 12 Monate',
     stats_period_all: 'Alles',
@@ -561,6 +563,8 @@ const I18N = {
     stats_title: 'Statistics',
     stats_close: 'Close',
     stats_period_label: 'Period',
+    stats_period_last_month: 'Last 30 days',
+    stats_period_last3: 'Last 3 months',
     stats_period_ytd: 'This year',
     stats_period_last12: 'Last 12 months',
     stats_period_all: 'All time',
@@ -823,6 +827,8 @@ const I18N = {
     stats_title: 'Statistiques',
     stats_close: 'Fermer',
     stats_period_label: 'Période',
+    stats_period_last_month: '30 derniers jours',
+    stats_period_last3: '3 derniers mois',
     stats_period_ytd: 'Cette année',
     stats_period_last12: '12 derniers mois',
     stats_period_all: 'Tout',
@@ -1745,7 +1751,11 @@ function filterByPeriod(snapshots, period) {
   if (period === 'all') return snapshots.slice();
   const now = new Date();
   let cutoff;
-  if (period === 'ytd') {
+  if (period === 'last_month') {
+    cutoff = now.getTime() - 30 * 86400000;
+  } else if (period === 'last3') {
+    cutoff = new Date(now.getFullYear(), now.getMonth() - 2, 1).getTime();
+  } else if (period === 'ytd') {
     cutoff = new Date(now.getFullYear(), 0, 1).getTime();
   } else if (period === 'last12') {
     cutoff = new Date(now.getFullYear(), now.getMonth() - 11, 1).getTime();
@@ -1855,9 +1865,47 @@ function renderMonthlyChartSVG(months, currency) {
     const x = P_LEFT + i * slot + (slot - barW) / 2;
     const y = P_TOP + (innerH - h);
     const tip = `${m.label}: ${fmt(m.total)} ${sym}`;
-    return `<g><rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="currentColor" opacity="0.7"><title>${esc(tip)}</title></rect><text x="${(x + barW / 2).toFixed(1)}" y="${(H - 8).toFixed(1)}" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.6">${esc(m.label)}</text></g>`;
+    // Hitbox covers the full slot width (not just the bar) so users don't
+    // need millimeter-precise hovering. The visible bar sits behind the
+    // transparent hitbox; the hitbox carries the data attributes that the
+    // chart-level mousemove handler reads.
+    const hitX = P_LEFT + i * slot;
+    return `<g>` +
+      `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="currentColor" opacity="0.7"></rect>` +
+      `<text x="${(x + barW / 2).toFixed(1)}" y="${(H - 8).toFixed(1)}" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.6">${esc(m.label)}</text>` +
+      `<rect class="stats-bar-hit" x="${hitX.toFixed(1)}" y="${P_TOP}" width="${slot.toFixed(1)}" height="${innerH}" fill="transparent" data-tip="${esc(tip)}"></rect>` +
+      `</g>`;
   }).join('');
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="stats-chart" role="img">${bars}</svg>`;
+  return `<div class="stats-chart-wrap-inner">` +
+    `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="stats-chart" role="img">${bars}</svg>` +
+    `<div class="stats-chart-tooltip" hidden></div>` +
+    `</div>`;
+}
+
+// Wire up tooltip behaviour for all bar charts inside the stats body.
+// Uses event delegation so it works after each renderStatistics() call.
+function attachChartTooltips() {
+  const body = $('statsBody');
+  if (!body || body.dataset.tooltipsBound === '1') return;
+  body.dataset.tooltipsBound = '1';
+  body.addEventListener('mousemove', (e) => {
+    const hit = e.target.closest('.stats-bar-hit');
+    if (!hit) return;
+    const wrap = hit.closest('.stats-chart-wrap-inner');
+    const tip = wrap && wrap.querySelector('.stats-chart-tooltip');
+    if (!tip) return;
+    tip.textContent = hit.getAttribute('data-tip') || '';
+    tip.hidden = false;
+    const wrapRect = wrap.getBoundingClientRect();
+    const x = e.clientX - wrapRect.left;
+    const y = e.clientY - wrapRect.top;
+    // Position above the cursor; clamp to wrap bounds so it stays readable.
+    tip.style.left = `${Math.max(4, Math.min(wrapRect.width - tip.offsetWidth - 4, x - tip.offsetWidth / 2))}px`;
+    tip.style.top  = `${Math.max(4, y - tip.offsetHeight - 8)}px`;
+  });
+  body.addEventListener('mouseleave', () => {
+    for (const tip of body.querySelectorAll('.stats-chart-tooltip')) tip.hidden = true;
+  }, true);
 }
 
 // Get the most recent invoice (across all currencies) for a given buyer name.
@@ -1958,6 +2006,7 @@ function renderStatistics() {
   }).join('');
 
   body.innerHTML = blocks;
+  attachChartTooltips();
 }
 
 function openStatsModal() {
