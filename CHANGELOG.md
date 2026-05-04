@@ -1,3 +1,16 @@
+## [Unreleased]
+
+### Changed
+
+- **Statistics period filter** has a new default and an extra option:
+  default is now "This year" instead of "Last 30 days", which surfaces
+  meaningful data immediately for users who haven't generated invoices
+  in the very recent past. Added "Last 6 months" between "Last 12
+  months" and "Last 3 months". Reordered the dropdown from longest to
+  shortest period (this year → last 12 → last 6 → last 3 → last 30
+  days → all time).
+
+  
 ## [1.4.1] - 2026-05-03
 
 Patch release. Fixes a few rough edges in the statistics view and

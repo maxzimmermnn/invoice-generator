@@ -301,6 +301,7 @@ const I18N = {
     stats_period_label: 'Zeitraum',
     stats_period_last_month: 'Letzte 30 Tage',
     stats_period_last3: 'Letzte 3 Monate',
+    stats_period_last6: 'Letzte 6 Monate',
     stats_period_ytd: 'Aktuelles Jahr',
     stats_period_last12: 'Letzte 12 Monate',
     stats_period_all: 'Alles',
@@ -565,6 +566,7 @@ const I18N = {
     stats_period_label: 'Period',
     stats_period_last_month: 'Last 30 days',
     stats_period_last3: 'Last 3 months',
+    stats_period_last6: 'Last 6 months',
     stats_period_ytd: 'This year',
     stats_period_last12: 'Last 12 months',
     stats_period_all: 'All time',
@@ -829,6 +831,7 @@ const I18N = {
     stats_period_label: 'Période',
     stats_period_last_month: '30 derniers jours',
     stats_period_last3: '3 derniers mois',
+    stats_period_last6: '6 derniers mois',
     stats_period_ytd: 'Cette année',
     stats_period_last12: '12 derniers mois',
     stats_period_all: 'Tout',
@@ -1743,7 +1746,7 @@ async function savePastInvoice() {
 // 'all' (everything). Per-currency results are returned as a Map keyed
 // by currency code.
 
-const STATS_PERIODS = ['ytd', 'last12', 'all'];
+const STATS_PERIODS = ['ytd', 'last12', 'last6', 'last3', 'last_month', 'all'];
 
 // Filter snapshots by period. Uses snapshot.date (invoice date), falling
 // back to ts (timestamp of save) for entries without a date.
@@ -1755,6 +1758,8 @@ function filterByPeriod(snapshots, period) {
     cutoff = now.getTime() - 30 * 86400000;
   } else if (period === 'last3') {
     cutoff = new Date(now.getFullYear(), now.getMonth() - 2, 1).getTime();
+  } else if (period === 'last6') {
+    cutoff = new Date(now.getFullYear(), now.getMonth() - 5, 1).getTime();
   } else if (period === 'ytd') {
     cutoff = new Date(now.getFullYear(), 0, 1).getTime();
   } else if (period === 'last12') {
