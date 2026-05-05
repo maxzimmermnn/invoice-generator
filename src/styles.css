@@ -101,8 +101,8 @@ header.top {
 }
 
 header.top h1 {
-  font-family: "Fraunces", serif;
-  font-weight: 400;
+  font-family: "Inconsolata", ui-monospace, monospace;
+  font-weight: 500;
   font-size: clamp(28px, 4vw, 42px);
   letter-spacing: -0.01em;
   margin: 0;
@@ -116,20 +116,23 @@ header.top .sub {
   color: var(--ink-soft);
 }
 
-/* Top-bar control groups: settings (lang+theme) and modal triggers
-   (history+stats+help) sit in two visual clusters. Tight gap inside
-   each group, larger gap between them. */
+/* Top-bar controls: all icons get the same uniform gap. The .top-group
+   wrappers exist for semantic grouping but use display: contents so
+   their children participate directly in the .top-controls flex layout.
+   The .tiny-btn margin-left override cancels the legacy 8px margin
+   rule that would otherwise add extra space before history/stats/help. */
 .top-controls {
   display: flex;
   align-items: center;
-  gap: var(--gap-3);
+  gap: var(--gap-2);
   /* Lift the controls slightly so they optically center on the H1. */
   margin-top: clamp(0px, 0.6vw, 8px);
 }
 .top-group {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--gap-1);
+  display: contents;
+}
+.top-controls .tiny-btn {
+  margin-left: 0;
 }
 
 
@@ -143,8 +146,8 @@ section.block {
 }
 
 section.block h2 {
-  font-family: "Fraunces", serif;
-  font-weight: 400;
+  font-family: "Inconsolata", ui-monospace, monospace;
+  font-weight: 500;
   font-size: 22px;
   margin: 0 0 var(--gap-1);
   letter-spacing: -0.005em;
@@ -181,9 +184,11 @@ section.block.sub h2 {
   color: var(--ink-soft);
   margin: 0 0 var(--gap-2);
 }
-/* Center the seller toggle vertically with the smaller secondary h2. */
+/* Center the seller toggle vertically with the smaller secondary h2,
+   plus breathing room between the header row and the body below. */
 section.block.sub .seller-head {
   align-items: center;
+  margin-bottom: var(--gap-3);
 }
 
 
@@ -198,20 +203,40 @@ section.block.sub .seller-head {
 .seller-head h2 {
   margin: 0 !important;
 }
+/* Save / reset buttons sit on the right end of the header row, only
+   visible while the section is expanded. The margin-left auto pushes
+   them past the toggle's summary regardless of how long it is. */
+.seller-head-actions {
+  display: flex;
+  gap: var(--gap-2);
+  margin-left: auto;
+}
+/* Tighter line-height inside these specific buttons so their text sits
+   on the same visual line as the SELLER h2 next to them. The default
+   tiny-btn padding gives them noticeably more height than the h2. */
+.seller-head-actions .tiny-btn {
+  line-height: 1;
+  padding: 6px 10px;
+}
+section.block.collapsed .seller-head-actions {
+  display: none;
+}
 
 .seller-toggle {
   appearance: none;
   background: transparent;
   border: none;
-  padding: 4px 8px;
+  padding: 0 8px;             /* no vertical padding so it aligns with h2 text */
   margin: 0;
   cursor: pointer;
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;        /* center arrow + summary vertically */
   gap: var(--gap-2);
   color: var(--ink-soft);
   font-family: "Inconsolata", monospace;
-  font-size: 13px;
+  font-size: inherit;         /* match the .sub h2 size (14px) */
+  font-weight: 400;
+  line-height: 1;
   border-radius: 2px;
   text-align: left;
   max-width: 100%;
@@ -228,7 +253,8 @@ section.block.sub .seller-head {
   display: inline-block;
   transition: transform 0.15s ease;
   color: var(--ink-faint);
-  font-size: 11px;
+  font-size: 0.85em;          /* slightly smaller than the summary text */
+  line-height: 1;
 }
 .seller-toggle[aria-expanded="false"] .seller-toggle-arrow {
   transform: rotate(-90deg);
@@ -398,7 +424,7 @@ input[type="number"] { -moz-appearance: textfield; }
   margin-top: 4px;
   font-size: 16px;
 }
-.totals .grand.val { font-family: "Fraunces", serif; font-size: 22px; }
+.totals .grand.val { font-family: "Inconsolata", ui-monospace, monospace; font-size: 22px; font-weight: 600; }
 
 
 /* === 8. PDF drop zone (in embed modal) ==================================== */
@@ -947,8 +973,8 @@ textarea:focus-visible {
   display: none;
 }
 .help-body h3 {
-  font-family: "Fraunces", serif;
-  font-weight: 400;
+  font-family: "Inconsolata", ui-monospace, monospace;
+  font-weight: 500;
   font-size: 19px;
   margin: 32px 0 12px;
   letter-spacing: -0.005em;
@@ -1050,8 +1076,9 @@ textarea:focus-visible {
   gap: 16px;
 }
 .stats-block-head {
-  font-family: "Fraunces", serif;
+  font-family: "Inconsolata", ui-monospace, monospace;
   font-size: 18px;
+  font-weight: 500;
 }
 .stats-block-count {
   color: var(--ink-soft);
@@ -1190,7 +1217,7 @@ textarea:focus-visible {
 }
 .stats-buyer-title {
   margin: 0;
-  font-family: "Fraunces", serif;
+  font-family: "Inconsolata", ui-monospace, monospace;
   font-size: 20px;
   font-weight: 500;
 }

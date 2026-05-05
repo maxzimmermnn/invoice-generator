@@ -33,33 +33,29 @@
     <div class="sub" data-i18n="subtitle">ZUGFeRD 2.3 · Factur-X · EN 16931 (Comfort)</div>
   </div>
   <div class="top-controls">
-    <div class="top-group">
-      <select id="langSelect" class="lang-select" aria-label="Language">
-        <option value="en">EN</option>
-        <option value="de">DE</option>
-        <option value="fr">FR</option>
-      </select>
-      <button type="button" id="themeToggle" class="theme-toggle" title="Theme" aria-label="Theme"></button>
-    </div>
-    <div class="top-group">
-      <button id="openHistory" class="tiny-btn top-icon-btn" type="button" data-i18n-title="btn_open_history" aria-label="History">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M2.5 4.5 A 5 5 0 1 1 1.8 8.3"/>
-          <polyline points="0.6,3.2 2.5,4.5 4.4,3.2"/>
-          <polyline points="7,4.2 7,7.2 9,8.8"/>
-        </svg>
-      </button>
-      <button id="openStats" class="tiny-btn top-icon-btn" type="button" data-i18n-title="btn_open_stats" aria-label="Statistics">
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-          <rect x="1" y="8" width="2.5" height="5" fill="currentColor"/>
-          <rect x="5.75" y="4" width="2.5" height="9" fill="currentColor"/>
-          <rect x="10.5" y="6" width="2.5" height="7" fill="currentColor"/>
-        </svg>
-      </button>
-      <button id="openHelp" class="tiny-btn top-icon-btn" type="button" data-i18n-title="btn_open_help" aria-label="Help">
-        <span aria-hidden="true">?</span>
-      </button>
-    </div>
+    <button id="openHistory" class="tiny-btn top-icon-btn" type="button" data-i18n-title="btn_open_history" aria-label="History">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M2.5 4.5 A 5 5 0 1 1 1.8 8.3"/>
+        <polyline points="0.6,3.2 2.5,4.5 4.4,3.2"/>
+        <polyline points="7,4.2 7,7.2 9,8.8"/>
+      </svg>
+    </button>
+    <button id="openStats" class="tiny-btn top-icon-btn" type="button" data-i18n-title="btn_open_stats" aria-label="Statistics">
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <rect x="1" y="8" width="2.5" height="5" fill="currentColor"/>
+        <rect x="5.75" y="4" width="2.5" height="9" fill="currentColor"/>
+        <rect x="10.5" y="6" width="2.5" height="7" fill="currentColor"/>
+      </svg>
+    </button>
+    <select id="langSelect" class="lang-select" aria-label="Language">
+      <option value="en">EN</option>
+      <option value="de">DE</option>
+      <option value="fr">FR</option>
+    </select>
+    <button type="button" id="themeToggle" class="theme-toggle" title="Theme" aria-label="Theme"></button>
+    <button id="openHelp" class="tiny-btn top-icon-btn" type="button" data-i18n-title="btn_open_help" aria-label="Help">
+      <span aria-hidden="true">?</span>
+    </button>
   </div>
 </header>
 
@@ -71,9 +67,13 @@
       <span class="seller-toggle-arrow" aria-hidden="true">▾</span>
       <span class="seller-toggle-summary" id="sellerSummary"></span>
     </button>
+    <div class="seller-head-actions">
+      <button class="tiny-btn" id="saveSeller" type="button" data-i18n="btn_save_template"></button>
+      <button class="tiny-btn" id="clearSeller" type="button" data-i18n="btn_reset"></button>
+    </div>
   </div>
   <div id="sellerBody">
-  <div class="hint"><span data-i18n="section_seller_hint"></span> <button class="tiny-btn" id="saveSeller" type="button" data-i18n="btn_save_template"></button> <button class="tiny-btn" id="clearSeller" type="button" data-i18n="btn_reset"></button></div>
+  <div class="hint"><span data-i18n="section_seller_hint"></span></div>
   <div class="grid">
     <label class="full"><span data-i18n="f_company"></span>
       <input type="text" id="s_name" autocomplete="off">
