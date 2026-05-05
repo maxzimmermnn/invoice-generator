@@ -21,6 +21,9 @@ const FOOTNOTES_KEY = 'erechnung:footnotes:v1';
 const HISTORY_KEY = 'erechnung:history:v1';
 const HISTORY_ENABLED_KEY = 'erechnung:history_enabled:v1';
 const HISTORY_LIMIT = 1000;
+const YOY_ENABLED_KEY = 'erechnung:yoy_enabled:v1';
+const YOY_DATA_KEY = 'erechnung:yoy:v1';
+const SELLER_COLLAPSED_KEY = 'erechnung:seller_collapsed:v1';
 
 const state = {
   items: [],
@@ -29,7 +32,8 @@ const state = {
   footnotes: [],
   history: [],            // array of invoice snapshots, newest first
   historyEnabled: true,   // user toggle; defaults to on
-  outputMode: 'generate', // 'generate' | 'upload'
+  yoyEnabled: false,      // year-over-year arrow visibility (default off)
+  yoyData: {},            // backfill: { CUR: { YEAR: number[12] } }
 };
 
 // -------- Helpers --------
@@ -179,7 +183,7 @@ const I18N = {
     f_filename_pattern: 'Dateiname-Muster',
     // Footer
     footer_main: 'Format: ZUGFeRD 2.3 / Factur-X 1.0 · Profil: EN 16931 (Comfort) · Konform mit §14 UStG und deutscher E-Rechnungspflicht seit 2025. XML nach BT-Nummern der EN 16931. Validierung z.B. mit Quba-Viewer, Mustang oder ELSTER E-Rechnungsviewer.',
-    footer_disclaimer: 'Kostenloses Tool, gevibecoded. Keine Gewähr für Richtigkeit, Vollständigkeit oder rechtliche Konformität der erzeugten Dokumente. Nutzung auf eigene Verantwortung. Keine Haftung für entgangenen Gewinn, Schäden oder Folgeschäden aus der Nutzung. Vor produktivem Einsatz unbedingt mit einem zugelassenen Validator prüfen und im Zweifel steuerlich beraten lassen.',
+    footer_disclaimer: 'Keine Gewähr. Vor produktivem Einsatz validieren. Details siehe Hilfe.',
     footer_backup: 'Datensicherung:',
     // Status messages
     msg_seller_saved: 'Verkäufer-Angaben gespeichert.',
@@ -305,6 +309,80 @@ const I18N = {
     stats_period_ytd: 'Aktuelles Jahr',
     stats_period_last12: 'Letzte 12 Monate',
     stats_period_all: 'Alles',
+    // --- Stats: tax breakdown ---
+    stats_tab_overview: 'Übersicht',
+    stats_tab_quarters: 'USt-Aufschlüsselung',
+    stats_year_label: 'Jahr',
+    stats_empty_year: 'Keine Rechnungen in diesem Jahr.',
+    qb_quarter: 'Quartal',
+    qb_q1: 'Q1 (Jan–Mär)',
+    qb_q2: 'Q2 (Apr–Jun)',
+    qb_q3: 'Q3 (Jul–Sep)',
+    qb_q4: 'Q4 (Okt–Dez)',
+    qb_year_total: 'Jahressumme',
+    qb_standard_net: 'Standard netto',
+    qb_standard_vat: 'Standard USt',
+    qb_reverse_charge: 'Reverse Charge netto',
+    qb_zero_rate: 'Steuersatz 0% netto',
+    qb_exempt: 'Steuerbefreit netto',
+    qb_out_of_scope: 'Nicht steuerbar netto',
+    // --- Stats: buyer drill-down ---
+    stats_back: 'Zurück',
+    stats_buyer_first: 'Erste Rechnung',
+    stats_buyer_last: 'Letzte Rechnung',
+    stats_buyer_col_date: 'Datum',
+    stats_buyer_col_number: 'Nummer',
+    stats_buyer_col_total: 'Gesamt',
+    // --- Stats: CSV export ---
+    btn_export_csv: 'CSV exportieren',
+    msg_csv_exported: 'CSV exportiert.',
+    msg_csv_no_data: 'Keine Daten zum Exportieren.',
+    // --- Stats: YoY arrows + backfill ---
+    btn_yoy_toggle: 'Vorjahresvergleich',
+    yoy_set_reference: 'Vorjahreswerte eingeben',
+    yoy_hint_no_data: 'Vorjahreswerte fehlen für den Vergleich.',
+    yoy_hint_no_period: 'Vorjahresvergleich für diesen Zeitraum nicht verfügbar.',
+    yoy_modal_title: 'Vorjahreswerte eintragen',
+    yoy_modal_intro: 'Brutto-Monatssummen aus dem Vorjahr für den Vergleich. Echte Rechnungen aus der Historie haben Vorrang.',
+    yoy_field_year: 'Jahr',
+    yoy_field_currency: 'Währung',
+    yoy_month_jan: 'Januar',
+    yoy_month_feb: 'Februar',
+    yoy_month_mar: 'März',
+    yoy_month_apr: 'April',
+    yoy_month_may: 'Mai',
+    yoy_month_jun: 'Juni',
+    yoy_month_jul: 'Juli',
+    yoy_month_aug: 'August',
+    yoy_month_sep: 'September',
+    yoy_month_oct: 'Oktober',
+    yoy_month_nov: 'November',
+    yoy_month_dec: 'Dezember',
+    yoy_save: 'Speichern',
+    yoy_cancel: 'Abbrechen',
+    msg_yoy_saved: 'Vorjahreswerte gespeichert.',
+    msg_yoy_cleared: 'Vorjahreswerte gelöscht.',
+    msg_yoy_invalid_year: 'Ungültiges Jahr.',
+    msg_yoy_invalid_value: 'Negative Werte sind nicht erlaubt.',
+    // --- UI restructure: top-bar icons, help/embed modals, past-invoice extras ---
+    btn_open_history: 'Historie',
+    btn_open_help: 'Hilfe',
+    help_title: 'Hilfe & Dokumentation',
+    embed_title: 'XML in vorhandenes PDF einbetten',
+    embed_intro: 'Lade ein bestehendes PDF hoch (z.B. aus InDesign exportiert). Die XML-Daten der aktuellen Rechnung werden eingebettet, damit das PDF zur konformen E-Rechnung wird.',
+    btn_embed_xml: 'XML einbetten...',
+    btn_embed_run: 'PDF erzeugen',
+    btn_embed_progress: 'Erzeuge...',
+    msg_embed_done: 'PDF mit eingebetteter XML erzeugt.',
+    msg_embed_failed: 'Einbetten fehlgeschlagen:',
+    btn_history_add_past: 'Vergangene Rechnung eintragen',
+    past_field_buyer_select: 'Bestehender Kunde',
+    past_field_vat_rate: 'USt-Satz (%)',
+    past_field_project: 'Projekt',
+    past_field_category: 'Kategorie',
+    past_err_no_date: 'Datum fehlt.',
+    past_err_no_buyer: 'Käufer fehlt.',
+    past_err_no_total: 'Brutto-Summe fehlt oder ist ungültig.',
     stats_empty: 'Noch keine Rechnungen im Verlauf — Statistik erscheint, sobald du welche generierst.',
     stats_empty_period: 'Keine Rechnungen in diesem Zeitraum.',
     stats_kpi_total: 'Gesamt (brutto)',
@@ -447,7 +525,7 @@ const I18N = {
     chip_layout: 'Layout',
     f_filename_pattern: 'Filename pattern',
     footer_main: 'Format: ZUGFeRD 2.3 / Factur-X 1.0 · Profile: EN 16931 (Comfort) · Compliant with German e-invoicing law (§14 UStG, in force since 2025). XML follows EN 16931 BT numbering. Validate e.g. with Quba Viewer, Mustang, or ELSTER E-Rechnungsviewer.',
-    footer_disclaimer: 'Free, vibe-coded tool. No warranty for correctness, completeness or legal compliance of generated documents. Use at your own risk. No liability for lost profit, damages or consequential damages from use. Always validate with a certified validator before production use, and consult a tax advisor when in doubt.',
+    footer_disclaimer: 'No warranty. Validate before production use. See Help for details.',
     footer_backup: 'Backup:',
     msg_seller_saved: 'Seller details saved.',
     msg_save_failed: 'Saving failed.',
@@ -570,6 +648,80 @@ const I18N = {
     stats_period_ytd: 'This year',
     stats_period_last12: 'Last 12 months',
     stats_period_all: 'All time',
+    // --- Stats: tax breakdown ---
+    stats_tab_overview: 'Overview',
+    stats_tab_quarters: 'Tax breakdown',
+    stats_year_label: 'Year',
+    stats_empty_year: 'No invoices in this year.',
+    qb_quarter: 'Quarter',
+    qb_q1: 'Q1 (Jan–Mar)',
+    qb_q2: 'Q2 (Apr–Jun)',
+    qb_q3: 'Q3 (Jul–Sep)',
+    qb_q4: 'Q4 (Oct–Dec)',
+    qb_year_total: 'Year total',
+    qb_standard_net: 'Standard net',
+    qb_standard_vat: 'Standard VAT',
+    qb_reverse_charge: 'Reverse charge net',
+    qb_zero_rate: 'Zero rate net',
+    qb_exempt: 'Exempt net',
+    qb_out_of_scope: 'Out of scope net',
+    // --- Stats: buyer drill-down ---
+    stats_back: 'Back',
+    stats_buyer_first: 'First invoice',
+    stats_buyer_last: 'Last invoice',
+    stats_buyer_col_date: 'Date',
+    stats_buyer_col_number: 'Number',
+    stats_buyer_col_total: 'Total',
+    // --- Stats: CSV export ---
+    btn_export_csv: 'Export CSV',
+    msg_csv_exported: 'CSV exported.',
+    msg_csv_no_data: 'No data to export.',
+    // --- Stats: YoY arrows + backfill ---
+    btn_yoy_toggle: 'Year-over-year',
+    yoy_set_reference: 'Set previous year reference',
+    yoy_hint_no_data: 'Previous year values missing for comparison.',
+    yoy_hint_no_period: 'Year-over-year not available for this period.',
+    yoy_modal_title: 'Set previous year reference',
+    yoy_modal_intro: 'Monthly gross totals from a previous year, used as the comparison baseline. Real invoices from history take precedence.',
+    yoy_field_year: 'Year',
+    yoy_field_currency: 'Currency',
+    yoy_month_jan: 'January',
+    yoy_month_feb: 'February',
+    yoy_month_mar: 'March',
+    yoy_month_apr: 'April',
+    yoy_month_may: 'May',
+    yoy_month_jun: 'June',
+    yoy_month_jul: 'July',
+    yoy_month_aug: 'August',
+    yoy_month_sep: 'September',
+    yoy_month_oct: 'October',
+    yoy_month_nov: 'November',
+    yoy_month_dec: 'December',
+    yoy_save: 'Save',
+    yoy_cancel: 'Cancel',
+    msg_yoy_saved: 'Previous year values saved.',
+    msg_yoy_cleared: 'Previous year values cleared.',
+    msg_yoy_invalid_year: 'Invalid year.',
+    msg_yoy_invalid_value: 'Negative values are not allowed.',
+    // --- UI restructure: top-bar icons, help/embed modals, past-invoice extras ---
+    btn_open_history: 'History',
+    btn_open_help: 'Help',
+    help_title: 'Help & documentation',
+    embed_title: 'Embed XML in existing PDF',
+    embed_intro: 'Upload an existing PDF (e.g. exported from InDesign). The current invoice data will be embedded as XML, turning the PDF into a compliant e-invoice.',
+    btn_embed_xml: 'Embed XML...',
+    btn_embed_run: 'Create PDF',
+    btn_embed_progress: 'Creating...',
+    msg_embed_done: 'PDF with embedded XML created.',
+    msg_embed_failed: 'Embed failed:',
+    btn_history_add_past: 'Add past invoice',
+    past_field_buyer_select: 'Existing customer',
+    past_field_vat_rate: 'VAT rate (%)',
+    past_field_project: 'Project',
+    past_field_category: 'Category',
+    past_err_no_date: 'Date is missing.',
+    past_err_no_buyer: 'Buyer is missing.',
+    past_err_no_total: 'Gross total is missing or invalid.',
     stats_empty: 'No invoices in history yet — statistics appear once you generate some.',
     stats_empty_period: 'No invoices in this period.',
     stats_kpi_total: 'Total (gross)',
@@ -712,7 +864,7 @@ const I18N = {
     chip_layout: 'Mise en page',
     f_filename_pattern: 'Modèle de nom de fichier',
     footer_main: 'Format : ZUGFeRD 2.3 / Factur-X 1.0 · Profil : EN 16931 (Comfort) · Conforme à la loi allemande sur la facture électronique (§14 UStG, en vigueur depuis 2025). XML suivant la numérotation BT de la EN 16931. Validation possible avec Quba Viewer, Mustang ou ELSTER E-Rechnungsviewer.',
-    footer_disclaimer: 'Outil gratuit, vibecodé. Aucune garantie sur l\'exactitude, l\'exhaustivité ou la conformité légale des documents générés. Utilisation à vos propres risques. Aucune responsabilité pour pertes de profit, dommages ou dommages consécutifs résultant de l\'utilisation. Avant toute utilisation en production, valider avec un validateur certifié et consulter un conseiller fiscal en cas de doute.',
+    footer_disclaimer: 'Aucune garantie. Validez avant utilisation en production. Voir Aide.',
     footer_backup: 'Sauvegarde :',
     msg_seller_saved: 'Coordonnées vendeur enregistrées.',
     msg_save_failed: 'Échec de l\'enregistrement.',
@@ -835,6 +987,80 @@ const I18N = {
     stats_period_ytd: 'Cette année',
     stats_period_last12: '12 derniers mois',
     stats_period_all: 'Tout',
+    // --- Stats: tax breakdown ---
+    stats_tab_overview: 'Vue d\'ensemble',
+    stats_tab_quarters: 'Ventilation TVA',
+    stats_year_label: 'Année',
+    stats_empty_year: 'Aucune facture dans cette année.',
+    qb_quarter: 'Trimestre',
+    qb_q1: 'T1 (jan–mars)',
+    qb_q2: 'T2 (avr–juin)',
+    qb_q3: 'T3 (juil–sept)',
+    qb_q4: 'T4 (oct–déc)',
+    qb_year_total: 'Total annuel',
+    qb_standard_net: 'TVA standard net',
+    qb_standard_vat: 'TVA standard',
+    qb_reverse_charge: 'Autoliquidation net',
+    qb_zero_rate: 'Taux 0% net',
+    qb_exempt: 'Exonéré net',
+    qb_out_of_scope: 'Hors champ net',
+    // --- Stats: buyer drill-down ---
+    stats_back: 'Retour',
+    stats_buyer_first: 'Première facture',
+    stats_buyer_last: 'Dernière facture',
+    stats_buyer_col_date: 'Date',
+    stats_buyer_col_number: 'Numéro',
+    stats_buyer_col_total: 'Total',
+    // --- Stats: CSV export ---
+    btn_export_csv: 'Exporter CSV',
+    msg_csv_exported: 'CSV exporté.',
+    msg_csv_no_data: 'Aucune donnée à exporter.',
+    // --- Stats: YoY arrows + backfill ---
+    btn_yoy_toggle: 'Année précédente',
+    yoy_set_reference: 'Saisir les valeurs de l\'année précédente',
+    yoy_hint_no_data: 'Valeurs de l\'année précédente manquantes.',
+    yoy_hint_no_period: 'Comparaison annuelle indisponible pour cette période.',
+    yoy_modal_title: 'Valeurs de l\'année précédente',
+    yoy_modal_intro: 'Totaux mensuels bruts d\'une année précédente, utilisés comme référence. Les factures réelles ont la priorité.',
+    yoy_field_year: 'Année',
+    yoy_field_currency: 'Devise',
+    yoy_month_jan: 'Janvier',
+    yoy_month_feb: 'Février',
+    yoy_month_mar: 'Mars',
+    yoy_month_apr: 'Avril',
+    yoy_month_may: 'Mai',
+    yoy_month_jun: 'Juin',
+    yoy_month_jul: 'Juillet',
+    yoy_month_aug: 'Août',
+    yoy_month_sep: 'Septembre',
+    yoy_month_oct: 'Octobre',
+    yoy_month_nov: 'Novembre',
+    yoy_month_dec: 'Décembre',
+    yoy_save: 'Enregistrer',
+    yoy_cancel: 'Annuler',
+    msg_yoy_saved: 'Valeurs enregistrées.',
+    msg_yoy_cleared: 'Valeurs supprimées.',
+    msg_yoy_invalid_year: 'Année invalide.',
+    msg_yoy_invalid_value: 'Les valeurs négatives ne sont pas autorisées.',
+    // --- UI restructure: top-bar icons, help/embed modals, past-invoice extras ---
+    btn_open_history: 'Historique',
+    btn_open_help: 'Aide',
+    help_title: 'Aide et documentation',
+    embed_title: 'Intégrer XML dans un PDF existant',
+    embed_intro: 'Téléversez un PDF existant (ex: exporté d\'InDesign). Les données XML de la facture actuelle seront intégrées, transformant le PDF en facture électronique conforme.',
+    btn_embed_xml: 'Intégrer XML...',
+    btn_embed_run: 'Créer le PDF',
+    btn_embed_progress: 'Création...',
+    msg_embed_done: 'PDF avec XML intégré créé.',
+    msg_embed_failed: 'Échec de l\'intégration:',
+    btn_history_add_past: 'Ajouter une facture passée',
+    past_field_buyer_select: 'Client existant',
+    past_field_vat_rate: 'Taux de TVA (%)',
+    past_field_project: 'Projet',
+    past_field_category: 'Catégorie',
+    past_err_no_date: 'Date manquante.',
+    past_err_no_buyer: 'Acheteur manquant.',
+    past_err_no_total: 'Total brut manquant ou invalide.',
     stats_empty: 'Aucune facture dans l\'historique — les statistiques apparaîtront dès que vous en générerez.',
     stats_empty_period: 'Aucune facture dans cette période.',
     stats_kpi_total: 'Total (TTC)',
@@ -1009,8 +1235,16 @@ async function saveSeller() {
   } catch (_) {}
   bMap[effectiveInvoiceLang()] = boilerplate;
   const ok2 = await store.set(BOILERPLATE_KEY, JSON.stringify(bMap));
-  if (ok1 && ok2) flash(t('msg_seller_saved'), 'ok');
-  else flash(t('msg_save_failed'), 'err');
+  if (ok1 && ok2) {
+    flash(t('msg_seller_saved'), 'ok');
+    // Auto-collapse after a successful save when the seller has data.
+    // Refresh the summary first so the collapsed view shows current values.
+    if (isSellerConfigured()) {
+      await setSellerCollapsed(true);
+    }
+  } else {
+    flash(t('msg_save_failed'), 'err');
+  }
 }
 async function clearSeller() {
   await store.del(STORAGE_KEY);
@@ -1018,6 +1252,8 @@ async function clearSeller() {
   ['s_name','s_line1','s_zip','s_city','s_country','s_vat','s_siret','s_email','s_phone','s_iban','s_bic','s_bank',
    'r_intro','r_payment_note','r_greeting','r_signature','r_footnote']
     .forEach(id => $(id).value = id === 's_country' ? 'DE' : '');
+  // After clearing, the seller is empty — force expanded so the user can re-enter
+  await setSellerCollapsed(false);
   flash(t('msg_reset'), 'ok');
 }
 function collectSellerStammdaten() {
@@ -1071,14 +1307,6 @@ function applyBoilerplate(b) {
   $('r_signature').value = nz(b.signature);
   $('r_footnote').value = nz(b.footnote);
 }
-function applySeller(s) {
-  // Legacy entry point for backups that still have boilerplate inside the seller object.
-  applySellerStammdaten(s);
-  if (s.intro !== undefined || s.payment_note !== undefined || s.greeting !== undefined ||
-      s.signature !== undefined || s.footnote !== undefined) {
-    applyBoilerplate(s);
-  }
-}
 
 // Per-language boilerplate
 async function loadBoilerplateForLang(lang) {
@@ -1093,14 +1321,6 @@ async function loadBoilerplateForLang(lang) {
     // No saved boilerplate for this language → clear the boilerplate fields
     applyBoilerplate({});
   }
-}
-
-// Save current boilerplate field state back to its language bucket
-// (used during language switch so unsaved edits aren't lost between switches).
-async function persistCurrentBoilerplateInMemory(lang) {
-  // Note: This intentionally does NOT save to storage — only used
-  // implicitly by saveSeller(). The user must hit "save as template"
-  // to persist boilerplate per language.
 }
 
 // -------- Buyer profiles (persisted list) --------
@@ -1427,6 +1647,57 @@ async function persistHistoryEnabled() {
   return store.set(HISTORY_ENABLED_KEY, String(state.historyEnabled));
 }
 
+// -------- Year-over-Year backfill --------
+//
+// Stores monthly gross totals for years where the user didn't have the tool
+// yet, so the YoY arrows have something to compare against. Schema:
+//   { EUR: { 2025: [12000, 8000, ...], 2024: [...] }, USD: { 2025: [...] } }
+// Each year array is exactly 12 entries (Jan..Dec), zero-filled where
+// missing. Numbers are gross (matches snapshot.total semantics).
+//
+// History always wins over backfill: if a real snapshot exists for a given
+// month, the backfill value for that same month is ignored when computing
+// YoY comparisons. That way the user can backfill a partial year and let
+// real data fill in over time without re-editing.
+
+async function loadYoY() {
+  try {
+    const v = await store.get(YOY_ENABLED_KEY);
+    state.yoyEnabled = v === 'true';
+  } catch (e) { state.yoyEnabled = false; }
+  try {
+    const v = await store.get(YOY_DATA_KEY);
+    state.yoyData = v ? (JSON.parse(v) || {}) : {};
+  } catch (e) { state.yoyData = {}; }
+}
+
+async function persistYoYEnabled() {
+  return store.set(YOY_ENABLED_KEY, String(state.yoyEnabled));
+}
+
+async function persistYoYData() {
+  return store.set(YOY_DATA_KEY, JSON.stringify(state.yoyData));
+}
+
+// Save 12 monthly values for one (currency, year). Pass null to delete.
+async function saveYoYYear(currency, year, monthlyValues) {
+  if (!state.yoyData[currency]) state.yoyData[currency] = {};
+  if (monthlyValues === null) {
+    delete state.yoyData[currency][year];
+    if (Object.keys(state.yoyData[currency]).length === 0) {
+      delete state.yoyData[currency];
+    }
+  } else {
+    // Normalize: 12 entries, numeric, rounded
+    const arr = new Array(12).fill(0);
+    for (let i = 0; i < 12; i++) {
+      arr[i] = round2(Number(monthlyValues[i]) || 0);
+    }
+    state.yoyData[currency][year] = arr;
+  }
+  await persistYoYData();
+}
+
 // Build a snapshot of the current form. Captures everything needed to fully
 // reconstruct the invoice via cloning. The seller is snapshotted too so a
 // later master-data change doesn't silently rewrite history.
@@ -1586,6 +1857,8 @@ async function cloneFromHistory() {
   calcTotals();
   updateFilenamePreview();
   updateBuyerHistoryHint();
+  // Auto-close the history modal so the user is back at the form, ready to edit.
+  closeHistoryModal();
   flash(snap.imported ? t('msg_history_clone_partial') : t('msg_history_cloned'), 'ok');
 }
 
@@ -1620,6 +1893,10 @@ async function clearAllHistory() {
 function openPastInvoiceModal() {
   const modal = $('pastInvoiceModal');
   if (!modal) return;
+
+  // If history modal is open, close it first — the past-invoice modal
+  // takes over.
+  closeHistoryModal();
 
   // Pre-fill defaults
   $('past_date').value = new Date().toISOString().slice(0, 10);
@@ -1738,18 +2015,22 @@ async function savePastInvoice() {
   flash(t('msg_history_added'), 'ok');
 }
 
-// -------- Statistics --------
-// Statistics derived from history. Pure functions over state.history,
-// grouped per currency since invoices come in EUR/USD/GBP/CHF.
-//
-// Period filters: 'ytd' (current year), 'last12' (rolling 12 months),
-// 'all' (everything). Per-currency results are returned as a Map keyed
-// by currency code.
+// -------- Statistics: core data functions --------
+// Pure functions over state.history that the renderers below build on.
+// Grouped per currency since invoices come in EUR/USD/GBP/CHF.
 
 const STATS_PERIODS = ['ytd', 'last12', 'last6', 'last3', 'last_month', 'all'];
 
 // Filter snapshots by period. Uses snapshot.date (invoice date), falling
 // back to ts (timestamp of save) for entries without a date.
+//
+// Period semantics:
+//   last_month — rolling 30 days back from today
+//   last3      — the last 3 calendar months including the current one
+//   last6      — the last 6 calendar months including the current one
+//   ytd        — start of current year through today
+//   last12     — the last 12 calendar months including the current one
+//   all        — everything
 function filterByPeriod(snapshots, period) {
   if (period === 'all') return snapshots.slice();
   const now = new Date();
@@ -1813,6 +2094,137 @@ function computeKPIs(snapshots) {
   };
 }
 
+// -------- Statistics: data + render + YoY + interactions --------
+//
+// This block contains all stats logic: period windows, YoY computation,
+// monthly + quarterly aggregations, top-buyer ranking, the SVG chart
+// renderer, the three view renderers (overview / quarters / drill-down),
+// and the small state machine for switching between them.
+//
+// Comparison windows per period:
+//   ytd        → same span Jan 1..today, but in previous calendar year
+//   last_month → same 30-day rolling window, shifted back exactly 365 days
+//   last3      → same 3 calendar months, shifted back 12 months
+//   last6      → same 6 calendar months, shifted back 12 months
+//   last12     → same 12 calendar months, shifted back 12 months
+//   all        → no YoY comparison (returns null)
+
+// Compute the [cutoff, until] millisecond window for a period, optionally
+// shifted by `yearShift` whole years. Returns null for periods without YoY.
+function periodWindow(period, yearShift = 0) {
+  const now = new Date();
+  const yr = now.getFullYear() - yearShift;
+  if (period === 'all') return null;
+  if (period === 'ytd') {
+    const start = new Date(yr, 0, 1).getTime();
+    // For shifted year, until = today's date in that year. For current = now.
+    let until;
+    if (yearShift === 0) until = now.getTime();
+    else until = new Date(yr, now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+    return [start, until];
+  }
+  if (period === 'last_month') {
+    const start = now.getTime() - 30 * 86400000 - yearShift * 365 * 86400000;
+    const end   = now.getTime() - yearShift * 365 * 86400000;
+    return [start, end];
+  }
+  if (period === 'last3' || period === 'last6' || period === 'last12') {
+    const monthsBack = period === 'last3' ? 2 : period === 'last6' ? 5 : 11;
+    const start = new Date(yr, now.getMonth() - monthsBack, 1).getTime();
+    let until;
+    if (yearShift === 0) until = now.getTime();
+    else until = new Date(yr, now.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
+    return [start, until];
+  }
+  return null;
+}
+
+// Filter snapshots to a [cutoff, until] window.
+function filterByWindow(snapshots, win) {
+  if (!win) return [];
+  const [from, to] = win;
+  return snapshots.filter(s => {
+    const ts = s.date ? new Date(s.date).getTime() : s.ts;
+    return Number.isFinite(ts) && ts >= from && ts <= to;
+  });
+}
+
+// Given a currency and a previous-year window, compute the previous-period
+// gross + net + tax KPIs. Combines real history snapshots and backfill
+// values; history wins per (year, month). Returns null when no comparable
+// data is available for that window.
+function computeYoYBaseline(currency, prevWindow, prevYear) {
+  if (!prevWindow) return null;
+  const [from, to] = prevWindow;
+
+  // Collect history snapshots for the currency in the window
+  const histInCur = state.history.filter(s => (s.currency || 'EUR') === currency);
+  const histInWin = filterByWindow(histInCur, prevWindow);
+  const baseKPI = computeKPIs(histInWin);
+
+  // Track which (year, month) pairs are already covered by real history.
+  // Backfill values for those months are then ignored.
+  const covered = new Set();
+  for (const s of histInWin) {
+    if (!s.date) continue;
+    const d = new Date(s.date);
+    if (Number.isNaN(d.getTime())) continue;
+    covered.add(`${d.getFullYear()}-${d.getMonth()}`);
+  }
+
+  // Backfill contribution: sum monthly gross values for months in the
+  // window that aren't covered by history. We don't have item-level data,
+  // so net == gross == total here (no VAT contribution from backfill).
+  let backfillGross = 0;
+  if (state.yoyData[currency]) {
+    // The window may straddle two calendar years (e.g. last_month rolling
+    // window in January). Walk month-by-month from `from` to `to`.
+    const fromD = new Date(from);
+    const toD = new Date(to);
+    const cursor = new Date(fromD.getFullYear(), fromD.getMonth(), 1);
+    while (cursor.getTime() <= toD.getTime()) {
+      const y = cursor.getFullYear();
+      const m = cursor.getMonth();
+      const key = `${y}-${m}`;
+      if (!covered.has(key)) {
+        const monthArr = state.yoyData[currency][y];
+        if (Array.isArray(monthArr) && monthArr.length === 12) {
+          backfillGross += Number(monthArr[m]) || 0;
+        }
+      }
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+  }
+
+  const total = round2(baseKPI.total + backfillGross);
+  // Backfill has no item-level breakdown — count it 1:1 into net only,
+  // tax stays whatever real history contributes.
+  const net   = round2(baseKPI.net + backfillGross);
+  const tax   = baseKPI.tax;
+  const count = baseKPI.count;  // backfill doesn't have a meaningful count
+  const avg   = count > 0 ? round2(total / count) : 0;
+
+  if (total === 0 && net === 0 && tax === 0 && count === 0) return null;
+  return { total, net, tax, count, avg };
+}
+
+// Format a percent change as a display string with an arrow glyph.
+// Returns { glyph, pct, cls } where cls is 'up'/'down'/'flat'/'none'.
+function yoyDelta(currentValue, prevValue) {
+  if (prevValue === null || prevValue === undefined) {
+    return { glyph: '\u2013', pct: '', cls: 'none' };
+  }
+  if (prevValue === 0) {
+    if (currentValue > 0) return { glyph: '\u25b2', pct: '\u2014', cls: 'up' };
+    return { glyph: '\u2013', pct: '', cls: 'flat' };
+  }
+  const diff = currentValue - prevValue;
+  const pct = Math.round((diff / prevValue) * 100);
+  if (pct === 0) return { glyph: '\u2013', pct: '0%', cls: 'flat' };
+  if (pct > 0)  return { glyph: '\u25b2', pct: `+${pct}%`, cls: 'up' };
+  return { glyph: '\u25bc', pct: `${pct}%`, cls: 'down' };
+}
+
 // Top N buyers by total amount, within a single currency. Returns
 // [{ name, total, count }, ...] sorted descending.
 function topBuyers(snapshots, n = 3) {
@@ -1856,6 +2268,44 @@ function monthlyTotals(snapshots) {
   return Array.from(buckets.values()).map(b => ({ ...b, total: round2(b.total) }));
 }
 
+// For a given currency and a year-month string ('YYYY-MM' from
+// monthlyTotals), return the gross total from one year earlier.
+// Combines real history snapshots with backfill data; history wins.
+// Returns null when no data exists for that month.
+function monthYoYValue(currency, ym) {
+  const [yStr, mStr] = ym.split('-');
+  const prevY = Number(yStr) - 1;
+  const monthIdx = Number(mStr) - 1;
+  let total = 0;
+  let hasData = false;
+
+  // Look in history first
+  for (const s of state.history) {
+    if (!s.date) continue;
+    if ((s.currency || 'EUR') !== currency) continue;
+    const d = new Date(s.date);
+    if (Number.isNaN(d.getTime())) continue;
+    if (d.getFullYear() === prevY && d.getMonth() === monthIdx) {
+      total += Number(s.total) || 0;
+      hasData = true;
+    }
+  }
+
+  // Backfill only counts if no real history covered this month
+  if (!hasData && state.yoyData[currency]) {
+    const arr = state.yoyData[currency][prevY];
+    if (Array.isArray(arr) && arr.length === 12) {
+      const v = Number(arr[monthIdx]) || 0;
+      if (v > 0) {
+        total = v;
+        hasData = true;
+      }
+    }
+  }
+
+  return hasData ? round2(total) : null;
+}
+
 // Build SVG bar-chart for monthly totals. Inline SVG so no library needed.
 function renderMonthlyChartSVG(months, currency) {
   const W = 560, H = 140, P_TOP = 16, P_BOT = 28, P_LEFT = 8, P_RIGHT = 8;
@@ -1863,21 +2313,35 @@ function renderMonthlyChartSVG(months, currency) {
   const innerW = W - P_LEFT - P_RIGHT;
   const innerH = H - P_TOP - P_BOT;
   const slot = innerW / months.length;
-  const barW = Math.max(4, slot * 0.6);
+  const barW = Math.max(3, slot * 0.45);
   const sym = currencySymbol(currency);
   const bars = months.map((m, i) => {
     const h = (m.total / max) * innerH;
     const x = P_LEFT + i * slot + (slot - barW) / 2;
     const y = P_TOP + (innerH - h);
-    const tip = `${m.label}: ${fmt(m.total)} ${sym}`;
-    // Hitbox covers the full slot width (not just the bar) so users don't
-    // need millimeter-precise hovering. The visible bar sits behind the
-    // transparent hitbox; the hitbox carries the data attributes that the
-    // chart-level mousemove handler reads.
+
+    // Build tooltip text. Adds a YoY comparison line when the toggle is
+    // on and a previous-year value exists for this month. The HTML is
+    // sanitized via esc(), and the tooltip element renders innerHTML so
+    // we can include the <br> as a literal break.
+    let tip = `${m.label}: ${fmt(m.total)} ${sym}`;
+    if (state.yoyEnabled) {
+      const prev = monthYoYValue(currency, m.ym);
+      if (prev !== null) {
+        const delta = yoyDelta(m.total, prev);
+        const arrowText = delta.pct
+          ? `${delta.glyph} ${delta.pct}`
+          : delta.glyph;
+        // Year derived from m.ym = 'YYYY-MM'
+        const prevYear = Number(m.ym.split('-')[0]) - 1;
+        tip += `\u2002\u00b7\u2002vs. ${prevYear}: ${fmt(prev)} ${sym} ${arrowText}`;
+      }
+    }
+    // Full-slot transparent hitbox so the tooltip works even between bars.
     const hitX = P_LEFT + i * slot;
     return `<g>` +
       `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="currentColor" opacity="0.7"></rect>` +
-      `<text x="${(x + barW / 2).toFixed(1)}" y="${(H - 8).toFixed(1)}" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.6">${esc(m.label)}</text>` +
+      `<text x="${(x + barW / 2).toFixed(1)}" y="${(H - 8).toFixed(1)}" text-anchor="middle" font-size="8" fill="currentColor" opacity="0.55">${esc(m.label)}</text>` +
       `<rect class="stats-bar-hit" x="${hitX.toFixed(1)}" y="${P_TOP}" width="${slot.toFixed(1)}" height="${innerH}" fill="transparent" data-tip="${esc(tip)}"></rect>` +
       `</g>`;
   }).join('');
@@ -1904,7 +2368,6 @@ function attachChartTooltips() {
     const wrapRect = wrap.getBoundingClientRect();
     const x = e.clientX - wrapRect.left;
     const y = e.clientY - wrapRect.top;
-    // Position above the cursor; clamp to wrap bounds so it stays readable.
     tip.style.left = `${Math.max(4, Math.min(wrapRect.width - tip.offsetWidth - 4, x - tip.offsetWidth / 2))}px`;
     tip.style.top  = `${Math.max(4, y - tip.offsetHeight - 8)}px`;
   });
@@ -1958,7 +2421,87 @@ function updateBuyerHistoryHint() {
 
 // Render the entire statistics modal body. Called when the modal opens
 // and when the period filter changes.
-function renderStatistics() {
+// Stats view: 'overview' (default KPIs + chart + top buyers) or
+// 'quarters' (quarterly tax breakdown for one year).
+let statsView = 'overview';
+// Year shown in the quarters view (independent of period filter).
+let statsYear = new Date().getFullYear();
+// When non-null, the overview is replaced with a single-buyer drill-down view.
+// Reset by clicking the "back" button or switching tabs.
+let statsBuyerDrillDown = null;
+
+// Compute a quarterly breakdown for one year of snapshots, grouped by
+// tax mode. Returns:
+//   { quarters: [{ q, S: {net, tax}, AE: {net}, Z: {net}, E: {net}, O: {net} }, ...],
+//     yearTotals: { S: {net, tax}, AE: {net}, Z: {net}, E: {net}, O: {net} } }
+function computeQuarterlyBreakdown(snapshots, year) {
+  const empty = () => ({
+    S:  { net: 0, tax: 0 },
+    AE: { net: 0 },
+    Z:  { net: 0 },
+    E:  { net: 0 },
+    O:  { net: 0 },
+  });
+  const quarters = [empty(), empty(), empty(), empty()];
+  const yearTotals = empty();
+
+  for (const s of snapshots) {
+    if (!s.date) continue;
+    const d = new Date(s.date);
+    if (Number.isNaN(d.getTime())) continue;
+    if (d.getFullYear() !== year) continue;
+    const q = Math.floor(d.getMonth() / 3);
+    const mode = (s.form && s.form.taxmode) || 'S';
+
+    // Reconstruct net + tax from items where possible, like computeKPIs does.
+    const items = s.form && Array.isArray(s.form.items) ? s.form.items : [];
+    let net = 0, tax = 0;
+    for (const it of items) {
+      const line = (Number(it.qty) || 0) * (Number(it.price) || 0);
+      net += line;
+      if (mode === 'S') tax += line * (Number(it.vat) || 0) / 100;
+    }
+    if (net === 0) net = Number(s.total) || 0; // fallback: gross only
+
+    const target = quarters[q][mode] || quarters[q].O;
+    target.net += net;
+    if (mode === 'S') target.tax += tax;
+
+    const yt = yearTotals[mode] || yearTotals.O;
+    yt.net += net;
+    if (mode === 'S') yt.tax += tax;
+  }
+
+  // Round everything for display
+  const round = (obj) => {
+    for (const k of Object.keys(obj)) {
+      obj[k].net = round2(obj[k].net);
+      if (obj[k].tax !== undefined) obj[k].tax = round2(obj[k].tax);
+    }
+  };
+  for (const qb of quarters) round(qb);
+  round(yearTotals);
+
+  return {
+    quarters: quarters.map((qb, i) => ({ q: i + 1, ...qb })),
+    yearTotals,
+  };
+}
+
+// Years available in the history, for the quarter-view year selector.
+function availableYearsInHistory() {
+  const set = new Set();
+  for (const s of state.history) {
+    if (!s.date) continue;
+    const d = new Date(s.date);
+    if (!Number.isNaN(d.getTime())) set.add(d.getFullYear());
+  }
+  if (set.size === 0) set.add(new Date().getFullYear());
+  return Array.from(set).sort((a, b) => b - a); // newest first
+}
+
+// Render the overview (existing) view body.
+function renderStatisticsOverview() {
   const period = $('statsPeriod').value;
   const filtered = filterByPeriod(state.history, period);
   const body = $('statsBody');
@@ -1974,34 +2517,62 @@ function renderStatistics() {
   }
 
   const groups = groupByCurrency(filtered);
-  // Sort by total volume (largest currency block first)
   const ordered = Array.from(groups.entries())
     .map(([cur, list]) => ({ cur, list, kpi: computeKPIs(list) }))
     .sort((a, b) => b.kpi.total - a.kpi.total);
+
+  // Compute YoY baselines per currency when enabled. Returns null when
+  // the period doesn't support YoY (e.g. "all time").
+  const prevWindow = state.yoyEnabled ? periodWindow(period, 1) : null;
+  const yoyByCurrency = {};
+  if (prevWindow) {
+    for (const { cur } of ordered) {
+      yoyByCurrency[cur] = computeYoYBaseline(cur, prevWindow, new Date().getFullYear() - 1);
+    }
+  }
+
+  // Helper: render one KPI card with optional YoY arrow.
+  // Tax KPI gets no arrow when the previous-period tax is zero (typical
+  // for a freelancer with mostly reverse-charge — the comparison is
+  // statistically empty).
+  const kpiCard = (labelKey, value, sym, prev) => {
+    let arrowHTML = '';
+    if (state.yoyEnabled && prev !== undefined) {
+      const d = yoyDelta(value, prev);
+      arrowHTML = `<span class="yoy-arrow yoy-${d.cls}">${esc(d.glyph)}${d.pct ? ` <span class="yoy-pct">${esc(d.pct)}</span>` : ''}</span>`;
+    }
+    return `<div class="stats-kpi"><div class="stats-kpi-label">${esc(t(labelKey))}</div><div class="stats-kpi-value">${fmt(value)} ${esc(sym)}${arrowHTML}</div></div>`;
+  };
 
   const blocks = ordered.map(({ cur, list, kpi }) => {
     const sym = currencySymbol(cur);
     const tops = topBuyers(list, 3);
     const months = monthlyTotals(list);
+    const prev = yoyByCurrency[cur];
+
     const topsHTML = tops.length === 0 ? '' : `
       <div class="stats-tops">
         <div class="stats-subhead">${esc(t('stats_top_buyers'))}</div>
         <ol>
           ${tops.map(b => {
             const pct = kpi.total > 0 ? Math.round((b.total / kpi.total) * 100) : 0;
-            return `<li><span class="stats-buyer-name">${esc(b.name)}</span><span class="stats-buyer-meta">${fmt(b.total)} ${esc(sym)} · ${pct}%</span></li>`;
+            return `<li><button class="stats-buyer-btn" type="button" data-buyer="${esc(b.name)}"><span class="stats-buyer-name">${esc(b.name)}</span><span class="stats-buyer-meta">${fmt(b.total)} ${esc(sym)} · ${pct}%</span></button></li>`;
           }).join('')}
         </ol>
       </div>`;
+
+    const kpisHTML = `
+      <div class="stats-kpis">
+        ${kpiCard('stats_kpi_total', kpi.total, sym, prev ? prev.total : undefined)}
+        ${kpiCard('stats_kpi_net',   kpi.net,   sym, prev ? prev.net   : undefined)}
+        ${kpiCard('stats_kpi_tax',   kpi.tax,   sym, prev ? prev.tax   : undefined)}
+        ${kpiCard('stats_kpi_avg',   kpi.avg,   sym, prev ? prev.avg   : undefined)}
+      </div>`;
+
     return `
       <div class="stats-block">
         <div class="stats-block-head">${esc(cur)} <span class="stats-block-count">· ${kpi.count} ${esc(t(kpi.count === 1 ? 'stats_invoice' : 'stats_invoices'))}</span></div>
-        <div class="stats-kpis">
-          <div class="stats-kpi"><div class="stats-kpi-label">${esc(t('stats_kpi_total'))}</div><div class="stats-kpi-value">${fmt(kpi.total)} ${esc(sym)}</div></div>
-          <div class="stats-kpi"><div class="stats-kpi-label">${esc(t('stats_kpi_net'))}</div><div class="stats-kpi-value">${fmt(kpi.net)} ${esc(sym)}</div></div>
-          <div class="stats-kpi"><div class="stats-kpi-label">${esc(t('stats_kpi_tax'))}</div><div class="stats-kpi-value">${fmt(kpi.tax)} ${esc(sym)}</div></div>
-          <div class="stats-kpi"><div class="stats-kpi-label">${esc(t('stats_kpi_avg'))}</div><div class="stats-kpi-value">${fmt(kpi.avg)} ${esc(sym)}</div></div>
-        </div>
+        ${kpisHTML}
         <div class="stats-chart-wrap">
           <div class="stats-subhead">${esc(t('stats_last_12_months'))}</div>
           ${renderMonthlyChartSVG(months, cur)}
@@ -2010,15 +2581,536 @@ function renderStatistics() {
       </div>`;
   }).join('');
 
-  body.innerHTML = blocks;
+  // YoY hint banner: when toggle is on but there's no comparable data
+  // anywhere (no history overlap AND no backfill), nudge the user to
+  // backfill. Skip banner when YoY isn't supported by the period.
+  let yoyBanner = '';
+  if (state.yoyEnabled && prevWindow) {
+    const anyData = ordered.some(({ cur }) => yoyByCurrency[cur] !== null);
+    if (!anyData) {
+      yoyBanner = `
+        <div class="yoy-banner">
+          <span>${esc(t('yoy_hint_no_data'))}</span>
+          <button class="tiny-btn" id="yoyOpenBackfill" type="button" data-i18n="yoy_set_reference"></button>
+        </div>`;
+    }
+  } else if (state.yoyEnabled && !prevWindow) {
+    yoyBanner = `<div class="yoy-banner yoy-banner-info">${esc(t('yoy_hint_no_period'))}</div>`;
+  }
+
+  body.innerHTML = yoyBanner + blocks;
   attachChartTooltips();
+  applyTranslations();
+}
+
+// Render the quarterly tax-breakdown view.
+function renderStatisticsQuarters() {
+  const body = $('statsBody');
+  if (!body) return;
+
+  if (state.history.length === 0) {
+    body.innerHTML = `<div class="stats-empty">${esc(t('stats_empty'))}</div>`;
+    return;
+  }
+
+  // Snapshots in the selected year only
+  const inYear = state.history.filter(s => {
+    if (!s.date) return false;
+    const d = new Date(s.date);
+    return !Number.isNaN(d.getTime()) && d.getFullYear() === statsYear;
+  });
+
+  if (inYear.length === 0) {
+    body.innerHTML = `<div class="stats-empty">${esc(t('stats_empty_year'))}</div>`;
+    return;
+  }
+
+  const groups = groupByCurrency(inYear);
+  const ordered = Array.from(groups.entries())
+    .map(([cur, list]) => ({ cur, list, breakdown: computeQuarterlyBreakdown(list, statsYear) }))
+    .sort((a, b) => b.list.length - a.list.length);
+
+  // Helper: render a value cell, falling back to "—" when 0.
+  const cell = (val, sym) => val > 0
+    ? `${fmt(val)} ${esc(sym)}`
+    : `<span class="qb-zero">—</span>`;
+
+  const blocks = ordered.map(({ cur, list, breakdown }) => {
+    const sym = currencySymbol(cur);
+    // Find which modes actually have data for this currency, so we don't
+    // render empty columns. Always show 'S' even if zero.
+    const modesWithData = new Set(['S']);
+    for (const qb of breakdown.quarters) {
+      if (qb.AE.net > 0) modesWithData.add('AE');
+      if (qb.Z.net > 0)  modesWithData.add('Z');
+      if (qb.E.net > 0)  modesWithData.add('E');
+      if (qb.O.net > 0)  modesWithData.add('O');
+    }
+    const showAE = modesWithData.has('AE');
+    const showZ  = modesWithData.has('Z');
+    const showE  = modesWithData.has('E');
+    const showO  = modesWithData.has('O');
+
+    // Build header row: Quarter | Standard Net | Standard VAT | [Reverse Charge] | [Zero] | [Exempt] | [Out of Scope]
+    const headers = [
+      `<th>${esc(t('qb_quarter'))}</th>`,
+      `<th class="num">${esc(t('qb_standard_net'))}</th>`,
+      `<th class="num">${esc(t('qb_standard_vat'))}</th>`,
+    ];
+    if (showAE) headers.push(`<th class="num">${esc(t('qb_reverse_charge'))}</th>`);
+    if (showZ)  headers.push(`<th class="num">${esc(t('qb_zero_rate'))}</th>`);
+    if (showE)  headers.push(`<th class="num">${esc(t('qb_exempt'))}</th>`);
+    if (showO)  headers.push(`<th class="num">${esc(t('qb_out_of_scope'))}</th>`);
+
+    // Body rows
+    const bodyRows = breakdown.quarters.map(qb => {
+      const cells = [
+        `<td>${esc(t('qb_q' + qb.q))}</td>`,
+        `<td class="num">${cell(qb.S.net, sym)}</td>`,
+        `<td class="num">${cell(qb.S.tax, sym)}</td>`,
+      ];
+      if (showAE) cells.push(`<td class="num">${cell(qb.AE.net, sym)}</td>`);
+      if (showZ)  cells.push(`<td class="num">${cell(qb.Z.net,  sym)}</td>`);
+      if (showE)  cells.push(`<td class="num">${cell(qb.E.net,  sym)}</td>`);
+      if (showO)  cells.push(`<td class="num">${cell(qb.O.net,  sym)}</td>`);
+      return `<tr>${cells.join('')}</tr>`;
+    }).join('');
+
+    // Total row
+    const yt = breakdown.yearTotals;
+    const totalCells = [
+      `<td><strong>${esc(t('qb_year_total'))}</strong></td>`,
+      `<td class="num"><strong>${cell(yt.S.net, sym)}</strong></td>`,
+      `<td class="num"><strong>${cell(yt.S.tax, sym)}</strong></td>`,
+    ];
+    if (showAE) totalCells.push(`<td class="num"><strong>${cell(yt.AE.net, sym)}</strong></td>`);
+    if (showZ)  totalCells.push(`<td class="num"><strong>${cell(yt.Z.net,  sym)}</strong></td>`);
+    if (showE)  totalCells.push(`<td class="num"><strong>${cell(yt.E.net,  sym)}</strong></td>`);
+    if (showO)  totalCells.push(`<td class="num"><strong>${cell(yt.O.net,  sym)}</strong></td>`);
+
+    return `
+      <div class="stats-block">
+        <div class="stats-block-head">${esc(cur)} <span class="stats-block-count">· ${list.length} ${esc(t(list.length === 1 ? 'stats_invoice' : 'stats_invoices'))}</span></div>
+        <div class="qb-table-wrap">
+          <table class="qb-table">
+            <thead><tr>${headers.join('')}</tr></thead>
+            <tbody>${bodyRows}</tbody>
+            <tfoot><tr class="qb-total">${totalCells.join('')}</tr></tfoot>
+          </table>
+        </div>
+      </div>`;
+  }).join('');
+
+  body.innerHTML = blocks;
+}
+
+// Render a single-buyer drill-down view: all invoices for `buyerName`, plus
+// per-buyer KPIs (count, total, avg, first/last invoice). Read-only — no
+// cloning from this view.
+function renderStatisticsBuyer(buyerName) {
+  const body = $('statsBody');
+  if (!body) return;
+
+  // Match case-insensitively, trim — same logic as updateBuyerHistoryHint.
+  const target = (buyerName || '').toLowerCase().trim();
+  const matched = state.history.filter(s =>
+    (s.buyerName || '').toLowerCase().trim() === target);
+
+  if (matched.length === 0) {
+    body.innerHTML = `
+      <div class="stats-buyer-detail">
+        <button class="tiny-btn stats-back-btn" id="statsBackBtn" type="button" data-i18n="stats_back"></button>
+        <div class="stats-empty">${esc(t('stats_empty'))}</div>
+      </div>`;
+    applyTranslations();
+    return;
+  }
+
+  // Group by currency since a buyer may have invoices in multiple
+  const groups = groupByCurrency(matched);
+  const ordered = Array.from(groups.entries())
+    .map(([cur, list]) => ({ cur, list, kpi: computeKPIs(list) }))
+    .sort((a, b) => b.kpi.total - a.kpi.total);
+
+  // Date range across all currencies (first / last invoice for this buyer)
+  const datedSorted = matched
+    .filter(s => s.date)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const firstInv = datedSorted[0];
+  const lastInv  = datedSorted[datedSorted.length - 1];
+
+  const formatDate = (iso) => {
+    if (!iso) return '';
+    try { return new Date(iso).toLocaleDateString(CURRENT_LANG); } catch { return iso; }
+  };
+
+  const blocks = ordered.map(({ cur, list, kpi }) => {
+    const sym = currencySymbol(cur);
+    // Sort newest first for the invoice list
+    const sortedList = list.slice().sort((a, b) => {
+      const ta = a.date ? new Date(a.date).getTime() : a.ts;
+      const tb = b.date ? new Date(b.date).getTime() : b.ts;
+      return tb - ta;
+    });
+    const rows = sortedList.map(s => `
+      <tr>
+        <td>${esc(formatDate(s.date))}</td>
+        <td>${esc(s.number || '—')}${s.imported ? ` <span class="qb-zero">(${esc(t('history_imported_marker'))})</span>` : ''}</td>
+        <td class="num">${fmt(Number(s.total) || 0)} ${esc(sym)}</td>
+      </tr>`).join('');
+
+    return `
+      <div class="stats-block">
+        <div class="stats-block-head">${esc(cur)} <span class="stats-block-count">· ${kpi.count} ${esc(t(kpi.count === 1 ? 'stats_invoice' : 'stats_invoices'))}</span></div>
+        <div class="stats-kpis">
+          <div class="stats-kpi"><div class="stats-kpi-label">${esc(t('stats_kpi_total'))}</div><div class="stats-kpi-value">${fmt(kpi.total)} ${esc(sym)}</div></div>
+          <div class="stats-kpi"><div class="stats-kpi-label">${esc(t('stats_kpi_avg'))}</div><div class="stats-kpi-value">${fmt(kpi.avg)} ${esc(sym)}</div></div>
+          <div class="stats-kpi"><div class="stats-kpi-label">${esc(t('stats_buyer_first'))}</div><div class="stats-kpi-value">${esc(formatDate(firstInv && firstInv.date))}</div></div>
+          <div class="stats-kpi"><div class="stats-kpi-label">${esc(t('stats_buyer_last'))}</div><div class="stats-kpi-value">${esc(formatDate(lastInv && lastInv.date))}</div></div>
+        </div>
+        <div class="qb-table-wrap">
+          <table class="qb-table stats-buyer-invoices">
+            <thead>
+              <tr>
+                <th>${esc(t('stats_buyer_col_date'))}</th>
+                <th>${esc(t('stats_buyer_col_number'))}</th>
+                <th class="num">${esc(t('stats_buyer_col_total'))}</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>`;
+  }).join('');
+
+  body.innerHTML = `
+    <div class="stats-buyer-detail">
+      <div class="stats-buyer-head">
+        <button class="tiny-btn stats-back-btn" id="statsBackBtn" type="button" data-i18n="stats_back"></button>
+        <h3 class="stats-buyer-title">${esc(buyerName)}</h3>
+      </div>
+      ${blocks}
+    </div>`;
+  applyTranslations();
+}
+
+// Update the visibility of the period-vs-year controls and the active-tab
+// button styling based on statsView.
+function updateStatsViewControls() {
+  const periodWrap = $('statsPeriodWrap');
+  const yearWrap   = $('statsYearWrap');
+  const overviewBtn = $('statsTabOverview');
+  const quartersBtn = $('statsTabQuarters');
+  // Hide period/year selectors entirely while drilled into a buyer
+  const inDrillDown = statsView === 'overview' && statsBuyerDrillDown !== null;
+  if (periodWrap) periodWrap.style.display = (statsView === 'overview' && !inDrillDown) ? '' : 'none';
+  if (yearWrap)   yearWrap.style.display   = statsView === 'quarters' ? '' : 'none';
+  if (overviewBtn) overviewBtn.classList.toggle('active', statsView === 'overview');
+  if (quartersBtn) quartersBtn.classList.toggle('active', statsView === 'quarters');
+}
+
+// Populate the year selector with years available in history.
+function refreshStatsYearSelector() {
+  const sel = $('statsYear');
+  if (!sel) return;
+  const years = availableYearsInHistory();
+  if (!years.includes(statsYear)) statsYear = years[0];
+  sel.innerHTML = years.map(y => `<option value="${y}"${y === statsYear ? ' selected' : ''}>${y}</option>`).join('');
+}
+
+// Dispatcher: routes to the appropriate view renderer.
+function renderStatistics() {
+  updateStatsViewControls();
+  if (statsView === 'overview' && statsBuyerDrillDown) {
+    renderStatisticsBuyer(statsBuyerDrillDown);
+  } else if (statsView === 'overview') {
+    renderStatisticsOverview();
+  } else {
+    renderStatisticsQuarters();
+  }
+}
+
+function setStatsView(v) {
+  if (v !== 'overview' && v !== 'quarters') return;
+  statsView = v;
+  // Switching tabs always exits drill-down mode
+  statsBuyerDrillDown = null;
+  if (v === 'quarters') refreshStatsYearSelector();
+  renderStatistics();
+}
+
+function setStatsBuyerDrillDown(name) {
+  statsBuyerDrillDown = name || null;
+  renderStatistics();
+}
+
+// -------- YoY: toggle + backfill modal --------
+
+async function setYoYEnabled(v) {
+  state.yoyEnabled = !!v;
+  await persistYoYEnabled();
+  updateYoYToggleButton();
+  renderStatistics();
+}
+
+function updateYoYToggleButton() {
+  const btn = $('statsYoYToggle');
+  if (!btn) return;
+  btn.classList.toggle('active', state.yoyEnabled);
+  btn.setAttribute('aria-pressed', state.yoyEnabled ? 'true' : 'false');
+}
+
+// Open the backfill modal for entering 12 monthly gross totals.
+function openYoYBackfillModal() {
+  const modal = $('yoyBackfillModal');
+  if (!modal) return;
+
+  // Year selector: previous year by default; allow the user to backfill
+  // older years too. Show last 5 years.
+  const thisYear = new Date().getFullYear();
+  const yearSel = $('yoyBackfillYear');
+  yearSel.innerHTML = '';
+  for (let y = thisYear - 1; y >= thisYear - 5; y--) {
+    yearSel.insertAdjacentHTML('beforeend', `<option value="${y}">${y}</option>`);
+  }
+  yearSel.value = String(thisYear - 1);
+
+  // Currency selector: pre-fill with currencies present in history,
+  // plus EUR as fallback. User can also type a custom 3-letter code.
+  const curSel = $('yoyBackfillCurrency');
+  const cursInHistory = new Set();
+  for (const s of state.history) cursInHistory.add(s.currency || 'EUR');
+  if (cursInHistory.size === 0) cursInHistory.add('EUR');
+  curSel.innerHTML = '';
+  for (const cur of cursInHistory) {
+    curSel.insertAdjacentHTML('beforeend', `<option value="${esc(cur)}">${esc(cur)}</option>`);
+  }
+
+  // Hook year/currency change to repopulate the input fields with any
+  // previously-saved data for that combination.
+  const repopulate = () => {
+    const cur = curSel.value;
+    const yr = Number(yearSel.value);
+    const arr = (state.yoyData[cur] && state.yoyData[cur][yr]) || new Array(12).fill(0);
+    for (let i = 0; i < 12; i++) {
+      const inp = $(`yoyMonth_${i}`);
+      if (inp) inp.value = arr[i] ? String(arr[i]) : '';
+    }
+  };
+  curSel.onchange = repopulate;
+  yearSel.onchange = repopulate;
+  repopulate();
+
+  modal.classList.add('open');
+  modal.removeAttribute('hidden');
+}
+
+function closeYoYBackfillModal() {
+  const modal = $('yoyBackfillModal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.setAttribute('hidden', '');
+}
+
+async function saveYoYBackfill() {
+  const cur = $('yoyBackfillCurrency').value.trim().toUpperCase() || 'EUR';
+  const yr = Number($('yoyBackfillYear').value);
+  if (!yr || yr < 1900 || yr > 2200) { flash(t('msg_yoy_invalid_year'), 'err'); return; }
+  const values = [];
+  let anyNonZero = false;
+  for (let i = 0; i < 12; i++) {
+    const inp = $(`yoyMonth_${i}`);
+    const v = parseFloat((inp && inp.value || '').replace(',', '.')) || 0;
+    if (v < 0) { flash(t('msg_yoy_invalid_value'), 'err'); return; }
+    values.push(v);
+    if (v > 0) anyNonZero = true;
+  }
+  if (!anyNonZero) {
+    // Saving all zeros = clear this year/currency combo
+    await saveYoYYear(cur, yr, null);
+    flash(t('msg_yoy_cleared'), 'ok');
+  } else {
+    await saveYoYYear(cur, yr, values);
+    flash(t('msg_yoy_saved'), 'ok');
+  }
+  closeYoYBackfillModal();
+  renderStatistics();
+}
+
+// -------- Stats: CSV export --------
+//
+// What gets exported is "what you see":
+//   Overview tab        → all snapshots in current period filter
+//   Quarters tab        → quarterly breakdown table for the selected year
+//   Buyer drill-down    → all snapshots for that buyer, all currencies
+//
+// CSV format: UTF-8 with BOM (so Excel reads umlauts correctly), semicolon
+// separators (so European Excel doesn't fight comma decimals), all fields
+// quoted per RFC 4180.
+
+// Quote a single CSV field: wrap in double quotes, escape internal quotes.
+function csvField(v) {
+  if (v === null || v === undefined) return '""';
+  return '"' + String(v).replace(/"/g, '""') + '"';
+}
+
+// Build a CSV string from a header row + body rows.
+function buildCSV(headers, rows) {
+  const sep = ';';
+  const lines = [headers.map(csvField).join(sep)];
+  for (const row of rows) lines.push(row.map(csvField).join(sep));
+  // BOM for Excel UTF-8 detection + CRLF line endings (RFC 4180)
+  return '\ufeff' + lines.join('\r\n') + '\r\n';
+}
+
+// Reconstruct net + tax for a single snapshot (mirrors computeKPIs / quarter
+// breakdown logic). Returns { net, tax }.
+function snapshotNetTax(s) {
+  const items = s.form && Array.isArray(s.form.items) ? s.form.items : [];
+  const mode = s.form && s.form.taxmode;
+  let net = 0, tax = 0;
+  for (const it of items) {
+    const line = (Number(it.qty) || 0) * (Number(it.price) || 0);
+    net += line;
+    if (mode === 'S') tax += line * (Number(it.vat) || 0) / 100;
+  }
+  if (net === 0) net = Number(s.total) || 0;
+  return { net: round2(net), tax: round2(tax) };
+}
+
+// Format a number for CSV: decimal point, two fraction digits, no thousands.
+function csvNum(n) {
+  return (Math.round((Number(n) || 0) * 100) / 100).toFixed(2);
+}
+
+// Export the current overview view: all snapshots in the active period.
+function exportOverviewCSV() {
+  const period = $('statsPeriod').value;
+  const filtered = filterByPeriod(state.history, period);
+  if (filtered.length === 0) { flash(t('msg_csv_no_data'), 'err'); return; }
+  // Newest first
+  const sorted = filtered.slice().sort((a, b) => {
+    const ta = a.date ? new Date(a.date).getTime() : a.ts;
+    const tb = b.date ? new Date(b.date).getTime() : b.ts;
+    return tb - ta;
+  });
+  const headers = ['Date', 'Number', 'Buyer', 'Currency', 'Net', 'VAT', 'Gross', 'Mode', 'Category', 'Project', 'Source'];
+  const rows = sorted.map(s => {
+    const { net, tax } = snapshotNetTax(s);
+    return [
+      s.date || '',
+      s.number || '',
+      s.buyerName || '',
+      s.currency || 'EUR',
+      csvNum(net),
+      csvNum(tax),
+      csvNum(s.total),
+      (s.form && s.form.taxmode) || '',
+      (s.form && s.form.category) || '',
+      (s.form && s.form.project) || '',
+      s.imported ? 'manual' : 'generated',
+    ];
+  });
+  const csv = buildCSV(headers, rows);
+  const ts = new Date().toISOString().slice(0, 10);
+  const periodLabel = period.replace(/[^a-z0-9]/gi, '_');
+  downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }),
+    `erechnung-stats-${periodLabel}-${ts}.csv`);
+  flash(t('msg_csv_exported'), 'ok');
+}
+
+// Export the quarterly tax breakdown for the selected year.
+function exportQuartersCSV() {
+  const inYear = state.history.filter(s => {
+    if (!s.date) return false;
+    const d = new Date(s.date);
+    return !Number.isNaN(d.getTime()) && d.getFullYear() === statsYear;
+  });
+  if (inYear.length === 0) { flash(t('msg_csv_no_data'), 'err'); return; }
+  const groups = groupByCurrency(inYear);
+  const headers = ['Currency', 'Quarter',
+    'Standard Net', 'Standard VAT',
+    'Reverse Charge Net', 'Zero Rate Net', 'Exempt Net', 'Out of Scope Net'];
+  const rows = [];
+  for (const [cur, list] of groups.entries()) {
+    const breakdown = computeQuarterlyBreakdown(list, statsYear);
+    for (const qb of breakdown.quarters) {
+      rows.push([
+        cur, `Q${qb.q}`,
+        csvNum(qb.S.net), csvNum(qb.S.tax),
+        csvNum(qb.AE.net), csvNum(qb.Z.net), csvNum(qb.E.net), csvNum(qb.O.net),
+      ]);
+    }
+    const yt = breakdown.yearTotals;
+    rows.push([
+      cur, `${statsYear} Total`,
+      csvNum(yt.S.net), csvNum(yt.S.tax),
+      csvNum(yt.AE.net), csvNum(yt.Z.net), csvNum(yt.E.net), csvNum(yt.O.net),
+    ]);
+  }
+  const csv = buildCSV(headers, rows);
+  downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }),
+    `erechnung-quarters-${statsYear}.csv`);
+  flash(t('msg_csv_exported'), 'ok');
+}
+
+// Export the buyer drill-down: all invoices for the currently-drilled buyer.
+function exportBuyerCSV() {
+  if (!statsBuyerDrillDown) { flash(t('msg_csv_no_data'), 'err'); return; }
+  const target = statsBuyerDrillDown.toLowerCase().trim();
+  const matched = state.history.filter(s =>
+    (s.buyerName || '').toLowerCase().trim() === target);
+  if (matched.length === 0) { flash(t('msg_csv_no_data'), 'err'); return; }
+  const sorted = matched.slice().sort((a, b) => {
+    const ta = a.date ? new Date(a.date).getTime() : a.ts;
+    const tb = b.date ? new Date(b.date).getTime() : b.ts;
+    return tb - ta;
+  });
+  const headers = ['Date', 'Number', 'Currency', 'Net', 'VAT', 'Gross', 'Mode', 'Category', 'Project', 'Source'];
+  const rows = sorted.map(s => {
+    const { net, tax } = snapshotNetTax(s);
+    return [
+      s.date || '',
+      s.number || '',
+      s.currency || 'EUR',
+      csvNum(net),
+      csvNum(tax),
+      csvNum(s.total),
+      (s.form && s.form.taxmode) || '',
+      (s.form && s.form.category) || '',
+      (s.form && s.form.project) || '',
+      s.imported ? 'manual' : 'generated',
+    ];
+  });
+  const csv = buildCSV(headers, rows);
+  // Sanitize buyer name for filename
+  const slug = statsBuyerDrillDown.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+  downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }),
+    `erechnung-buyer-${slug || 'export'}.csv`);
+  flash(t('msg_csv_exported'), 'ok');
+}
+
+// Dispatcher: exports based on the active stats view.
+function exportStatsCSV() {
+  if (state.history.length === 0) { flash(t('msg_csv_no_data'), 'err'); return; }
+  if (statsView === 'quarters') {
+    exportQuartersCSV();
+  } else if (statsBuyerDrillDown) {
+    exportBuyerCSV();
+  } else {
+    exportOverviewCSV();
+  }
 }
 
 function openStatsModal() {
   const modal = $('statsModal');
   if (!modal) return;
+  // Always start at overview, no drill-down
+  statsBuyerDrillDown = null;
+  statsView = 'overview';
   modal.classList.add('open');
   modal.removeAttribute('hidden');
+  updateYoYToggleButton();
   renderStatistics();
 }
 function closeStatsModal() {
@@ -2845,16 +3937,8 @@ $('btnPDF').addEventListener('click', async () => {
     btn.textContent = t('btn_create_pdf_progress');
 
     const xml = buildXML();
-    let pdfDoc;
     const outName = resolveFilenamePattern($('r_filename').value) + '.pdf';
-
-    if (state.outputMode === 'upload') {
-      if (!state.pdfFile) throw new Error(t('msg_pdf_select_first'));
-      const pdfBytes = await state.pdfFile.arrayBuffer();
-      pdfDoc = await PDFDocument.load(pdfBytes, { updateMetadata: false });
-    } else {
-      pdfDoc = await generateInvoicePDF();
-    }
+    const pdfDoc = await generateInvoicePDF();
 
     await embedFacturXIntoPDF(pdfDoc, xml);
 
@@ -2962,7 +4046,7 @@ async function exportData() {
   const layoutKey = await store.get(LAYOUT_KEY);
   const payload = {
     format: 'erechnung-backup',
-    version: 2,
+    version: 4,
     exported_at: new Date().toISOString(),
     seller: sellerJSON ? JSON.parse(sellerJSON) : null,
     boilerplate: boilerplateJSON ? JSON.parse(boilerplateJSON) : {},
@@ -2972,6 +4056,8 @@ async function exportData() {
     filename_pattern: filenamePattern || null,
     font: fontKey || null,
     layout: layoutKey || null,
+    yoy_data: state.yoyData || {},
+    yoy_enabled: state.yoyEnabled,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const ts = new Date().toISOString().slice(0, 10);
@@ -3041,16 +4127,363 @@ async function importData(file) {
       await store.set(LAYOUT_KEY, payload.layout);
       $('invoiceLayoutSelect').value = payload.layout;
     }
+    // YoY backfill (v4+): restore both data and the toggle state.
+    // Older backups won't have these keys; that's fine, leave defaults.
+    if (payload.yoy_data && typeof payload.yoy_data === 'object') {
+      state.yoyData = payload.yoy_data;
+      await persistYoYData();
+    }
+    if (typeof payload.yoy_enabled === 'boolean') {
+      state.yoyEnabled = payload.yoy_enabled;
+      await persistYoYEnabled();
+    }
     flash(`${t('msg_backup_import_done')} ${sellerCount} ${t('msg_backup_seller')}, ${buyerCount} ${t('msg_backup_buyers')}, ${footnoteCount} ${t('msg_backup_footnotes')}.`, 'ok');
   } catch (e) {
     flash(t('msg_backup_failed') + ' ' + e.message, 'err');
   }
 }
 
+// -------- Seller collapse/expand --------
+
+// True if seller stammdaten contain enough data to be considered "configured"
+// — at minimum a name and one of (address, city, country). When configured
+// and no edit is active, the section can collapse to a one-line summary.
+function isSellerConfigured() {
+  const s = collectSellerStammdaten();
+  return Boolean(s.name && (s.line1 || s.city || s.country));
+}
+
+// Build a compact summary line for the collapsed seller header.
+// Pattern: "Name · VAT-or-SIRET · COUNTRY"
+function buildSellerSummary() {
+  const s = collectSellerStammdaten();
+  const bits = [];
+  if (s.name) bits.push(s.name);
+  if (s.vat) bits.push(s.vat);
+  else if (s.siret) bits.push(s.siret);
+  if (s.country) bits.push(s.country);
+  return bits.join(' \u00b7 ');
+}
+
+let sellerCollapsed = false;
+
+async function loadSellerCollapsed() {
+  try {
+    const v = await store.get(SELLER_COLLAPSED_KEY);
+    sellerCollapsed = v === 'true';
+  } catch (e) { sellerCollapsed = false; }
+}
+
+async function setSellerCollapsed(v, persist = true) {
+  sellerCollapsed = !!v;
+  if (persist) {
+    try { await store.set(SELLER_COLLAPSED_KEY, String(sellerCollapsed)); } catch (_) {}
+  }
+  applySellerCollapsedUI();
+}
+
+// Apply current sellerCollapsed state to the DOM. Also decides whether
+// the toggle button should even be visible (only when seller has data).
+function applySellerCollapsedUI() {
+  const section = $('sellerSection');
+  const body = $('sellerBody');
+  const toggle = $('sellerToggle');
+  const summary = $('sellerSummary');
+  if (!section || !body || !toggle || !summary) return;
+
+  const configured = isSellerConfigured();
+  toggle.hidden = !configured;
+  if (!configured) {
+    // Force expanded — nothing to summarize
+    body.hidden = false;
+    section.classList.remove('collapsed');
+    toggle.setAttribute('aria-expanded', 'true');
+    return;
+  }
+  summary.textContent = buildSellerSummary();
+  if (sellerCollapsed) {
+    body.hidden = true;
+    section.classList.add('collapsed');
+    toggle.setAttribute('aria-expanded', 'false');
+  } else {
+    body.hidden = false;
+    section.classList.remove('collapsed');
+    toggle.setAttribute('aria-expanded', 'true');
+  }
+}
+
+
+// -------- Help modal (renders bundled README via mini-markdown) --------
+//
+// We keep the README content as a string literal so the build stays
+// single-file. A tiny Markdown renderer handles the subset used by the
+// README: headings (#, ##, ###), unordered lists (- and *), inline code
+// (`x`), bold (**x**), italic (*x*), links ([t](url)), paragraphs.
+
+const HELP_README_TEXT = `# E-Invoice Generator
+
+A self-contained, offline-first tool for creating ZUGFeRD- / Factur-X-compliant invoices. Runs fully offline in any modern browser, doesn't store anything on a server.
+
+The motivation came from frustration that essentially all tools that can do this are paid. Adding XML to a PDF and making it compliant with the regulation didn't seem too hard to tackle, so this exists. It tries to have all the features I could ever need, plus customization options. The tool can also retrofit existing PDFs with an XML if you'd like to use another application for fancy layouts.
+
+This is created with the help of AI; I'm not a finance expert, so use at your own risk. The created files pass current e-invoice viewers and the strict verapdf validation.
+
+## Short description
+
+Open the tool in a browser, fill in the invoice data, generate a PDF. The PDF carries machine-readable XML data per EN 16931 (ZUGFeRD 2.3 / Factur-X 1.0, Comfort profile) embedded inside it, making it compliant with German e-invoicing law (§14 UStG, in force since 2025) and a valid Factur-X document for French B2B reverse-charge invoicing.
+
+## Layouts
+
+Three layouts are available:
+
+- **Modern** — minimal, magazine-style, single full-width column
+- **DIN 5008** — German letterhead standard with window-envelope-positioned recipient
+- **Typewriter** — monospace two-column header, tight monoBold body
+
+All layouts support multi-page rendering when item lists overflow a single page.
+
+## Features
+
+### Seller profile
+Stammdaten (name, address, tax IDs, banking) are saved locally. Boilerplate texts (intro, payment note, greeting, signature, footnote) are stored per invoice language (DE/EN/FR) so a language switch loads the right defaults.
+
+### Customer database
+Save buyers as named profiles, pick from a dropdown, save changes back to the profile.
+
+### Invoice number with pattern
+Auto-incrementing numbers in YYYY-NNNNN format (continuous, no annual reset). Manual override is always possible.
+
+### Date fields
+Invoice date, due date with quick-set chips (today, +7, +14, +30, +60), service date (single or range with end date).
+
+### Tax modes
+Standard (S) with VAT, Reverse Charge (AE), Zero-rated (Z), Exempt (E), Out of scope (O). The PDF text adapts; the XML follows EN 16931 BT-95/BT-96 codes.
+
+### Line items
+Description, quantity, unit price, VAT percent (only used in S mode). Multi-line descriptions are wrapped properly across all layouts and pages.
+
+### Default texts (boilerplate)
+Per-invoice-language storage so DE invoices reach for German default texts and EN invoices for English.
+
+### Footnote presets
+Save footnote variants as named presets, switch between them via dropdown.
+
+### Language selectors
+Three independent language axes: UI language, invoice content language, and (implicitly) buyer language inferred from the buyer country code.
+
+### Fonts
+Choose between Courier Prime, Inconsolata, IBM Plex Mono, or JetBrains Mono for the PDF body. UI font stays the same.
+
+### Filename pattern
+Token-based filename builder. Drop \`{nr}\`, \`{buyer}\`, \`{project}\`, \`{date}\`, \`{category}\`, \`{seller}\`, \`{layout}\` into a pattern; chips help insertion.
+
+### History & Statistics
+Every generated invoice is saved as a snapshot. Click the history icon to browse, clone, or remove past invoices. Click the chart icon for statistics: KPIs, monthly chart, top buyers, quarterly tax breakdown, year-over-year comparison, CSV export.
+
+### Backup
+Export everything (seller, buyers, footnotes, settings, YoY backfill) to a JSON file; import to restore. Format is forward-compatible.
+
+### Theme
+Dark / light toggle, persists across sessions, defaults to system preference.
+
+## Compliance & standards
+
+Generated PDFs pass:
+- Quba Viewer
+- Mustang Validator
+- ELSTER E-Rechnungsviewer
+- verapdf (strict PDF/A-3 conformance check)
+
+XML follows EN 16931 BT numbering (Comfort profile). All required fields are populated; optional fields included where the tool collects them.
+
+## Notes
+
+This is a vibe-coded tool. No warranty for correctness, completeness or legal compliance of generated documents. Always validate with a certified validator before production use, and consult a tax advisor when in doubt.
+`;
+
+// Render a small subset of Markdown to HTML. Handles: # headings, lists,
+// **bold**, *italic*, \`code\`, [link](url), and paragraphs.
+function renderMarkdown(md) {
+  const lines = md.split('\n');
+  const out = [];
+  let inList = false;
+  let para = [];
+
+  const flushPara = () => {
+    if (para.length) {
+      out.push('<p>' + inlineMD(para.join(' ').trim()) + '</p>');
+      para = [];
+    }
+  };
+  const closeList = () => {
+    if (inList) { out.push('</ul>'); inList = false; }
+  };
+
+  for (let raw of lines) {
+    const line = raw.replace(/\s+$/, '');
+    if (!line.trim()) {
+      flushPara();
+      closeList();
+      continue;
+    }
+    let m;
+    if ((m = line.match(/^### (.+)$/))) {
+      flushPara(); closeList();
+      out.push('<h4>' + esc(m[1]) + '</h4>');
+    } else if ((m = line.match(/^## (.+)$/))) {
+      flushPara(); closeList();
+      out.push('<h3>' + esc(m[1]) + '</h3>');
+    } else if ((m = line.match(/^# (.+)$/))) {
+      flushPara(); closeList();
+      out.push('<h2 class="help-toptitle">' + esc(m[1]) + '</h2>');
+    } else if ((m = line.match(/^[-*] (.+)$/))) {
+      flushPara();
+      if (!inList) { out.push('<ul>'); inList = true; }
+      out.push('<li>' + inlineMD(m[1]) + '</li>');
+    } else {
+      closeList();
+      para.push(line);
+    }
+  }
+  flushPara();
+  closeList();
+  return out.join('\n');
+}
+
+// Inline Markdown: **bold**, *italic*, \`code\`, [text](url).
+function inlineMD(text) {
+  let s = esc(text);
+  // Code first so its content doesn't get further mangled
+  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // Bold then italic (bold wraps double * which would otherwise eat italic)
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+  // Links
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  return s;
+}
+
+
+// Modal open / close
+
+function openHelpModal() {
+  const modal = $('helpModal');
+  const body = $('helpBody');
+  if (!modal || !body) return;
+  // Render once on first open, reuse afterwards
+  if (!body.dataset.rendered) {
+    body.innerHTML = renderMarkdown(HELP_README_TEXT);
+    body.dataset.rendered = '1';
+  }
+  modal.classList.add('open');
+  modal.removeAttribute('hidden');
+}
+function closeHelpModal() {
+  const modal = $('helpModal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.setAttribute('hidden', '');
+}
+
+
+// -------- History modal --------
+
+function openHistoryModal() {
+  const modal = $('historyModal');
+  if (!modal) return;
+  modal.classList.add('open');
+  modal.removeAttribute('hidden');
+  renderHistoryPicker();
+}
+function closeHistoryModal() {
+  const modal = $('historyModal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.setAttribute('hidden', '');
+}
+
+
+// -------- Embed-XML modal --------
+
+function openEmbedModal() {
+  const modal = $('embedModal');
+  if (!modal) return;
+  modal.classList.add('open');
+  modal.removeAttribute('hidden');
+  // Reset previous selection
+  state.pdfFile = null;
+  $('fname').textContent = '';
+}
+function closeEmbedModal() {
+  const modal = $('embedModal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.setAttribute('hidden', '');
+}
+
+// Run the embed-XML-into-existing-PDF action. Used by the modal's
+// "Embed" button. Skips PDF generation: just loads the user's PDF and
+// embeds the current invoice's XML into it.
+async function runEmbedXML() {
+  if (!state.pdfFile) {
+    flash(t('msg_pdf_select_first'), 'err');
+    return;
+  }
+  const btn = $('btnEmbedRun');
+  try {
+    btn.disabled = true;
+    btn.textContent = t('btn_embed_progress');
+
+    const xml = buildXML();
+    const pdfBytes = await state.pdfFile.arrayBuffer();
+    const pdfDoc = await PDFDocument.load(pdfBytes, { updateMetadata: false });
+    await embedFacturXIntoPDF(pdfDoc, xml);
+    setPDFTrailerID(pdfDoc);
+
+    const outName = resolveFilenamePattern($('r_filename').value) + '.pdf';
+    const finalBytes = await pdfDoc.save();
+    const blob = new Blob([finalBytes], { type: 'application/pdf' });
+    downloadBlob(blob, outName);
+
+    saveHistorySnapshot();
+    closeEmbedModal();
+    flash(t('msg_embed_done'), 'ok');
+  } catch (e) {
+    console.error(e);
+    flash(t('msg_embed_failed') + ' ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('btn_embed_run');
+  }
+}
+
+
 // -------- Init --------
 document.getElementById('addItem').addEventListener('click', () => addItem());
 document.getElementById('saveSeller').addEventListener('click', saveSeller);
-document.getElementById('clearSeller').addEventListener('click', clearSeller);
+$('clearSeller').addEventListener('click', clearSeller);
+$('sellerToggle').addEventListener('click', () => setSellerCollapsed(!sellerCollapsed));
+
+// Top-bar modal openers
+$('openHistory').addEventListener('click', openHistoryModal);
+$('openHelp').addEventListener('click', openHelpModal);
+$('historyClose').addEventListener('click', closeHistoryModal);
+$('historyModal').addEventListener('click', (e) => {
+  if (e.target === $('historyModal')) closeHistoryModal();
+});
+$('helpClose').addEventListener('click', closeHelpModal);
+$('helpModal').addEventListener('click', (e) => {
+  if (e.target === $('helpModal')) closeHelpModal();
+});
+
+// Embed-XML modal (was the upload mode in the old output section)
+$('btnEmbed').addEventListener('click', openEmbedModal);
+$('embedClose').addEventListener('click', closeEmbedModal);
+$('btnEmbedRun').addEventListener('click', runEmbedXML);
+$('embedModal').addEventListener('click', (e) => {
+  if (e.target === $('embedModal')) closeEmbedModal();
+});
+
 document.getElementById('r_taxmode').addEventListener('change', calcTotals);
 
 // Buyer picker events
@@ -3092,16 +4525,61 @@ $('pastInvoiceModal').addEventListener('click', (e) => {
 $('openStats').addEventListener('click', openStatsModal);
 $('statsClose').addEventListener('click', closeStatsModal);
 $('statsPeriod').addEventListener('change', renderStatistics);
+$('statsTabOverview').addEventListener('click', () => setStatsView('overview'));
+$('statsTabQuarters').addEventListener('click', () => setStatsView('quarters'));
+$('statsYear').addEventListener('change', (e) => {
+  statsYear = Number(e.target.value);
+  renderStatistics();
+});
+$('statsExportCsv').addEventListener('click', exportStatsCSV);
+$('statsYoYToggle').addEventListener('click', () => setYoYEnabled(!state.yoyEnabled));
+$('yoyBackfillOpen').addEventListener('click', openYoYBackfillModal);
+$('yoyBackfillCancel').addEventListener('click', closeYoYBackfillModal);
+$('yoyBackfillSave').addEventListener('click', saveYoYBackfill);
+$('yoyBackfillModal').addEventListener('click', (e) => {
+  if (e.target === $('yoyBackfillModal')) closeYoYBackfillModal();
+});
+// Delegated click handler for the stats body: catches buyer-drill-down
+// clicks in the top buyers list, the back button in the drill-down view,
+// and the "set previous year reference" button in the YoY hint banner.
+$('statsBody').addEventListener('click', (e) => {
+  const buyerBtn = e.target.closest('.stats-buyer-btn');
+  if (buyerBtn) {
+    setStatsBuyerDrillDown(buyerBtn.getAttribute('data-buyer'));
+    return;
+  }
+  const back = e.target.closest('#statsBackBtn');
+  if (back) {
+    setStatsBuyerDrillDown(null);
+    return;
+  }
+  const yoyOpen = e.target.closest('#yoyOpenBackfill');
+  if (yoyOpen) {
+    openYoYBackfillModal();
+  }
+});
 // Click backdrop or press Esc to close
 $('statsModal').addEventListener('click', (e) => {
   if (e.target === $('statsModal')) closeStatsModal();
 });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  const sm = $('statsModal');
+  // Order: deepest/topmost modals first
+  const ym = $('yoyBackfillModal');
   const pm = $('pastInvoiceModal');
-  if (sm && sm.classList.contains('open')) closeStatsModal();
-  if (pm && pm.classList.contains('open')) closePastInvoiceModal();
+  const em = $('embedModal');
+  const hm = $('helpModal');
+  const histm = $('historyModal');
+  const sm = $('statsModal');
+  if (ym && ym.classList.contains('open')) { closeYoYBackfillModal(); return; }
+  if (pm && pm.classList.contains('open')) { closePastInvoiceModal(); return; }
+  if (em && em.classList.contains('open')) { closeEmbedModal(); return; }
+  if (hm && hm.classList.contains('open')) { closeHelpModal(); return; }
+  if (histm && histm.classList.contains('open')) { closeHistoryModal(); return; }
+  if (sm && sm.classList.contains('open')) {
+    if (statsBuyerDrillDown) { setStatsBuyerDrillDown(null); return; }
+    closeStatsModal();
+  }
 });
 
 $('r_delivery_end').addEventListener('change', () => {
@@ -3207,16 +4685,6 @@ $('saveFilenamePattern').addEventListener('click', saveFilenamePattern);
   $(id).addEventListener('input', updateFilenamePreview);
 });
 
-// Mode toggle
-document.querySelectorAll('.mode-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const mode = btn.dataset.mode;
-    state.outputMode = mode;
-    document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b === btn));
-$('mode-generate').classList.toggle('hidden', mode !== 'generate');
-$('mode-upload').classList.toggle('hidden', mode !== 'upload');  });
-});
-
 // Due-date quick-set chips: add N days to invoice date (or today if not set)
 document.querySelectorAll('.due-chips button').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -3309,6 +4777,8 @@ async function init() {
     loadBuyers(),
     loadFootnotes(),
     loadHistory(),
+    loadYoY(),
+    loadSellerCollapsed(),
     loadFilenamePattern(),
     updateSuggestNumberChipPreview(),
     (async () => { $('invoiceFontSelect').value = await getCurrentFontKey(); })(),
@@ -3323,6 +4793,9 @@ async function init() {
   // 6. History UI — populate after translations + load are done so labels are correct.
   $('historyEnable').checked = state.historyEnabled;
   renderHistoryPicker();
+
+  // 7. Apply seller-collapse UI based on whether stammdaten exist.
+  applySellerCollapsedUI();
 }
 
 init().catch(err => {

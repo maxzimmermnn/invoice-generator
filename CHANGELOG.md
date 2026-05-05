@@ -1,43 +1,123 @@
-## [Unreleased]
+## [1.5.0] - 2026-05-05
+
+A large release that pulls statistics and history into proper modals,
+adds year-over-year comparisons, drill-down per buyer, quarterly tax
+breakdowns, CSV export, and a sticky action bar. The main page is
+calmer and faster to scan; advanced features moved into modals
+reachable from a refreshed top bar.
+
+### Added
+
+- **Year-over-year comparison.** Toggle in the statistics modal header
+  enables YoY arrows next to all four KPIs (gross, net, VAT, average)
+  and a tooltip in the monthly chart. Comparison windows match the
+  current period: YTD vs. same span last year, last 3 months vs. same
+  3 months last year, and so on. Persistent setting per browser.
+- **YoY backfill modal.** When you only have invoices for the current
+  year in the history, you can manually enter the monthly totals from
+  the previous year (per currency) so the YoY arrows have something to
+  compare against. History always wins over backfill for any month
+  that has actual invoices.
+- **Quarterly tax breakdown.** A new Quarters tab in the statistics
+  modal shows Q1–Q4 totals with columns adapted to the selected tax
+  mode (S, AE, Z, E, O). Year selector to flip through past years.
+  Per-currency separation kept consistent with the rest of stats.
+- **Buyer drill-down.** Click a buyer in the Top Buyers list to
+  replace the overview with a detail view: KPIs scoped to that buyer
+  plus a chronological invoice list. Esc steps back to overview, then
+  closes the modal.
+- **CSV export.** A button in the statistics header exports the
+  current view (overview, quarters, or drill-down) as CSV with UTF-8
+  BOM and semicolon separators, ready for Excel/Numbers.
+- **History modal.** The history list is now a modal opened from a
+  history icon in the top bar. Cloning auto-closes the modal. Adding
+  a past invoice (manual backfill) is a sub-action inside the modal.
+- **Help modal with bundled README.** A `?` icon in the top bar opens
+  a help modal that renders the README content directly. No external
+  dependency, no internet needed.
+- **Embed-XML modal.** The "embed XML in an existing PDF" workflow is
+  a clearly labelled action button (and modal) instead of a mode
+  toggle hidden in the output section.
+- **Sticky bottom action bar.** Create PDF / XML only / Validate /
+  Embed XML are always reachable as you scroll. Status messages
+  appear inside the bar.
+- **Multi-page PDF rendering.** Item lists that overflow a single page
+  now break onto additional pages cleanly across all three layouts.
 
 ### Changed
 
-- **Statistics period filter** has a new default and an extra option:
-  default is now "This year" instead of "Last 30 days", which surfaces
-  meaningful data immediately for users who haven't generated invoices
-  in the very recent past. Added "Last 6 months" between "Last 12
-  months" and "Last 3 months". Reordered the dropdown from longest to
-  shortest period (this year → last 12 → last 6 → last 3 → last 30
-  days → all time).
-
-  
-## [1.4.1] - 2026-05-03
-
-Patch release. Fixes a few rough edges in the statistics view and
-restores some CSS that had drifted out of sync with the JavaScript.
+- **Statistics period filter** now defaults to "This year" (was "Last
+  30 days") and adds "Last 6 months" between "Last 12 months" and
+  "Last 3 months". Order is now longest-to-shortest: this year → last
+  12 months → last 6 months → last 3 months → last 30 days → all
+  time. (Migrated from the [Unreleased] section in the previous
+  CHANGELOG.)
+- **Top bar redesigned.** Four icons (history, statistics, help, plus
+  the existing language and theme controls), grouped into two visual
+  clusters: settings (language + theme) and modal triggers (history
+  + stats + help). Statistics icon is now a recognisable bar chart.
+  History icon is a circular arrow with an inset clock.
+- **Section hierarchy.** Buyer / Invoice / Items are visually
+  primary (heavy top rule, large serif heading). Seller and Filename
+  are visually secondary (light rule, small caps mono heading), since
+  they are configured once and rarely touched after.
+- **Seller section collapses by default** once master data is filled
+  in, showing a one-line summary like `Acme GmbH · DE12345 · DE`.
+  Click to expand. State persists.
+- **Footer is one slim line:** disclaimer left, backup links right.
+  The compliance/standards block was moved into the help modal where
+  it is easier to read in context.
+- **Backup format bumped to v4.** Adds `yoy_data` and `yoy_enabled`
+  fields. v1, v2, and v3 backups still import correctly.
 
 ### Fixed
 
-- **`Last 30 days` and `Last 3 months` period filters** in the
-  statistics modal now actually filter. The supporting i18n keys
-  (`stats_period_last_month`, `stats_period_last3`) and the
-  corresponding cases in `filterByPeriod` were missing in some
-  builds, so picking those options either showed the raw key name
-  in the dropdown or silently fell through to "all time".
-- **Chart hover tooltip** is reliable now. The previous
-  implementation used SVG `<title>` elements which Chrome on macOS
-  shows inconsistently; replaced with a JS-driven tooltip plus
-  full-slot transparent hitboxes so the tooltip appears even when
-  the cursor is between bars.
-- **Statistics modal CSS scope.** The appended block lived inside an
-  unclosed `@media print { ... }` rule, so all modal, statistics,
-  buyer-hint, past-invoice and tooltip rules applied only when the
-  page was actually printed. The print block is now correctly closed
-  before the rest, and the modal renders as an overlay with the
-  intended backdrop.
-- **`.modal-content` background** referenced a non-existent CSS
-  variable (`--bg`); switched to `--paper`, restoring the visible
-  content panel.
-- **`.top-stats-btn` styling** restored. Without it the statistics
-  button in the top bar fell back to default `.tiny-btn` shape and
-  did not match the theme toggle next to it.
+- **Statistics modal CSS scope.** Several appended blocks lived
+  inside an unclosed `@media print` rule, so modal/stats/buyer-hint
+  CSS only applied while printing. The print block is now correctly
+  scoped and consolidated at the bottom of `styles.css`.
+- **Double rule between header and first section.** Header had
+  `border-bottom`, first section had `border-top`, both rendered as
+  parallel lines with the section gap between them. The first
+  section now drops its top border so only the header rule shows.
+- **`.modal-content` background variable.** Switched from
+  non-existent `--bg` to `--paper`.
+- **`Last 30 days` and `Last 3 months` filters** were missing i18n
+  keys and case branches in `filterByPeriod` in some builds, falling
+  through to "all time" silently. Both work as advertised now.
+- **Chart hover tooltip** is reliable across browsers. Replaced the
+  SVG `<title>` approach with a JS-driven tooltip plus full-slot
+  transparent hitboxes, so the tooltip appears even when the cursor
+  is between bars.
+- **`.top-stats-btn` styling regression** has become moot — the top
+  bar buttons share a single `.top-icon-btn` class with consistent
+  sizing and hover/active states.
+
+### Removed
+
+- **`.intro` block** on the main page (introductory paragraph and
+  alt-text). Content moved into the help modal.
+- **Output section** with mode-toggle (generate / upload). Replaced
+  by the explicit Embed-XML action button + modal.
+- **Inline `footer_main` paragraph** with compliance text. Same
+  content lives in the help modal now.
+- Dead CSS classes: `.intro*`, `.mode-toggle`, `.mode-btn`,
+  `.top-stats-btn`, `.past-grid`, `.modal-actions`,
+  `.noscript-warning`, `.yoy-modal-intro`. Dead JS functions:
+  `applySeller`, `persistCurrentBoilerplateInMemory`.
+
+### Internal
+
+- `styles.css` reorganised into 18 numbered sections with all
+  `@media` blocks consolidated and the spacing scale (`--gap-1` to
+  `--gap-6`) plus YoY arrow colours promoted to CSS variables in
+  `:root`. From 1854 lines / 187 KB to 1446 lines / 32 KB without
+  visual changes.
+- `main.js` section headers normalised; misleading "YoY computation"
+  header (which actually housed the entire stats engine) renamed.
+- `index.html` cleaned up: indentation fixed in the header,
+  per-modal section comments slimmed, ARIA labels added to the
+  buyer and history pickers.
+- 21 new i18n keys in DE / EN / FR for the new modals, buttons, and
+  status messages. Disclaimer text shortened to a single line in all
+  three languages.

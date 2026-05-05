@@ -57,20 +57,104 @@ function drawCenteredBankLine(seller, kit, { y, font, maxWidth, separator = '  \
 }
 
 
+// -------- Multi-page support --------
+//
+// Strategy: pre-compute item heights given the available width, then bucket
+// them into pages so a page never starts an item it can't finish. The first
+// page reserves more vertical space (header + meta + buyer/seller block);
+// continuation pages get a leaner mini-header. The last page must reserve
+// space for totals + payment + greeting + signature + footnote.
+//
+// The renderer calls paginateItems() once up front, then iterates the pages.
+// On each page it draws the appropriate header, the table header, the items,
+// and on the last page the closing block. Page numbers ("X / Y") render in
+// the footer area only when there's more than one page.
+
+// Measure how many vertical units (using `lineH`) an item needs given the
+// description column width. Returns at least 1 line.
+function measureItemLines(item, font, size, maxWidth, wrapText) {
+  const lines = wrapText(item.desc || '', font, size, maxWidth);
+  return Math.max(1, lines.length);
+}
+
+// Distribute items into page buckets, pixel-based.
+//   firstPageBudget — vertical units available for items on page 1
+//   midPageBudget   — vertical units available on continuation pages (no
+//                     full header, just mini-header + table header)
+//   lastPageReserve — vertical units the last page must keep free below
+//                     the items for totals + closing block. If items don't
+//                     finish before reaching this reserve on the planned
+//                     last page, an extra page is added.
+//
+// Returns: array of { items: [...], indexFrom, indexTo }
+function paginateItems(items, lineHeights, firstPageBudget, midPageBudget, lastPageReserve) {
+  const pages = [];
+  let cursor = 0;
+  let pageItems = [];
+  let pageHeight = 0;
+  let isFirst = true;
+
+  while (cursor < items.length) {
+    const budget = isFirst ? firstPageBudget : midPageBudget;
+    const itemH = lineHeights[cursor];
+    if (pageHeight + itemH <= budget) {
+      pageItems.push(items[cursor]);
+      pageHeight += itemH;
+      cursor++;
+    } else if (pageItems.length === 0) {
+      // Item doesn't fit even on a fresh page (extreme case): force it on.
+      pageItems.push(items[cursor]);
+      pageHeight += itemH;
+      cursor++;
+    } else {
+      // Page full, flush and continue.
+      pages.push({ items: pageItems, indexFrom: cursor - pageItems.length, indexTo: cursor - 1 });
+      pageItems = [];
+      pageHeight = 0;
+      isFirst = false;
+    }
+  }
+  if (pageItems.length > 0) {
+    pages.push({ items: pageItems, indexFrom: cursor - pageItems.length, indexTo: cursor - 1 });
+  }
+
+  // Reserve check: does the last page have room for the closing block?
+  // If the items on the last page consumed enough of the page that less
+  // than `lastPageReserve` remains, we need one more page for the closing.
+  // We approximate by saying: if the last page used > (its budget -
+  // lastPageReserve), close-block goes to a fresh "tail" page.
+  if (pages.length > 0) {
+    const last = pages[pages.length - 1];
+    const lastIsFirst = pages.length === 1;
+    const lastBudget = lastIsFirst ? firstPageBudget : midPageBudget;
+    const lastUsed = last.items.reduce((sum, _, i) => sum + lineHeights[last.indexFrom + i], 0);
+    if (lastUsed > lastBudget - lastPageReserve) {
+      // tail page for closing block only
+      pages.push({ items: [], indexFrom: items.length, indexTo: items.length - 1, isTail: true });
+    }
+  } else {
+    // 0 items: still need 1 page for header + closing
+    pages.push({ items: [], indexFrom: 0, indexTo: -1 });
+  }
+
+  return pages;
+}
+
+
 //INVOICE DIN 5008 (GERMAN STANDARD)
 
 async function renderInvoiceDIN5008(pdfDoc, ctx) {
   const kit = makeDrawKit(pdfDoc, ctx.fonts);
   const { mono, monoBold, SOFT, PAGE_W, PAGE_H,
-          widthAt, wrapText, drawText, drawTextRight, drawTextCenter, drawRule } = kit;
+          widthAt, wrapText, drawText, drawTextRight, drawTextCenter, drawRule, newPage } = kit;
   const { seller, buyer, items, totals, mode, number, date, delivery, deliveryEnd,
           currencySym, project, category, intro, paymentNote, greeting,
           signature, footnote, fmtDate, fmtMoney, countryName: cn, tInvoice: tI } = ctx;
 
   // DIN 5008 Form B measurements (mm → pt at 72dpi: mm * 2.8346)
   const mm = (n) => n * 2.83464567;
-  const M_L = mm(25);                  // left margin
-  const M_R = mm(20);                  // right margin
+  const M_L = mm(25);
+  const M_R = mm(20);
   const colRight = PAGE_W - M_R;
   const contentW = PAGE_W - M_L - M_R;
 
@@ -80,18 +164,23 @@ async function renderInvoiceDIN5008(pdfDoc, ctx) {
   const LINE = 13;
   const LINE_TIGHT = 11;
 
-  // === Sender mini-line (visible above recipient through window envelope) ===
-  // DIN 5008 places this at 45mm from top, single line, small font, underlined.
+  // Item-table column anchors (used on every page)
+  const cPosRight    = M_L + mm(10);
+  const cTotalRight  = colRight;
+  const cAmountRight = colRight - mm(28);
+  const cPriceRight  = colRight - mm(56);
+  const descX        = cPosRight + mm(4);
+
+  // ---- Page 1: full DIN 5008 header ----
+  // Sender mini-line (visible above recipient through window envelope)
   const senderLineY = PAGE_H - mm(45);
   const senderMini = [seller.name, seller.line1, `${seller.zip || ''} ${seller.city || ''}`.trim()]
-    .filter(Boolean).join(' · ');
-  // Auto-shrink sender mini-line if it would overflow the underline width
+    .filter(Boolean).join(' \u00b7 ');
   const senderSize = shrinkToFit(senderMini, mono, mm(85), widthAt, SIZE_SMALL, 5.5);
   drawText(senderMini, M_L, senderLineY, mono, senderSize, SOFT);
   drawRule(senderLineY - 2, 0.3, M_L, M_L + mm(85));
 
-  // === Recipient block (DIN 5008 Form B: starts at 50mm from top, max 9 lines) ===
-  // Country printed UPPERCASE only when buyer is in a different country than seller (postal convention).
+  // Recipient block (Form B: starts at 50mm from top, max 9 lines)
   const recipientLines = [
     buyer.name,
     buyer.line1,
@@ -101,15 +190,13 @@ async function renderInvoiceDIN5008(pdfDoc, ctx) {
   let y = PAGE_H - mm(52);
   for (const ln of recipientLines) { drawText(ln, M_L, y, mono, SIZE); y -= LINE; }
 
-  // === Info block on the right side (reference fields) ===
-  // DIN 5008 places this aligned with the recipient block, in two columns.
+  // Info block on the right
   const infoLabelX = M_L + mm(110);
   const infoValueX = M_L + mm(125);
   let infoY = PAGE_H - mm(52);
-  const infoLabelSize = SIZE_SMALL;
   const drawInfo = (label, value) => {
     if (!value) return;
-    drawText(label, infoLabelX, infoY, mono, infoLabelSize, SOFT);
+    drawText(label, infoLabelX, infoY, mono, SIZE_SMALL, SOFT);
     drawText(value, infoValueX, infoY, mono, SIZE);
     infoY -= LINE;
   };
@@ -122,7 +209,7 @@ async function renderInvoiceDIN5008(pdfDoc, ctx) {
   }
   if (seller.vat) drawInfo(tI('pdf_vat_id_label'), seller.vat);
 
-  // === Subject line at fixed position (98mm from top) ===
+  // Subject line at fixed position (98mm from top)
   y = PAGE_H - mm(98);
   const subject = project
     ? (number ? `${tI('pdf_no')} ${number}: ${project}` : project)
@@ -132,101 +219,189 @@ async function renderInvoiceDIN5008(pdfDoc, ctx) {
   }
   y -= LINE * 0.5;
 
-  // === Body: intro, items table, totals, VAT, footnote, payment note, greeting ===
   if (intro) {
     for (const ln of wrapText(intro, mono, 9, contentW)) { drawText(ln, M_L, y, mono, 9); y -= LINE * 0.85; }
     y -= LINE * 2;
   }
   if (category) { drawText(category, M_L, y, monoBold, SIZE); y -= LINE * 1.4; }
 
-  // Items table — DIN 5008 typical: pos | desc | qty | price | total
-  const cPosRight    = M_L + mm(10);
-  const cTotalRight  = colRight;
-  const cAmountRight = colRight - mm(28);
-  const cPriceRight  = colRight - mm(56);
-  const descX        = cPosRight + mm(4);
+  // ---- Pagination plan ----
+  // Measure each item against the description budget (which depends on the
+  // price column width — we use a generous default since prices vary).
+  const descBudget = cPriceRight - widthAt('9999.99', mono, SIZE) - descX - mm(6);
+  const itemUnits = items.map(it => measureItemLines(it, mono, SIZE, descBudget, wrapText) * LINE);
 
-  drawText('Pos.', M_L, y, mono, SIZE, SOFT);
-  drawText(tI('th_desc'), descX, y, mono, SIZE, SOFT);
-  drawTextRight(tI('pdf_amount'), cAmountRight, y, mono, SIZE, SOFT);
-  drawTextRight(tI('pdf_price'),  cPriceRight,  y, mono, SIZE, SOFT);
-  drawTextRight(tI('pdf_total'),  cTotalRight,  y, mono, SIZE, SOFT);
-  y -= LINE * 0.4;
-  drawRule(y, 0.4, M_L, colRight);
-  y -= LINE * 1.2;
+  // Footer height in DIN5008 is fixed (3-column block at mm(20) + rule above)
+  const FOOTER_TOP = mm(20) + LINE * 1.5;     // top of footer rule
+  const PAGE_NUM_RESERVE = LINE * 0.7;
+  const BOTTOM_LIMIT = FOOTER_TOP + PAGE_NUM_RESERVE;
 
-  let pos = 1;
-  for (const it of items) {
-    const qty = Number(it.qty) || 0;
-    const price = Number(it.price) || 0;
-    const lineTotal = round2(qty * price);
-    const priceStr = fmtMoney(price);
-    const descBudget = cPriceRight - widthAt(priceStr, mono, SIZE) - descX - mm(6);
-    const descLines = wrapText(it.desc || '', mono, SIZE, descBudget);
-    drawTextRight(String(pos++), cPosRight, y, mono, SIZE, SOFT);
-    drawText(descLines[0] || '', descX, y, mono, SIZE);
-    drawTextRight(String(qty % 1 === 0 ? qty : fmt(qty)), cAmountRight, y, mono, SIZE);
-    drawTextRight(fmtMoney(price), cPriceRight, y, mono, SIZE);
-    drawTextRight(fmtMoney(lineTotal), cTotalRight, y, mono, SIZE);
-    y -= LINE;
-    for (let i = 1; i < descLines.length; i++) { drawText(descLines[i], descX, y, mono, SIZE); y -= LINE; }
-  }
-  y -= LINE * 0.4;
-  drawRule(y, 0.4, M_L, colRight);
-  y -= LINE * 1.2;
+  const TABLE_HEADER_H = LINE * 1.6;          // label row + rule
+  const TABLE_END_RULE = LINE * 1.2;          // closing rule under last item
 
-  // Totals — right-aligned block under the table
-  const totalLabelX = cAmountRight - mm(2);
-  drawTextRight(tI('pdf_sum') + ':', totalLabelX, y, mono, SIZE);
-  drawTextRight(fmtMoney(totals.net), cTotalRight, y, mono, SIZE);
-  y -= LINE;
-  if (mode === 'S' && totals.tax) {
-    drawTextRight(tI('total_tax_S') + ':', totalLabelX, y, mono, SIZE);
-    drawTextRight(fmtMoney(totals.tax), cTotalRight, y, mono, SIZE);
-    y -= LINE;
-  }
-  // Divider sits exactly between the Sum/VAT row and the grand-total row,
-  // with a full LINE of breathing room on each side.
-  drawRule(y, 0.4, M_L + mm(80), colRight);
-  y -= LINE;
-  drawTextRight(tI('pdf_grand_total') + ':', totalLabelX, y, monoBold, SIZE);
-  drawTextRight(fmtMoney(totals.grand), cTotalRight, y, monoBold, SIZE);
-  y -= LINE * 2;
+  const firstPageBudget = (y - BOTTOM_LIMIT) - TABLE_HEADER_H - TABLE_END_RULE;
 
-  // VAT note
-  if (mode !== 'S') {
-    drawText(tI('pdf_vat_' + mode), M_L, y, monoBold, SIZE); y -= LINE * 1.4;
-  }
-  if (footnote) {
-    for (const ln of wrapText(footnote, mono, SIZE - 1, contentW)) { drawText(ln, M_L, y, mono, SIZE - 1, SOFT); y -= LINE_TIGHT; }
-    y -= LINE * 0.6;
-  }
-  if (paymentNote) {
-    for (const ln of wrapText(paymentNote, mono, SIZE, contentW)) { drawText(ln, M_L, y, mono, SIZE); y -= LINE; }
-    y -= LINE * 0.8;
-  }
-  if (greeting)  { drawText(greeting,  M_L, y, mono, SIZE); y -= LINE * 1.4; }
-  if (signature) { drawText(signature, M_L, y, mono, SIZE); y -= LINE; }
+  // Continuation pages: top is at PAGE_H - mm(30), mini-header takes ~LINE*3
+  const MINI_HEADER_TOP = PAGE_H - mm(30);
+  const MINI_HEADER_H = LINE * 3.2;
+  const midPageBudget = (MINI_HEADER_TOP - BOTTOM_LIMIT) - MINI_HEADER_H - TABLE_HEADER_H - TABLE_END_RULE;
 
-  // === Footer (DIN 5008 typically has 3-column footer: company/contact/banking) ===
-  const footY = mm(20);
-  drawRule(footY + LINE * 1.5, 0.3, M_L, colRight);
-  const colW = contentW / 3;
-  const col1 = [seller.name, seller.line1, `${seller.zip || ''} ${seller.city || ''}`.trim(), seller.country ? cn(seller.country) : ''].filter(Boolean);
-  const col2 = [seller.phone, seller.email, seller.vat ? `${tI('pdf_vat_id_label')}: ${seller.vat}` : '', seller.siret ? `SIRET: ${seller.siret}` : ''].filter(Boolean);
-  const col3 = [seller.bank, seller.iban ? `IBAN: ${seller.iban.replace(/(.{4})/g, '$1 ').trim()}` : '', seller.bic ? `BIC: ${seller.bic}` : ''].filter(Boolean);
-  const drawCol = (lines, x) => {
-    let yy = footY + LINE * 0.8;
-    for (const ln of lines) {
-      // Per-line auto-shrink so long emails / addresses don't overflow into next column
-      const s = shrinkToFit(ln, mono, colW - mm(4), widthAt, SIZE_SMALL, 5.5);
-      drawText(ln, x, yy, mono, s, SOFT);
-      yy -= LINE_TIGHT * 0.85;
+  // Last-page reserve: totals + VAT note + footnote + payment + greeting/signature
+  let lastPageReserve = LINE * 5;  // base totals block (sum/vat/grand)
+  if (mode !== 'S') lastPageReserve += LINE * 1.4;
+  if (footnote)    lastPageReserve += LINE_TIGHT * Math.max(1, wrapText(footnote, mono, SIZE - 1, contentW).length) + LINE * 0.6;
+  if (paymentNote) lastPageReserve += LINE * wrapText(paymentNote, mono, SIZE, contentW).length + LINE * 0.8;
+  if (greeting)    lastPageReserve += LINE * 1.4;
+  if (signature)   lastPageReserve += LINE;
+
+  const pages = paginateItems(items, itemUnits, firstPageBudget, midPageBudget, lastPageReserve);
+  const totalPages = pages.length;
+
+  // Helper: draw the items table header (Pos | Desc | Qty | Price | Total)
+  function drawTableHeader(yStart) {
+    drawText('Pos.', M_L, yStart, mono, SIZE, SOFT);
+    drawText(tI('th_desc'), descX, yStart, mono, SIZE, SOFT);
+    drawTextRight(tI('pdf_amount'), cAmountRight, yStart, mono, SIZE, SOFT);
+    drawTextRight(tI('pdf_price'),  cPriceRight,  yStart, mono, SIZE, SOFT);
+    drawTextRight(tI('pdf_total'),  cTotalRight,  yStart, mono, SIZE, SOFT);
+    let yy = yStart - LINE * 0.4;
+    drawRule(yy, 0.4, M_L, colRight);
+    yy -= LINE * 1.2;
+    return yy;
+  }
+
+  // Helper: draw items, with continuous Pos numbering across pages
+  function drawItems(pageItems, yStart, indexFrom) {
+    let yy = yStart;
+    for (let i = 0; i < pageItems.length; i++) {
+      const it = pageItems[i];
+      const qty = Number(it.qty) || 0;
+      const price = Number(it.price) || 0;
+      const lineTotal = round2(qty * price);
+      const priceStr = fmtMoney(price);
+      const itemDescBudget = cPriceRight - widthAt(priceStr, mono, SIZE) - descX - mm(6);
+      const descLines = wrapText(it.desc || '', mono, SIZE, itemDescBudget);
+      drawTextRight(String(indexFrom + i + 1), cPosRight, yy, mono, SIZE, SOFT);
+      drawText(descLines[0] || '', descX, yy, mono, SIZE);
+      drawTextRight(String(qty % 1 === 0 ? qty : fmt(qty)), cAmountRight, yy, mono, SIZE);
+      drawTextRight(fmtMoney(price), cPriceRight, yy, mono, SIZE);
+      drawTextRight(fmtMoney(lineTotal), cTotalRight, yy, mono, SIZE);
+      yy -= LINE;
+      for (let j = 1; j < descLines.length; j++) {
+        drawText(descLines[j], descX, yy, mono, SIZE);
+        yy -= LINE;
+      }
     }
-  };
-  drawCol(col1, M_L);
-  drawCol(col2, M_L + colW);
-  drawCol(col3, M_L + colW * 2);
+    return yy;
+  }
+
+  // Helper: draw the 3-column DIN 5008 footer (company / contact / banking)
+  function drawPageFooter(pageNum) {
+    const footY = mm(20);
+    drawRule(footY + LINE * 1.5, 0.3, M_L, colRight);
+    const colW = contentW / 3;
+    const col1 = [seller.name, seller.line1, `${seller.zip || ''} ${seller.city || ''}`.trim(), seller.country ? cn(seller.country) : ''].filter(Boolean);
+    const col2 = [seller.phone, seller.email, seller.vat ? `${tI('pdf_vat_id_label')}: ${seller.vat}` : '', seller.siret ? `SIRET: ${seller.siret}` : ''].filter(Boolean);
+    const col3 = [seller.bank, seller.iban ? `IBAN: ${seller.iban.replace(/(.{4})/g, '$1 ').trim()}` : '', seller.bic ? `BIC: ${seller.bic}` : ''].filter(Boolean);
+    const drawCol = (lines, x) => {
+      let yy = footY + LINE * 0.8;
+      for (const ln of lines) {
+        const s = shrinkToFit(ln, mono, colW - mm(4), widthAt, SIZE_SMALL, 5.5);
+        drawText(ln, x, yy, mono, s, SOFT);
+        yy -= LINE_TIGHT * 0.85;
+      }
+    };
+    drawCol(col1, M_L);
+    drawCol(col2, M_L + colW);
+    drawCol(col3, M_L + colW * 2);
+    if (totalPages > 1) {
+      const label = tI('pdf_page_of').replace('{n}', pageNum).replace('{total}', totalPages);
+      drawTextCenter(label, mm(8), mono, SIZE_SMALL - 0.5, SOFT);
+    }
+  }
+
+  // Helper: continuation mini-header for pages 2+
+  function drawMiniHeader() {
+    let yy = MINI_HEADER_TOP;
+    const left = number ? `${tI('pdf_invoice_label')} ${number}` : tI('pdf_invoice_label');
+    drawText(left, M_L, yy, monoBold, SIZE);
+    const cont = tI('pdf_continued');
+    if (buyer.name) {
+      drawTextRight(`${buyer.name} \u00b7 ${cont}`, colRight, yy, mono, SIZE_SMALL, SOFT);
+    } else {
+      drawTextRight(cont, colRight, yy, mono, SIZE_SMALL, SOFT);
+    }
+    yy -= LINE * 0.5;
+    drawRule(yy, 0.4, M_L, colRight);
+    yy -= LINE * 1.6;
+    return yy;
+  }
+
+  // Closing block: totals + VAT note + footnote + payment + greeting/signature
+  function drawClosingBlock(yStart) {
+    let yy = yStart;
+    const totalLabelX = cAmountRight - mm(2);
+    drawTextRight(tI('pdf_sum') + ':', totalLabelX, yy, mono, SIZE);
+    drawTextRight(fmtMoney(totals.net), cTotalRight, yy, mono, SIZE);
+    yy -= LINE;
+    if (mode === 'S' && totals.tax) {
+      drawTextRight(tI('total_tax_S') + ':', totalLabelX, yy, mono, SIZE);
+      drawTextRight(fmtMoney(totals.tax), cTotalRight, yy, mono, SIZE);
+      yy -= LINE;
+    }
+    drawRule(yy, 0.4, M_L + mm(80), colRight);
+    yy -= LINE;
+    drawTextRight(tI('pdf_grand_total') + ':', totalLabelX, yy, monoBold, SIZE);
+    drawTextRight(fmtMoney(totals.grand), cTotalRight, yy, monoBold, SIZE);
+    yy -= LINE * 2;
+
+    if (mode !== 'S') {
+      drawText(tI('pdf_vat_' + mode), M_L, yy, monoBold, SIZE); yy -= LINE * 1.4;
+    }
+    if (footnote) {
+      for (const ln of wrapText(footnote, mono, SIZE - 1, contentW)) { drawText(ln, M_L, yy, mono, SIZE - 1, SOFT); yy -= LINE_TIGHT; }
+      yy -= LINE * 0.6;
+    }
+    if (paymentNote) {
+      for (const ln of wrapText(paymentNote, mono, SIZE, contentW)) { drawText(ln, M_L, yy, mono, SIZE); yy -= LINE; }
+      yy -= LINE * 0.8;
+    }
+    if (greeting)  { drawText(greeting,  M_L, yy, mono, SIZE); yy -= LINE * 1.4; }
+    if (signature) { drawText(signature, M_L, yy, mono, SIZE); yy -= LINE; }
+    return yy;
+  }
+
+  // ---- Render each page ----
+  // Page 1 has its full DIN 5008 header above. Now: table + items + footer.
+  let pageY = y;
+  pageY = drawTableHeader(pageY);
+  if (pages[0].items.length > 0) {
+    pageY = drawItems(pages[0].items, pageY, pages[0].indexFrom);
+  }
+  if (pages.length === 1) {
+    pageY -= LINE * 0.4;
+    drawRule(pageY, 0.4, M_L, colRight);
+    pageY -= LINE * 1.2;
+    pageY = drawClosingBlock(pageY);
+  }
+  drawPageFooter(1);
+
+  // Pages 2..N
+  for (let pi = 1; pi < pages.length; pi++) {
+    newPage();
+    let yy = drawMiniHeader();
+    yy = drawTableHeader(yy);
+    if (pages[pi].items.length > 0) {
+      yy = drawItems(pages[pi].items, yy, pages[pi].indexFrom);
+    }
+    if (pi === pages.length - 1) {
+      yy -= LINE * 0.4;
+      drawRule(yy, 0.4, M_L, colRight);
+      yy -= LINE * 1.2;
+      yy = drawClosingBlock(yy);
+    }
+    drawPageFooter(pi + 1);
+  }
 }
 
 
@@ -239,7 +414,7 @@ async function renderInvoiceDIN5008(pdfDoc, ctx) {
 async function renderInvoiceModern(pdfDoc, ctx) {
   const kit = makeDrawKit(pdfDoc, ctx.fonts);
   const { mono, monoBold, SOFT, PAGE_W, PAGE_H,
-          widthAt, wrapText, drawText, drawTextRight, drawTextCenter, drawRule } = kit;
+          widthAt, wrapText, drawText, drawTextRight, drawTextCenter, drawRule, newPage } = kit;
   const { seller, buyer, items, totals, mode, number, date, delivery, deliveryEnd,
           currencySym, project, category, intro, paymentNote, greeting,
           signature, footnote, fmtDate, fmtMoney, countryName: cn, tInvoice: tI } = ctx;
@@ -256,38 +431,38 @@ async function renderInvoiceModern(pdfDoc, ctx) {
   const LINE = 14;
   const LINE_TIGHT = 12;
 
+  // Item-table column anchors — used by both the items loop and the table
+  // header, on every page.
+  const cTotalRight  = colRight;
+  const cAmountRight = M_L + contentW * 0.62;
+  const cPriceRight  = M_L + contentW * 0.82;
+  const descColW     = cAmountRight - M_L - 16;
+
+  // ---- Page 1: full header ----
   let y = PAGE_H - M_T;
 
-  // Top label + thin rule
   drawText(tI('pdf_invoice_label'), M_L, y, monoBold, SIZE_LABEL, SOFT);
   if (category) drawTextRight(category.toUpperCase(), colRight, y, monoBold, SIZE_LABEL, SOFT);
   y -= LINE * 0.5;
   drawRule(y, 0.4, M_L, colRight);
   y -= LINE * 2.4;
 
-  // Big project headline
   if (project) {
     const projLines = wrapText(project, monoBold, SIZE_TITLE, contentW);
-for (const ln of projLines) { drawText(ln, M_L, y, monoBold, SIZE_TITLE); y -= LINE * 1.1; }
-    
-
+    for (const ln of projLines) { drawText(ln, M_L, y, monoBold, SIZE_TITLE); y -= LINE * 1.1; }
   } else if (number) {
     drawText(number, M_L, y, monoBold, SIZE_HEAD);
     y -= SIZE_HEAD * 1.15;
     y -= LINE * 0.4;
   }
 
-  // Meta row: small caps labels above values, evenly spaced
-  // Limited to 3 slots so long date ranges don't overflow.
   const meta = [];
-  if (number)   meta.push([tI('pdf_no'),    number]);
-  if (date)     meta.push([tI('pdf_date'),  fmtDate(date)]);
+  if (number) meta.push([tI('pdf_no'),    number]);
+  if (date)   meta.push([tI('pdf_date'),  fmtDate(date)]);
   const svc = deliveryEnd && delivery && deliveryEnd !== delivery
     ? `${fmtDate(delivery)} \u2013 ${fmtDate(deliveryEnd)}`
     : (delivery ? fmtDate(delivery) : '');
-  if (svc)      meta.push([tI('pdf_service'), svc]);
-  // (Due date appears in the payment note section below; keeping it out of the
-  // meta row prevents overflow when the service date is a range.)
+  if (svc) meta.push([tI('pdf_service'), svc]);
 
   if (meta.length) {
     const slotW = contentW / meta.length;
@@ -315,10 +490,9 @@ for (const ln of projLines) { drawText(ln, M_L, y, monoBold, SIZE_TITLE); y -= L
 
   const buyerLines  = formatPartyAddress(buyer,  cn, { includeReference: true });
   const sellerLines = formatPartyAddress(seller, cn, { includeContact: true });
-  // Wrap long address lines so they don't bleed into the next column / off the page
   const buyerColW  = contentW * 0.55 - 12;
   const sellerColW = contentW * 0.45 - 12;
-  for (const ln of buyerLines)  {
+  for (const ln of buyerLines) {
     for (const w of wrapText(ln, mono, SIZE_BODY, buyerColW)) {
       drawText(w, colL, yL2, mono, SIZE_BODY, SOFT); yL2 -= LINE_TIGHT;
     }
@@ -330,92 +504,185 @@ for (const ln of projLines) { drawText(ln, M_L, y, monoBold, SIZE_TITLE); y -= L
   }
   y = Math.min(yL2, yR2) - LINE * 1.6;
 
-  // Intro
   if (intro) {
     for (const ln of wrapText(intro, mono, 9, contentW)) { drawText(ln, M_L, y, mono, 9); y -= LINE * 0.85; }
     y -= LINE * 2;
   }
 
-  // Items table — minimal hairlines
-  const cTotalRight  = colRight;
-  const cAmountRight = M_L + contentW * 0.62;
-  const cPriceRight  = M_L + contentW * 0.82;
+  // ---- Pagination plan ----
+  // Measure each item in vertical units of LINE. One line = LINE units.
+  const itemUnits = items.map(it => measureItemLines(it, mono, SIZE_BODY, descColW, wrapText) * LINE);
+  // What's left on page 1 below intro for items? y is current cursor, footer
+  // sits at M_B + ~LINE*1.2 (rule above bank line). Reserve also for the
+  // table header itself and a short ending rule.
+  const TABLE_HEADER_H = LINE * 1.7;     // label row + thin rule
+  const TABLE_END_RULE = LINE * 1.4;     // closing rule under last item
+  const FOOTER_RESERVE_PAGE_NUM = LINE * 0.7;  // for "Page X / Y"
+  const FOOTER_RESERVE_BANK = LINE * 1.6;      // bank line + rule above
+  const BOTTOM_LIMIT = M_B + FOOTER_RESERVE_BANK + FOOTER_RESERVE_PAGE_NUM;
 
-  drawText(tI('th_desc'),     M_L,          y, monoBold, SIZE_LABEL, SOFT);
-  drawTextRight(tI('pdf_amount'), cAmountRight, y, monoBold, SIZE_LABEL, SOFT);
-  drawTextRight(tI('pdf_price'),  cPriceRight,  y, monoBold, SIZE_LABEL, SOFT);
-  drawTextRight(tI('pdf_total'),  cTotalRight,  y, monoBold, SIZE_LABEL, SOFT);
-  y -= LINE * 0.5;
-  drawRule(y, 0.4, M_L, colRight);
-  y -= LINE * 1.2;
+  const firstPageBudget = (y - BOTTOM_LIMIT) - TABLE_HEADER_H - TABLE_END_RULE;
 
-  for (const it of items) {
-    const qty = Number(it.qty) || 0;
-    const price = Number(it.price) || 0;
-    const lineTotal = round2(qty * price);
-    const descLines = wrapText(it.desc || '', mono, SIZE_BODY, cAmountRight - M_L - 16);
-    drawText(descLines[0] || '', M_L, y, mono, SIZE_BODY);
-    drawTextRight(String(qty % 1 === 0 ? qty : fmt(qty)), cAmountRight, y, mono, SIZE_BODY);
-    drawTextRight(fmtMoney(price), cPriceRight, y, mono, SIZE_BODY);
-    drawTextRight(fmtMoney(lineTotal), cTotalRight, y, mono, SIZE_BODY);
-    y -= LINE;
-    for (let i = 1; i < descLines.length; i++) { drawText(descLines[i], M_L, y, mono, SIZE_BODY, SOFT); y -= LINE; }
+  // Continuation pages: top is M_T, mini-header takes ~LINE*2.4 plus rule.
+  const MINI_HEADER_H = LINE * 3.4;
+  const midPageBudget = (PAGE_H - M_T - BOTTOM_LIMIT) - MINI_HEADER_H - TABLE_HEADER_H - TABLE_END_RULE;
+
+  // Last-page reserve for totals + footnote + payment + greeting + signature.
+  // This is conservative; better an extra blank-ish tail page than collision.
+  let lastPageReserve = LINE * 7;  // base: totals block
+  if (footnote) lastPageReserve += LINE_TIGHT * Math.max(1, wrapText(footnote, mono, SIZE_BODY - 1.5, contentW).length) + LINE * 0.6;
+  if (paymentNote) lastPageReserve += LINE + LINE * wrapText(paymentNote, mono, SIZE_BODY, contentW).length + LINE * 0.4;
+  if (greeting)  lastPageReserve += LINE;
+  if (signature) lastPageReserve += LINE;
+
+  const pages = paginateItems(items, itemUnits, firstPageBudget, midPageBudget, lastPageReserve);
+  const totalPages = pages.length;
+
+  // Helper: draw the table header (label row + rule) at current y.
+  // Returns the y after the header (where the first item should go).
+  function drawTableHeader(yStart) {
+    drawText(tI('th_desc'),         M_L,          yStart, monoBold, SIZE_LABEL, SOFT);
+    drawTextRight(tI('pdf_amount'), cAmountRight, yStart, monoBold, SIZE_LABEL, SOFT);
+    drawTextRight(tI('pdf_price'),  cPriceRight,  yStart, monoBold, SIZE_LABEL, SOFT);
+    drawTextRight(tI('pdf_total'),  cTotalRight,  yStart, monoBold, SIZE_LABEL, SOFT);
+    let yy = yStart - LINE * 0.5;
+    drawRule(yy, 0.4, M_L, colRight);
+    yy -= LINE * 1.2;
+    return yy;
   }
-  y -= LINE * 0.4;
-  drawRule(y, 0.4, M_L, colRight);
-  y -= LINE * 1.4;
 
-  // Totals — right-aligned block, big grand total
-  const labelX = M_L + contentW * 0.55;
-  const valueXRight = colRight;
-  drawText(tI('pdf_sum').toUpperCase(), labelX, y, monoBold, SIZE_LABEL, SOFT);
-  drawTextRight(fmtMoney(totals.net), valueXRight, y, mono, SIZE_BODY);
-  y -= LINE * 1.1;
-  drawText(tI('total_tax_S'), labelX, y, monoBold, SIZE_LABEL, SOFT);
-  if (mode === 'S' && totals.tax) {
-    drawTextRight(fmtMoney(totals.tax), valueXRight, y, mono, SIZE_BODY);
-  } else {
-    const vatNote = (tI('pdf_vat_' + mode) || '').replace(/^[^:]+:\s*/, '');
-    drawTextRight(vatNote, valueXRight, y, mono, SIZE_BODY - 1, SOFT);
-  }
-  y -= LINE * 1.8;
-  drawRule(y + LINE * 0.7, 0.5, labelX, valueXRight);
-  y -= LINE * 0.9;
-  drawText(tI('pdf_grand_total').toUpperCase(), labelX, y, monoBold, SIZE_LABEL, SOFT);
-  drawTextRight(fmtMoney(totals.grand), valueXRight, y - LINE * 0.4, monoBold, SIZE_TITLE);
-  y -= LINE * 2.6;
-
-  // Footnote (small, soft)
-  if (footnote) {
-    for (const ln of wrapText(footnote, mono, SIZE_BODY - 1.5, contentW)) {
-      drawText(ln, M_L, y, mono, SIZE_BODY - 1.5, SOFT); y -= LINE_TIGHT;
+  // Helper: draw items, returns final y.
+  function drawItems(pageItems, yStart, indexFrom) {
+    let yy = yStart;
+    for (let i = 0; i < pageItems.length; i++) {
+      const it = pageItems[i];
+      const qty = Number(it.qty) || 0;
+      const price = Number(it.price) || 0;
+      const lineTotal = round2(qty * price);
+      const descLines = wrapText(it.desc || '', mono, SIZE_BODY, descColW);
+      drawText(descLines[0] || '', M_L, yy, mono, SIZE_BODY);
+      drawTextRight(String(qty % 1 === 0 ? qty : fmt(qty)), cAmountRight, yy, mono, SIZE_BODY);
+      drawTextRight(fmtMoney(price), cPriceRight, yy, mono, SIZE_BODY);
+      drawTextRight(fmtMoney(lineTotal), cTotalRight, yy, mono, SIZE_BODY);
+      yy -= LINE;
+      for (let j = 1; j < descLines.length; j++) {
+        drawText(descLines[j], M_L, yy, mono, SIZE_BODY, SOFT);
+        yy -= LINE;
+      }
     }
-    y -= LINE * 0.6;
+    return yy;
   }
 
-  // Payment block
-  if (paymentNote) {
-    drawText(tI('pdf_payment'), M_L, y, monoBold, SIZE_LABEL, SOFT);
-    y -= LINE;
-    for (const ln of wrapText(paymentNote, mono, SIZE_BODY, contentW)) {
-      drawText(ln, M_L, y, mono, SIZE_BODY); y -= LINE;
+  // Helper: draw the bottom-of-page elements (rule, bank line, page number).
+  function drawPageFooter(pageNum) {
+    const footY = M_B;
+    drawRule(footY + LINE * 1.2, 0.3, M_L, colRight);
+    drawCenteredBankLine(seller, kit, {
+      y: footY,
+      font: mono,
+      maxWidth: contentW,
+      startSize: SIZE_TINY,
+      minSize: 5,
+      color: SOFT,
+    });
+    if (totalPages > 1) {
+      const label = tI('pdf_page_of').replace('{n}', pageNum).replace('{total}', totalPages);
+      drawTextCenter(label, footY - LINE * 0.9, mono, SIZE_TINY - 0.5, SOFT);
     }
-    y -= LINE * 0.4;
   }
-  if (greeting)  { drawText(greeting,  M_L, y, mono, SIZE_BODY); y -= LINE; }
-  if (signature) { drawText(signature, M_L, y, monoBold, SIZE_BODY); y -= LINE; }
 
-  // Footer — subtle single-line bank info
-  const footY = M_B;
-  drawRule(footY + LINE * 1.2, 0.3, M_L, colRight);
-  drawCenteredBankLine(seller, kit, {
-    y: footY,
-    font: mono,
-    maxWidth: contentW,
-    startSize: SIZE_TINY,
-    minSize: 5,
-    color: SOFT,
-  });
+  // Helper: draw the continuation mini-header on pages 2+.
+  function drawMiniHeader() {
+    let yy = PAGE_H - M_T;
+    const left = number ? `${tI('pdf_invoice_label')} ${number}` : tI('pdf_invoice_label');
+    drawText(left, M_L, yy, monoBold, SIZE_LABEL, SOFT);
+    const cont = tI('pdf_continued');
+    if (buyer.name) {
+      drawTextRight(`${buyer.name} \u00b7 ${cont}`, colRight, yy, monoBold, SIZE_LABEL, SOFT);
+    } else {
+      drawTextRight(cont, colRight, yy, monoBold, SIZE_LABEL, SOFT);
+    }
+    yy -= LINE * 0.5;
+    drawRule(yy, 0.4, M_L, colRight);
+    yy -= LINE * 2.0;
+    return yy;
+  }
+
+  // ---- Render each page ----
+  // Page 1 already has its header above; finish it with table + items + footer.
+  let pageY = y;
+  pageY = drawTableHeader(pageY);
+  if (pages[0].items.length > 0) {
+    pageY = drawItems(pages[0].items, pageY, pages[0].indexFrom);
+  }
+  // If this is the last page, draw the closing block before the footer.
+  if (pages.length === 1) {
+    pageY -= LINE * 0.4;
+    drawRule(pageY, 0.4, M_L, colRight);
+    pageY -= LINE * 1.4;
+    pageY = drawClosingBlock(pageY);
+  }
+  drawPageFooter(1);
+
+  // Pages 2..N-1 (and possibly N): mini-header, table header, items, footer.
+  for (let pi = 1; pi < pages.length; pi++) {
+    newPage();
+    let yy = drawMiniHeader();
+    yy = drawTableHeader(yy);
+    if (pages[pi].items.length > 0) {
+      yy = drawItems(pages[pi].items, yy, pages[pi].indexFrom);
+    }
+    if (pi === pages.length - 1) {
+      yy -= LINE * 0.4;
+      drawRule(yy, 0.4, M_L, colRight);
+      yy -= LINE * 1.4;
+      yy = drawClosingBlock(yy);
+    }
+    drawPageFooter(pi + 1);
+  }
+
+  // Closing block: totals + footnote + payment + greeting + signature.
+  // Returns the final y after drawing.
+  function drawClosingBlock(yStart) {
+    let yy = yStart;
+    const labelX = M_L + contentW * 0.55;
+    const valueXRight = colRight;
+    drawText(tI('pdf_sum').toUpperCase(), labelX, yy, monoBold, SIZE_LABEL, SOFT);
+    drawTextRight(fmtMoney(totals.net), valueXRight, yy, mono, SIZE_BODY);
+    yy -= LINE * 1.1;
+    drawText(tI('total_tax_S'), labelX, yy, monoBold, SIZE_LABEL, SOFT);
+    if (mode === 'S' && totals.tax) {
+      drawTextRight(fmtMoney(totals.tax), valueXRight, yy, mono, SIZE_BODY);
+    } else {
+      const vatNote = (tI('pdf_vat_' + mode) || '').replace(/^[^:]+:\s*/, '');
+      drawTextRight(vatNote, valueXRight, yy, mono, SIZE_BODY - 1, SOFT);
+    }
+    yy -= LINE * 1.8;
+    drawRule(yy + LINE * 0.7, 0.5, labelX, valueXRight);
+    yy -= LINE * 0.9;
+    drawText(tI('pdf_grand_total').toUpperCase(), labelX, yy, monoBold, SIZE_LABEL, SOFT);
+    drawTextRight(fmtMoney(totals.grand), valueXRight, yy - LINE * 0.4, monoBold, SIZE_TITLE);
+    yy -= LINE * 2.6;
+
+    if (footnote) {
+      for (const ln of wrapText(footnote, mono, SIZE_BODY - 1.5, contentW)) {
+        drawText(ln, M_L, yy, mono, SIZE_BODY - 1.5, SOFT); yy -= LINE_TIGHT;
+      }
+      yy -= LINE * 0.6;
+    }
+
+    if (paymentNote) {
+      drawText(tI('pdf_payment'), M_L, yy, monoBold, SIZE_LABEL, SOFT);
+      yy -= LINE;
+      for (const ln of wrapText(paymentNote, mono, SIZE_BODY, contentW)) {
+        drawText(ln, M_L, yy, mono, SIZE_BODY); yy -= LINE;
+      }
+      yy -= LINE * 0.4;
+    }
+    if (greeting)  { drawText(greeting,  M_L, yy, mono, SIZE_BODY); yy -= LINE; }
+    if (signature) { drawText(signature, M_L, yy, monoBold, SIZE_BODY); yy -= LINE; }
+    return yy;
+  }
 }
 
 
@@ -426,7 +693,7 @@ for (const ln of projLines) { drawText(ln, M_L, y, monoBold, SIZE_TITLE); y -= L
 async function renderInvoiceTypewriter(pdfDoc, ctx) {
   const kit = makeDrawKit(pdfDoc, ctx.fonts);
   const { mono, monoBold, SOFT, PAGE_W, PAGE_H,
-          widthAt, wrapText, drawText, drawTextRight, drawTextCenter, drawRule } = kit;
+          widthAt, wrapText, drawText, drawTextRight, drawTextCenter, drawRule, newPage } = kit;
 
   const { seller, buyer, items, totals, mode, number, date, delivery, deliveryEnd,
           currencySym, project, category, intro, paymentNote, greeting,
@@ -442,15 +709,20 @@ async function renderInvoiceTypewriter(pdfDoc, ctx) {
   const LABEL_SIZE = 8;
   const RULE_NAME_GAP = 14;
 
-  let y = PAGE_H - M_T;
-  const topY = y;
+  // Item-table column anchors (used on every page)
+  const cTotalRight  = colRight;
+  const cAmountRight = M_L + contentW * 0.75;
+  const cPriceRight  = M_L + contentW * 0.55;
 
   function drawLabel(text, x, yy, align = 'left') {
     if (align === 'right') drawTextRight(text, x, yy, monoBold, LABEL_SIZE, SOFT);
     else drawText(text, x, yy, monoBold, LABEL_SIZE, SOFT);
   }
 
-  // Build address arrays (name rendered separately as anchor)
+  // ---- Page 1: full Typewriter header (two-column buyer/seller block) ----
+  let y = PAGE_H - M_T;
+  const topY = y;
+
   const buyerAddr  = formatPartyAddress(buyer,  cn, { includeReference: true });
   const sellerAddr = formatPartyAddress(seller, cn, { includeContact: true });
 
@@ -462,7 +734,7 @@ async function renderInvoiceTypewriter(pdfDoc, ctx) {
 
   let yBuyer = topY - RULE_NAME_GAP;
   let ySeller = topY - RULE_NAME_GAP;
-  if (buyer.name) { drawText(buyer.name, colBuyerX, yBuyer, monoBold, SIZE_BODY); yBuyer -= LINE_H; }
+  if (buyer.name)  { drawText(buyer.name, colBuyerX, yBuyer, monoBold, SIZE_BODY); yBuyer -= LINE_H; }
   if (seller.name) { drawTextRight(seller.name, colSellerX, ySeller, monoBold, SIZE_BODY); ySeller -= LINE_H; }
   for (const ln of buyerAddr)  { drawText(ln, colBuyerX, yBuyer, mono, SIZE_BODY); yBuyer -= LINE_TIGHT; }
   for (const ln of sellerAddr) { drawTextRight(ln, colSellerX, ySeller, mono, SIZE_BODY); ySeller -= LINE_TIGHT; }
@@ -505,73 +777,163 @@ async function renderInvoiceTypewriter(pdfDoc, ctx) {
   // Category
   if (category) { drawText(category, M_L, y, monoBold, SIZE_BODY); y -= LINE_H * 1.6; } else { y -= LINE_H * 0.5; }
 
-  // Items table
-  const cTotalRight = colRight;
-  const cAmountRight = M_L + contentW * 0.75;
-  const cPriceRight = M_L + contentW * 0.55;
+  // ---- Pagination plan ----
+  // Description budget: items render in monoBold first line, depend on price width
+  const descBudget = cPriceRight - M_L - widthAt('9999.99', monoBold, SIZE_BODY) - 20;
+  const itemUnits = items.map(it => measureItemLines(it, monoBold, SIZE_BODY, descBudget, wrapText) * LINE_H);
 
-  drawTextRight(tI('pdf_price'),  cPriceRight,  y, mono, SIZE_BODY);
-  drawTextRight(tI('pdf_amount'), cAmountRight, y, mono, SIZE_BODY);
-  drawTextRight(tI('pdf_total'),  cTotalRight,  y, mono, SIZE_BODY);
-  y -= LINE_H * 1.4;
+  // Footer geometry: bank line at M_B, rule above at M_B + LINE_H + 6
+  const FOOTER_TOP = M_B + LINE_H + 6;
+  const PAGE_NUM_RESERVE = LINE_H * 0.9;
+  const BOTTOM_LIMIT = FOOTER_TOP + PAGE_NUM_RESERVE;
 
-  for (const it of items) {
-    const qty = Number(it.qty) || 0;
-    const price = Number(it.price) || 0;
-    const lineTotal = round2(qty * price);
-    const descLines = wrapText(it.desc || '', monoBold, SIZE_BODY,
-      cPriceRight - M_L - widthAt(fmtMoney(price), monoBold, SIZE_BODY) - 20);
-    drawText(descLines[0] || '', M_L, y, monoBold, SIZE_BODY);
-    drawTextRight(fmtMoney(price), cPriceRight, y, monoBold, SIZE_BODY);
-    drawTextRight(String(qty % 1 === 0 ? qty : fmt(qty)), cAmountRight, y, monoBold, SIZE_BODY);
-    drawTextRight(fmtMoney(lineTotal), cTotalRight, y, monoBold, SIZE_BODY);
-    y -= LINE_H;
-    for (let i = 1; i < descLines.length; i++) { drawText(descLines[i], M_L, y, mono, SIZE_BODY); y -= LINE_H; }
+  const TABLE_HEADER_H = LINE_H * 1.4;       // label row only (no rule above items in Typewriter)
+  const TABLE_END_RULE = LINE_H * 1.5;       // strong rule below items
+
+  const firstPageBudget = (y - BOTTOM_LIMIT) - TABLE_HEADER_H - TABLE_END_RULE;
+
+  // Continuation pages: smaller mini-header
+  const MINI_HEADER_TOP = PAGE_H - M_T;
+  const MINI_HEADER_H = LINE_H * 3.0;
+  const midPageBudget = (MINI_HEADER_TOP - BOTTOM_LIMIT) - MINI_HEADER_H - TABLE_HEADER_H - TABLE_END_RULE;
+
+  // Last-page reserve: totals + VAT + footnote + payment + greeting/signature
+  let lastPageReserve = LINE_H * 5;  // sum + grand total + spacing
+  lastPageReserve += LINE_H * 1.8;    // VAT line
+  if (footnote)    lastPageReserve += LINE_TIGHT * Math.max(1, wrapText(footnote, mono, SIZE_BODY - 1, contentW).length) + LINE_H * 0.8;
+  if (paymentNote) lastPageReserve += LINE_H * wrapText(paymentNote, mono, SIZE_BODY, contentW).length + LINE_H * 0.8;
+  if (greeting)    lastPageReserve += LINE_H;
+  if (signature)   lastPageReserve += LINE_H;
+
+  const pages = paginateItems(items, itemUnits, firstPageBudget, midPageBudget, lastPageReserve);
+  const totalPages = pages.length;
+
+  // Helper: draw the table header (Typewriter has no leading rule, just labels)
+  function drawTableHeader(yStart) {
+    drawTextRight(tI('pdf_price'),  cPriceRight,  yStart, mono, SIZE_BODY);
+    drawTextRight(tI('pdf_amount'), cAmountRight, yStart, mono, SIZE_BODY);
+    drawTextRight(tI('pdf_total'),  cTotalRight,  yStart, mono, SIZE_BODY);
+    return yStart - LINE_H * 1.4;
   }
 
-  drawRule(y, 0.8, M_L, colRight);
-  y -= LINE_H * 1.5;
-
-  const sumLabel = tI('pdf_sum');
-  drawText(sumLabel, cAmountRight - widthAt(sumLabel, mono, SIZE_BODY), y, mono, SIZE_BODY);
-  drawTextRight(fmtMoney(totals.net), cTotalRight, y, mono, SIZE_BODY);
-  y -= LINE_H * 1.4;
-  const grandLabel = tI('pdf_grand_total');
-  drawText(grandLabel, cAmountRight - widthAt(grandLabel, monoBold, SIZE_BODY), y, monoBold, SIZE_BODY);
-  drawTextRight(fmtMoney(totals.grand), cTotalRight, y, monoBold, SIZE_BODY);
-  y -= LINE_H * 2.2;
-
-  // VAT line
-  const vatLabel = mode === 'S' && totals.tax
-    ? `${tI('pdf_vat_label')} ${fmt(totals.tax)} ${currencySym} (${tI('pdf_vat_S').replace(/^[^:]+:\s*/, '')})`
-    : tI('pdf_vat_' + mode);
-  drawText(vatLabel || tI('pdf_vat_label'), M_L, y, monoBold, SIZE_BODY);
-  y -= LINE_H * 1.8;
-
-  if (footnote) {
-    for (const ln of wrapText(footnote, mono, SIZE_BODY - 1, contentW)) {
-      drawText(ln, M_L, y, mono, SIZE_BODY - 1, SOFT); y -= LINE_TIGHT;
+  // Helper: draw items (monoBold first line, mono for wrapped lines)
+  function drawItems(pageItems, yStart) {
+    let yy = yStart;
+    for (const it of pageItems) {
+      const qty = Number(it.qty) || 0;
+      const price = Number(it.price) || 0;
+      const lineTotal = round2(qty * price);
+      const descLines = wrapText(it.desc || '', monoBold, SIZE_BODY,
+        cPriceRight - M_L - widthAt(fmtMoney(price), monoBold, SIZE_BODY) - 20);
+      drawText(descLines[0] || '', M_L, yy, monoBold, SIZE_BODY);
+      drawTextRight(fmtMoney(price), cPriceRight, yy, monoBold, SIZE_BODY);
+      drawTextRight(String(qty % 1 === 0 ? qty : fmt(qty)), cAmountRight, yy, monoBold, SIZE_BODY);
+      drawTextRight(fmtMoney(lineTotal), cTotalRight, yy, monoBold, SIZE_BODY);
+      yy -= LINE_H;
+      for (let i = 1; i < descLines.length; i++) {
+        drawText(descLines[i], M_L, yy, mono, SIZE_BODY);
+        yy -= LINE_H;
+      }
     }
-    y -= LINE_H * 0.8;
-  } else { y -= LINE_H * 0.2; }
-
-  if (paymentNote) {
-    for (const ln of wrapText(paymentNote, mono, SIZE_BODY, contentW)) {
-      drawText(ln, M_L, y, mono, SIZE_BODY); y -= LINE_H;
-    }
-    y -= LINE_H * 0.8;
+    return yy;
   }
-  if (greeting)  { drawText(greeting,  M_L, y, mono, SIZE_BODY); y -= LINE_H; }
-  if (signature) { drawText(signature, M_L, y, mono, SIZE_BODY); y -= LINE_H; }
 
-  // Footer: rule + bank line
-  const footerY = M_B + LINE_H + 6;
-  drawRule(footerY, 0.6, M_L, colRight);
-  drawCenteredBankLine(seller, kit, {
-    y: M_B,
-    font: monoBold,
-    maxWidth: contentW,
-    startSize: SIZE_BODY,
-    minSize: 6,
-  });
+  // Helper: bottom-of-page elements (rule + centered bank line + page number)
+  function drawPageFooter(pageNum) {
+    drawRule(FOOTER_TOP, 0.6, M_L, colRight);
+    drawCenteredBankLine(seller, kit, {
+      y: M_B,
+      font: monoBold,
+      maxWidth: contentW,
+      startSize: SIZE_BODY,
+      minSize: 6,
+    });
+    if (totalPages > 1) {
+      const label = tI('pdf_page_of').replace('{n}', pageNum).replace('{total}', totalPages);
+      drawTextCenter(label, M_B - LINE_H * 1.8, mono, LABEL_SIZE - 0.5, SOFT);
+    }
+  }
+
+  // Helper: continuation mini-header for pages 2+
+  function drawMiniHeader() {
+    let yy = MINI_HEADER_TOP;
+    const left = number ? `${tI('pdf_invoice_label')} ${number}` : tI('pdf_invoice_label');
+    drawText(left, M_L, yy, monoBold, LABEL_SIZE, SOFT);
+    const cont = tI('pdf_continued');
+    if (buyer.name) {
+      drawTextRight(`${buyer.name} \u00b7 ${cont}`, colRight, yy, monoBold, LABEL_SIZE, SOFT);
+    } else {
+      drawTextRight(cont, colRight, yy, monoBold, LABEL_SIZE, SOFT);
+    }
+    yy -= LINE_H * 0.8;
+    drawRule(yy, 0.4, M_L, colRight);
+    yy -= LINE_H * 1.6;
+    return yy;
+  }
+
+  // Closing block: totals + VAT + footnote + payment + greeting/signature
+  function drawClosingBlock(yStart) {
+    let yy = yStart;
+    const sumLabel = tI('pdf_sum');
+    drawText(sumLabel, cAmountRight - widthAt(sumLabel, mono, SIZE_BODY), yy, mono, SIZE_BODY);
+    drawTextRight(fmtMoney(totals.net), cTotalRight, yy, mono, SIZE_BODY);
+    yy -= LINE_H * 1.4;
+    const grandLabel = tI('pdf_grand_total');
+    drawText(grandLabel, cAmountRight - widthAt(grandLabel, monoBold, SIZE_BODY), yy, monoBold, SIZE_BODY);
+    drawTextRight(fmtMoney(totals.grand), cTotalRight, yy, monoBold, SIZE_BODY);
+    yy -= LINE_H * 2.2;
+
+    const vatLabel = mode === 'S' && totals.tax
+      ? `${tI('pdf_vat_label')} ${fmt(totals.tax)} ${currencySym} (${tI('pdf_vat_S').replace(/^[^:]+:\s*/, '')})`
+      : tI('pdf_vat_' + mode);
+    drawText(vatLabel || tI('pdf_vat_label'), M_L, yy, monoBold, SIZE_BODY);
+    yy -= LINE_H * 1.8;
+
+    if (footnote) {
+      for (const ln of wrapText(footnote, mono, SIZE_BODY - 1, contentW)) {
+        drawText(ln, M_L, yy, mono, SIZE_BODY - 1, SOFT); yy -= LINE_TIGHT;
+      }
+      yy -= LINE_H * 0.8;
+    } else { yy -= LINE_H * 0.2; }
+
+    if (paymentNote) {
+      for (const ln of wrapText(paymentNote, mono, SIZE_BODY, contentW)) {
+        drawText(ln, M_L, yy, mono, SIZE_BODY); yy -= LINE_H;
+      }
+      yy -= LINE_H * 0.8;
+    }
+    if (greeting)  { drawText(greeting,  M_L, yy, mono, SIZE_BODY); yy -= LINE_H; }
+    if (signature) { drawText(signature, M_L, yy, mono, SIZE_BODY); yy -= LINE_H; }
+    return yy;
+  }
+
+  // ---- Render each page ----
+  // Page 1: header is already drawn. Now table + items + footer.
+  let pageY = y;
+  pageY = drawTableHeader(pageY);
+  if (pages[0].items.length > 0) {
+    pageY = drawItems(pages[0].items, pageY);
+  }
+  if (pages.length === 1) {
+    drawRule(pageY, 0.8, M_L, colRight);
+    pageY -= LINE_H * 1.5;
+    pageY = drawClosingBlock(pageY);
+  }
+  drawPageFooter(1);
+
+  // Pages 2..N
+  for (let pi = 1; pi < pages.length; pi++) {
+    newPage();
+    let yy = drawMiniHeader();
+    yy = drawTableHeader(yy);
+    if (pages[pi].items.length > 0) {
+      yy = drawItems(pages[pi].items, yy);
+    }
+    if (pi === pages.length - 1) {
+      drawRule(yy, 0.8, M_L, colRight);
+      yy -= LINE_H * 1.5;
+      yy = drawClosingBlock(yy);
+    }
+    drawPageFooter(pi + 1);
+  }
 }

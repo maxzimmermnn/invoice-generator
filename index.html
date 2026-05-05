@@ -32,27 +32,47 @@
     <h1 data-i18n="title">E-Invoice Generator</h1>
     <div class="sub" data-i18n="subtitle">ZUGFeRD 2.3 · Factur-X · EN 16931 (Comfort)</div>
   </div>
-<div class="top-controls">
-    <select id="langSelect" class="lang-select" aria-label="Language">
-      <option value="en">EN</option>
-      <option value="de">DE</option>
-      <option value="fr">FR</option>
-    </select>
-    <button type="button" id="themeToggle" class="theme-toggle" title="Theme" aria-label="Theme"></button>
-    <button id="openStats" class="tiny-btn top-stats-btn" type="button" data-i18n-title="btn_open_stats" aria-label="Statistics">
-      <span aria-hidden="true">▤</span>
-    </button>
+  <div class="top-controls">
+    <div class="top-group">
+      <select id="langSelect" class="lang-select" aria-label="Language">
+        <option value="en">EN</option>
+        <option value="de">DE</option>
+        <option value="fr">FR</option>
+      </select>
+      <button type="button" id="themeToggle" class="theme-toggle" title="Theme" aria-label="Theme"></button>
+    </div>
+    <div class="top-group">
+      <button id="openHistory" class="tiny-btn top-icon-btn" type="button" data-i18n-title="btn_open_history" aria-label="History">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M2.5 4.5 A 5 5 0 1 1 1.8 8.3"/>
+          <polyline points="0.6,3.2 2.5,4.5 4.4,3.2"/>
+          <polyline points="7,4.2 7,7.2 9,8.8"/>
+        </svg>
+      </button>
+      <button id="openStats" class="tiny-btn top-icon-btn" type="button" data-i18n-title="btn_open_stats" aria-label="Statistics">
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+          <rect x="1" y="8" width="2.5" height="5" fill="currentColor"/>
+          <rect x="5.75" y="4" width="2.5" height="9" fill="currentColor"/>
+          <rect x="10.5" y="6" width="2.5" height="7" fill="currentColor"/>
+        </svg>
+      </button>
+      <button id="openHelp" class="tiny-btn top-icon-btn" type="button" data-i18n-title="btn_open_help" aria-label="Help">
+        <span aria-hidden="true">?</span>
+      </button>
+    </div>
   </div>
 </header>
 
-<div class="intro">
-  <p class="intro-line" data-i18n="intro_main"></p>
-  <p class="intro-line-last" data-i18n="intro_alt"></p>
-</div>
-
 <!-- SELLER -->
-<section class="block">
-  <h2 data-i18n="section_seller"></h2>
+<section class="block sub" id="sellerSection">
+  <div class="seller-head">
+    <h2 data-i18n="section_seller"></h2>
+    <button id="sellerToggle" class="seller-toggle" type="button" hidden aria-expanded="true">
+      <span class="seller-toggle-arrow" aria-hidden="true">▾</span>
+      <span class="seller-toggle-summary" id="sellerSummary"></span>
+    </button>
+  </div>
+  <div id="sellerBody">
   <div class="hint"><span data-i18n="section_seller_hint"></span> <button class="tiny-btn" id="saveSeller" type="button" data-i18n="btn_save_template"></button> <button class="tiny-btn" id="clearSeller" type="button" data-i18n="btn_reset"></button></div>
   <div class="grid">
     <label class="full"><span data-i18n="f_company"></span>
@@ -92,6 +112,7 @@
       <input type="text" id="s_bank" autocomplete="off">
     </label>
   </div>
+  </div>
 </section>
 
 <!-- BUYER -->
@@ -99,7 +120,7 @@
   <h2 data-i18n="section_buyer"></h2>
   <div class="hint" data-i18n="section_buyer_hint"></div>
   <div class="picker-row">
-    <select id="buyerPicker">
+    <select id="buyerPicker" aria-label="Buyer profile">
       <option value="" data-i18n="f_buyer_picker"></option>
     </select>
     <button class="tiny-btn" id="saveBuyer" type="button" data-i18n="btn_save_buyer"></button>
@@ -133,31 +154,6 @@
       <span class="note-small" data-i18n="f_buyer_reference_hint"></span>
     </label>
   </div>
-</section>
-
-
-<!-- HISTORY  -->
-
-<section class="block">
-  <h2 data-i18n="section_history"></h2>
-  <div class="hint" data-i18n="section_history_hint"></div>
-
-  <div class="input-with-action">
-    <select id="historyPicker">
-      <!-- Filled by renderHistoryPicker() -->
-    </select>
-    <button class="tiny-btn" id="historyClone" type="button" data-i18n="btn_history_clone"></button>
-  </div>
-
-  <div class="input-with-action history-bottom-row">
-  <label class="inline">
-    <input type="checkbox" id="historyEnable">
-    <span data-i18n="history_enable_label"></span>
-  </label>
-  <button class="tiny-btn" id="historyAddPast" type="button" data-i18n="btn_history_add_past"></button>
-  <button class="tiny-btn" id="historyDelete" type="button" data-i18n="btn_history_delete"></button>
-  <button class="tiny-btn" id="historyClearAll" type="button" data-i18n="btn_history_clear_all"></button>
-</div>
 </section>
 
 
@@ -310,28 +306,8 @@
   </div>
 </section>
 
-<!-- OUTPUT -->
-<section class="block">
-  <h2 data-i18n="section_output"></h2>
-  <div class="hint" data-i18n="section_output_hint"></div>
-  <div class="mode-toggle">
-    <button class="mode-btn active" data-mode="generate" type="button" data-i18n="mode_generate"></button>
-    <button class="mode-btn" data-mode="upload" type="button" data-i18n="mode_upload"></button>
-  </div>
-  <div id="mode-generate">
-    <p class="note-small" data-i18n="mode_generate_hint"></p>
-  </div>
-  <div id="mode-upload" class="hidden">
-    <div class="drop" id="drop">
-      <div data-i18n="drop_pdf"></div>
-      <div class="fname" id="fname"></div>
-    </div>
-    <input type="file" id="file" accept="application/pdf,.pdf" class="visually-hidden">
-  </div>
-</section>
-
 <!-- FILENAME -->
-<section class="block">
+<section class="block sub">
   <h2 data-i18n="section_filename"></h2>
   <div class="hint"><span data-i18n="section_filename_hint"></span> <button class="tiny-btn" id="saveFilenamePattern" type="button" data-i18n="btn_save_filename"></button></div>
 <div class="due-chips filename-chips" id="filenameChips">
@@ -349,16 +325,7 @@
   <div class="note-small filename-preview" id="filenamePreview"></div>
 </section>
 
-<div class="actions">
-  <button type="button" class="primary" id="btnPDF" data-i18n="btn_create_pdf"></button>
-  <button type="button" class="secondary" id="btnXML" data-i18n="btn_xml_only"></button>
-  <button type="button" class="secondary" id="btnValidate" data-i18n="btn_validate"></button>
-</div>
-
-<div class="status" id="status"></div>
-
 <footer>
-  <p data-i18n="footer_main"></p>
   <p class="footer-disclaimer" data-i18n="footer_disclaimer"></p>
   <p class="footer-backup">
     <span data-i18n="footer_backup"></span>
@@ -369,26 +336,54 @@
   </p>
 </footer>
 
+</div><!-- /.wrap -->
+
+<!-- Sticky bottom action bar — sits outside .wrap so it can span the
+     full viewport. Body has padding-bottom matching the bar's height. -->
+<div class="action-bar">
+  <div class="action-bar-inner">
+    <div class="status" id="status"></div>
+    <div class="actions">
+      <button type="button" class="primary" id="btnPDF" data-i18n="btn_create_pdf"></button>
+      <button type="button" class="secondary" id="btnXML" data-i18n="btn_xml_only"></button>
+      <button type="button" class="secondary" id="btnValidate" data-i18n="btn_validate"></button>
+      <button type="button" class="secondary" id="btnEmbed" data-i18n="btn_embed_xml"></button>
+    </div>
+  </div>
 </div>
 
+<!-- Stats modal -->
 <div class="modal" id="statsModal" hidden>
-  <div class="modal-content">
+  <div class="modal-content stats-modal-content">
     <div class="modal-head">
       <h2 data-i18n="stats_title"></h2>
-      <button id="statsClose" class="tiny-btn" type="button" data-i18n="stats_close"></button>
+      <div class="modal-head-actions">
+        <button id="statsYoYToggle" class="tiny-btn" type="button" data-i18n="btn_yoy_toggle" aria-pressed="false"></button>
+        <button id="yoyBackfillOpen" class="tiny-btn" type="button" data-i18n="yoy_set_reference"></button>
+        <button id="statsExportCsv" class="tiny-btn" type="button" data-i18n="btn_export_csv"></button>
+        <button id="statsClose" class="tiny-btn" type="button" data-i18n="stats_close"></button>
+      </div>
     </div>
 
-    <div class="modal-controls">
-      <label class="inline">
+    <div class="modal-controls stats-controls">
+      <div class="stats-tabs">
+        <button id="statsTabOverview" class="tiny-btn active" type="button" data-i18n="stats_tab_overview"></button>
+        <button id="statsTabQuarters" class="tiny-btn" type="button" data-i18n="stats_tab_quarters"></button>
+      </div>
+      <label class="inline" id="statsPeriodWrap">
         <span data-i18n="stats_period_label"></span>
-          <select id="statsPeriod">
-            <option value="ytd"        data-i18n="stats_period_ytd" selected></option>
-           <option value="last12"     data-i18n="stats_period_last12"></option>
-           <option value="last6"      data-i18n="stats_period_last6"></option>
-           <option value="last3"      data-i18n="stats_period_last3"></option>
-           <option value="last_month" data-i18n="stats_period_last_month"></option>
-           <option value="all"        data-i18n="stats_period_all"></option>
-          </select>        
+        <select id="statsPeriod">
+          <option value="ytd" selected data-i18n="stats_period_ytd"></option>
+          <option value="last12" data-i18n="stats_period_last12"></option>
+          <option value="last6" data-i18n="stats_period_last6"></option>
+          <option value="last3" data-i18n="stats_period_last3"></option>
+          <option value="last_month" data-i18n="stats_period_last_month"></option>
+          <option value="all" data-i18n="stats_period_all"></option>
+        </select>
+      </label>
+      <label class="inline" id="statsYearWrap" style="display: none;">
+        <span data-i18n="stats_year_label"></span>
+        <select id="statsYear"></select>
       </label>
     </div>
 
@@ -398,85 +393,161 @@
   </div>
 </div>
 
-<div class="modal" id="pastInvoiceModal" hidden>
-  <div class="modal-content">
+<!-- History modal -->
+<div class="modal" id="historyModal" hidden>
+  <div class="modal-content history-modal-content">
     <div class="modal-head">
-      <h2 data-i18n="past_modal_title"></h2>
-      <button id="pastCancel" class="tiny-btn" type="button" data-i18n="past_cancel"></button>
+      <h2 data-i18n="section_history"></h2>
+      <button id="historyClose" class="tiny-btn" type="button" data-i18n="stats_close"></button>
     </div>
 
-    <div class="hint" data-i18n="past_modal_hint"></div>
+    <p class="modal-intro" data-i18n="section_history_hint"></p>
 
-    <div class="past-grid">
-      <label>
-        <span data-i18n="past_field_date"></span>
-        <input type="date" id="past_date">
-      </label>
-
-      <label>
-        <span data-i18n="past_field_buyer"></span>
-        <select id="past_buyer_select"></select>
-      </label>
-
-      <label class="full">
-        <span data-i18n="past_field_buyer_new"></span>
-        <input type="text" id="past_buyer_text">
-      </label>
-
-      <label>
-        <span data-i18n="past_field_total"></span>
-        <input type="number" id="past_total" step="0.01" min="0">
-      </label>
-
-      <label>
-        <span data-i18n="past_field_currency"></span>
-        <select id="past_currency">
-          <option value="EUR">EUR</option>
-          <option value="USD">USD</option>
-          <option value="GBP">GBP</option>
-          <option value="CHF">CHF</option>
-        </select>
-      </label>
-
-      <label>
-        <span data-i18n="past_field_taxmode"></span>
-        <select id="past_taxmode">
-          <option value="S">Standard (VAT)</option>
-          <option value="AE">Reverse charge</option>
-          <option value="Z">Zero rate</option>
-          <option value="E">Exempt</option>
-          <option value="O">Out of scope</option>
-        </select>
-      </label>
-
-      <label id="past_vat_rate_wrap">
-        <span data-i18n="past_field_vat_rate"></span>
-        <input type="number" id="past_vat_rate" step="0.1" min="0" value="20">
-      </label>
-
-      <label>
-        <span data-i18n="past_field_number"></span>
-        <input type="text" id="past_number">
-      </label>
-
-      <label>
-        <span data-i18n="past_field_project"></span>
-        <input type="text" id="past_project">
-      </label>
-
-      <label>
-        <span data-i18n="past_field_category"></span>
-        <input type="text" id="past_category">
-      </label>
+    <div class="input-with-action">
+      <select id="historyPicker" aria-label="Past invoice">
+        <!-- Filled by renderHistoryPicker() -->
+      </select>
+      <button class="tiny-btn" id="historyClone" type="button" data-i18n="btn_history_clone"></button>
     </div>
 
-    <div class="modal-actions">
-      <button class="tiny-btn" id="pastSave" type="button" data-i18n="past_save"></button>
+    <div class="history-bottom-row">
+      <label class="inline">
+        <input type="checkbox" id="historyEnable">
+        <span data-i18n="history_enable_label"></span>
+      </label>
+      <div class="history-bottom-actions">
+        <button class="tiny-btn" id="historyAddPast" type="button" data-i18n="btn_history_add_past"></button>
+        <button class="tiny-btn" id="historyDelete" type="button" data-i18n="btn_history_delete"></button>
+        <button class="tiny-btn" id="historyClearAll" type="button" data-i18n="btn_history_clear_all"></button>
+      </div>
     </div>
   </div>
 </div>
 
+<!-- Help modal -->
+<div class="modal" id="helpModal" hidden>
+  <div class="modal-content help-modal-content">
+    <div class="modal-head">
+      <h2 data-i18n="help_title"></h2>
+      <button id="helpClose" class="tiny-btn" type="button" data-i18n="stats_close"></button>
+    </div>
+    <div id="helpBody" class="help-body">
+      <!-- Filled by openHelpModal() with rendered README -->
+    </div>
+  </div>
+</div>
 
+<!-- Embed-XML modal -->
+<div class="modal" id="embedModal" hidden>
+  <div class="modal-content embed-modal-content">
+    <div class="modal-head">
+      <h2 data-i18n="embed_title"></h2>
+      <button id="embedClose" class="tiny-btn" type="button" data-i18n="stats_close"></button>
+    </div>
+    <p class="modal-intro" data-i18n="embed_intro"></p>
+    <div class="drop" id="drop">
+      <div data-i18n="drop_pdf"></div>
+      <div class="fname" id="fname"></div>
+    </div>
+    <input type="file" id="file" accept="application/pdf,.pdf" class="visually-hidden">
+    <div class="embed-actions">
+      <button type="button" class="primary" id="btnEmbedRun" data-i18n="btn_embed_run"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Past-invoice modal -->
+<div class="modal" id="pastInvoiceModal" hidden>
+  <div class="modal-content past-invoice-content">
+    <div class="modal-head">
+      <h2 data-i18n="past_modal_title"></h2>
+      <button id="pastCancel" class="tiny-btn" type="button" data-i18n="past_cancel"></button>
+    </div>
+    <p class="modal-intro" data-i18n="past_modal_intro"></p>
+    <div class="grid">
+      <label><span data-i18n="past_field_date"></span>
+        <input type="date" id="past_date">
+      </label>
+      <label><span data-i18n="past_field_number"></span>
+        <input type="text" id="past_number" autocomplete="off">
+      </label>
+      <label class="full"><span data-i18n="past_field_buyer_select"></span>
+        <select id="past_buyer_select"></select>
+      </label>
+      <label class="full"><span data-i18n="past_field_buyer"></span>
+        <input type="text" id="past_buyer_text" autocomplete="off">
+      </label>
+      <label><span data-i18n="past_field_currency"></span>
+        <input type="text" id="past_currency" maxlength="3" value="EUR">
+      </label>
+      <label><span data-i18n="past_field_total"></span>
+        <input type="number" id="past_total" step="0.01" min="0">
+      </label>
+      <label><span data-i18n="past_field_taxmode"></span>
+        <select id="past_taxmode">
+          <option value="S" data-i18n="tax_S"></option>
+          <option value="AE" data-i18n="tax_AE"></option>
+          <option value="Z" data-i18n="tax_Z"></option>
+          <option value="E" data-i18n="tax_E"></option>
+          <option value="O" data-i18n="tax_O"></option>
+        </select>
+      </label>
+      <label id="past_vat_rate_wrap"><span data-i18n="past_field_vat_rate"></span>
+        <input type="number" id="past_vat_rate" step="1" min="0" value="20">
+      </label>
+      <label><span data-i18n="past_field_project"></span>
+        <input type="text" id="past_project" autocomplete="off">
+      </label>
+      <label><span data-i18n="past_field_category"></span>
+        <input type="text" id="past_category" autocomplete="off">
+      </label>
+    </div>
+    <div class="past-modal-actions">
+      <button id="pastSave" class="primary" type="button" data-i18n="past_save"></button>
+    </div>
+  </div>
+</div>
+
+<!-- YoY backfill modal -->
+<div class="modal" id="yoyBackfillModal" hidden>
+  <div class="modal-content yoy-backfill-content">
+    <div class="modal-head">
+      <h2 data-i18n="yoy_modal_title"></h2>
+      <button id="yoyBackfillCancel" class="tiny-btn" type="button" data-i18n="yoy_cancel"></button>
+    </div>
+    <p class="modal-intro" data-i18n="yoy_modal_intro"></p>
+
+    <div class="yoy-modal-fields">
+      <label class="inline">
+        <span data-i18n="yoy_field_year"></span>
+        <select id="yoyBackfillYear"></select>
+      </label>
+      <label class="inline">
+        <span data-i18n="yoy_field_currency"></span>
+        <select id="yoyBackfillCurrency"></select>
+      </label>
+    </div>
+
+    <div class="yoy-month-grid">
+      <label><span data-i18n="yoy_month_jan"></span><input type="number" id="yoyMonth_0" step="0.01" min="0"></label>
+      <label><span data-i18n="yoy_month_feb"></span><input type="number" id="yoyMonth_1" step="0.01" min="0"></label>
+      <label><span data-i18n="yoy_month_mar"></span><input type="number" id="yoyMonth_2" step="0.01" min="0"></label>
+      <label><span data-i18n="yoy_month_apr"></span><input type="number" id="yoyMonth_3" step="0.01" min="0"></label>
+      <label><span data-i18n="yoy_month_may"></span><input type="number" id="yoyMonth_4" step="0.01" min="0"></label>
+      <label><span data-i18n="yoy_month_jun"></span><input type="number" id="yoyMonth_5" step="0.01" min="0"></label>
+      <label><span data-i18n="yoy_month_jul"></span><input type="number" id="yoyMonth_6" step="0.01" min="0"></label>
+      <label><span data-i18n="yoy_month_aug"></span><input type="number" id="yoyMonth_7" step="0.01" min="0"></label>
+      <label><span data-i18n="yoy_month_sep"></span><input type="number" id="yoyMonth_8" step="0.01" min="0"></label>
+      <label><span data-i18n="yoy_month_oct"></span><input type="number" id="yoyMonth_9" step="0.01" min="0"></label>
+      <label><span data-i18n="yoy_month_nov"></span><input type="number" id="yoyMonth_10" step="0.01" min="0"></label>
+      <label><span data-i18n="yoy_month_dec"></span><input type="number" id="yoyMonth_11" step="0.01" min="0"></label>
+    </div>
+
+    <div class="yoy-modal-actions">
+      <button id="yoyBackfillSave" class="primary" type="button" data-i18n="yoy_save"></button>
+    </div>
+  </div>
+</div>
 
 <script type="module" src="/src/main.js"></script>
 </body>
