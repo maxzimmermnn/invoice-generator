@@ -1,39 +1,41 @@
-## [1.5.1] - 2026-05-05
+## [1.5.2] - 2026-05-07
 
-Patch release with UI polish based on post-release feedback. No
-functional changes; same backup format as v1.5.0.
+Patch release. Typewriter layout text justification and a thorough
+refresh of the bundled help text.
+
+### Added
+
+- **Justified body text in the Typewriter layout.** The intro,
+  footnote, and payment note now render with full justification: each
+  line is stretched so its words exactly fill the content width.
+  The last line of each paragraph stays left-aligned, as do
+  single-word lines, to avoid ugly gap distribution. Modern and
+  DIN 5008 layouts are unchanged.
 
 ### Changed
 
-- **Top bar reorganised into three groups.** Order is now history +
-  stats on the left, language + theme in the middle, help on the
-  right. Spacing between all icons is uniform (was previously
-  inconsistent due to a legacy `.tiny-btn` margin that affected only
-  some of the icon buttons).
-- **Save / reset buttons moved into the seller header row.** They now
-  sit on the right side of the SELLER toggle line, only visible when
-  the section is expanded. Hides automatically when the section is
-  collapsed so the summary line stays clean. The hint paragraph
-  underneath is now plain explanatory text without buttons appended.
-- **All headlines switched from serif to mono.** The H1, primary
-  section headings (Buyer, Invoice, Items), the totals grand value,
-  the help modal subheadings, the per-currency stats block headers,
-  and the buyer drill-down title were previously declared as Fraunces
-  serif (which fell back to the system serif since Fraunces was never
-  actually loaded). They now use Inconsolata mono consistently with
-  the rest of the UI.
+- **Help modal content brought up to date with v1.5.0 / v1.5.1.**
+  The bundled README text inside the help modal was last touched
+  before the major v1.5.0 release and was missing several features
+  and contained a few factual errors.
 
-### Fixed
+  Added: Embed-XML modal description, all three statistics tabs
+  (Overview / Quarters / Buyer drill-down), period filter options,
+  YoY toggle and backfill, CSV export, buyer reference / Leitweg-ID
+  (BT-10), seller-section collapse-and-summary behaviour, layout
+  descriptions matching the README.
 
-- **Seller toggle vertical alignment.** The toggle text and arrow
-  now sit on the same baseline as the SELLER h2 next to them. The
-  previous setup mixed `align-items: baseline` on the toggle with a
-  smaller font-size and vertical padding, which pushed the toggle
-  text below the heading.
-- **Save / reset button height in the seller header.** The default
-  `.tiny-btn` line-height made these buttons taller than the
-  surrounding h2; now they share a baseline thanks to a tighter
-  line-height plus matching padding adjustment.
-- **Header indentation in `index.html`.** The `<div class="top-controls">`
-  block had inconsistent leading whitespace; reformatted to match
-  the rest of the file.
+  Fixed: font count corrected from four to five (Space Mono was
+  missing), due-date chip list corrected to +14 / +30 / +60 (the
+  previous text claimed five chips including "today" and "+7"
+  which never existed), filename-pattern token list expanded to
+  document the date-and-counter family (\`{yyyy}\`, \`{counter:N}\`,
+  etc.).
+
+### Internal
+
+- New shared helper \`drawJustifiedLines\` in \`layouts.js\` that
+  takes pre-wrapped lines, splits them into words, measures word
+  widths via \`widthAt\`, and distributes the remaining horizontal
+  space evenly between word gaps. Available to all layouts; only
+  Typewriter uses it currently.

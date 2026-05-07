@@ -1307,6 +1307,14 @@ function applyBoilerplate(b) {
   $('r_signature').value = nz(b.signature);
   $('r_footnote').value = nz(b.footnote);
 }
+function applySeller(s) {
+  // Legacy entry point for backups that still have boilerplate inside the seller object.
+  applySellerStammdaten(s);
+  if (s.intro !== undefined || s.payment_note !== undefined || s.greeting !== undefined ||
+      s.signature !== undefined || s.footnote !== undefined) {
+    applyBoilerplate(s);
+  }
+}
 
 // Per-language boilerplate
 async function loadBoilerplateForLang(lang) {
@@ -1321,6 +1329,14 @@ async function loadBoilerplateForLang(lang) {
     // No saved boilerplate for this language → clear the boilerplate fields
     applyBoilerplate({});
   }
+}
+
+// Save current boilerplate field state back to its language bucket
+// (used during language switch so unsaved edits aren't lost between switches).
+async function persistCurrentBoilerplateInMemory(lang) {
+  // Note: This intentionally does NOT save to storage — only used
+  // implicitly by saveSeller(). The user must hit "save as template"
+  // to persist boilerplate per language.
 }
 
 // -------- Buyer profiles (persisted list) --------
@@ -1521,7 +1537,8 @@ function resolveFilenamePattern(pattern) {
     '{category}': $('r_category').value.trim(),
     '{seller}':   $('s_name').value.trim(),
     '{layout}':   $('invoiceLayoutSelect').value,
-    // Backwards compatibility for legacy German tokens in saved patterns
+    // Backwards compatibility: early versions used German token names.
+    // These are still resolved if they slip through migration somewhere.
     '{projekt}':   $('r_project').value.trim(),
     '{kunde}':     $('b_name').value.trim(),
     '{datum}':     $('r_date').value ? $('r_date').value.replace(/-/g, '') : '',
@@ -1544,9 +1561,23 @@ function updateFilenamePreview() {
 async function loadFilenamePattern() {
   try {
     const v = await store.get(FILENAME_KEY);
-    if (v) $('r_filename').value = v;
+    if (v) $('r_filename').value = migrateLegacyFilenameTokens(v);
   } catch (_) {}
   updateFilenamePreview();
+}
+
+// Some early versions of the tool stored filename patterns with German
+// token names ({verkäufer}, {projekt}, {kunde}, {kategorie}, {datum}).
+// Rewrite to canonical English tokens on load so the input field shows
+// the documented form. The resolver still accepts the German tokens for
+// compatibility with any patterns we might have missed.
+function migrateLegacyFilenameTokens(pattern) {
+  return pattern
+    .replaceAll('{verkäufer}', '{seller}')
+    .replaceAll('{projekt}',   '{project}')
+    .replaceAll('{kunde}',     '{buyer}')
+    .replaceAll('{kategorie}', '{category}')
+    .replaceAll('{datum}',     '{date}');
 }
 
 async function saveFilenamePattern() {
@@ -2015,9 +2046,13 @@ async function savePastInvoice() {
   flash(t('msg_history_added'), 'ok');
 }
 
-// -------- Statistics: core data functions --------
-// Pure functions over state.history that the renderers below build on.
-// Grouped per currency since invoices come in EUR/USD/GBP/CHF.
+// -------- Statistics --------
+// Statistics derived from history. Pure functions over state.history,
+// grouped per currency since invoices come in EUR/USD/GBP/CHF.
+//
+// Period filters: 'ytd' (current year), 'last12' (rolling 12 months),
+// 'all' (everything). Per-currency results are returned as a Map keyed
+// by currency code.
 
 const STATS_PERIODS = ['ytd', 'last12', 'last6', 'last3', 'last_month', 'all'];
 
@@ -2094,12 +2129,11 @@ function computeKPIs(snapshots) {
   };
 }
 
-// -------- Statistics: data + render + YoY + interactions --------
+// -------- YoY computation --------
 //
-// This block contains all stats logic: period windows, YoY computation,
-// monthly + quarterly aggregations, top-buyer ranking, the SVG chart
-// renderer, the three view renderers (overview / quarters / drill-down),
-// and the small state machine for switching between them.
+// Given the current period and the resulting filtered snapshots (per
+// currency), compute a comparable KPI bundle from one year earlier and
+// derive percent-change arrows.
 //
 // Comparison windows per period:
 //   ytd        → same span Jan 1..today, but in previous calendar year
@@ -4115,8 +4149,9 @@ async function importData(file) {
       await store.set(COUNTER_KEY, payload.last_invoice);
     }
     if (payload.filename_pattern) {
-      await store.set(FILENAME_KEY, payload.filename_pattern);
-      $('r_filename').value = payload.filename_pattern;
+      const migrated = migrateLegacyFilenameTokens(payload.filename_pattern);
+      await store.set(FILENAME_KEY, migrated);
+      $('r_filename').value = migrated;
       updateFilenamePreview();
     }
     if (payload.font && FONT_OPTIONS[payload.font]) {
@@ -4213,7 +4248,7 @@ function applySellerCollapsedUI() {
 }
 
 
-// -------- Help modal (renders bundled README via mini-markdown) --------
+// -------- Help modal: bundled README rendering --------
 //
 // We keep the README content as a string literal so the build stays
 // single-file. A tiny Markdown renderer handles the subset used by the
@@ -4234,67 +4269,94 @@ Open the tool in a browser, fill in the invoice data, generate a PDF. The PDF ca
 
 ## Layouts
 
-Three layouts are available:
+- **Modern** large headline, generous whitespace, prominent total block
+- **DIN 5008** German business-letter standard with recipient address top-left (window-envelope compatible) and a 3-column footer
+- **Typewriter** centered two-column header (buyer left, seller right), evenly-spaced meta row, single-line bank footer; body texts are justified
 
-- **Modern** — minimal, magazine-style, single full-width column
-- **DIN 5008** — German letterhead standard with window-envelope-positioned recipient
-- **Typewriter** — monospace two-column header, tight monoBold body
-
-All layouts support multi-page rendering when item lists overflow a single page.
+All three layouts support multi-page rendering when item lists overflow a single page.
 
 ## Features
 
 ### Seller profile
-Stammdaten (name, address, tax IDs, banking) are saved locally. Boilerplate texts (intro, payment note, greeting, signature, footnote) are stored per invoice language (DE/EN/FR) so a language switch loads the right defaults.
+Master data (address, VAT ID, IBAN, BIC, bank, optional SIRET) is stored locally. The seller section collapses to a one-line summary (\`Company · VAT ID · Country\`) once filled in, with save and reset buttons appearing in the header row when expanded.
 
 ### Customer database
-Save buyers as named profiles, pick from a dropdown, save changes back to the profile.
+Add, select, delete customers. Selecting a saved customer fills all buyer fields. Buyer reference / Leitweg-ID is stored as BT-10 in the XML (required for German government clients). When you select a buyer the tool also shows the date and amount of the most recent invoice you sent them.
 
 ### Invoice number with pattern
-Auto-incrementing numbers in YYYY-NNNNN format (continuous, no annual reset). Manual override is always possible.
+Default pattern: \`{yyyy}-{counter:5}\` e.g. \`2026-00042\`. An internal counter increments by 1 after each invoice. Available tokens: \`{yyyy}\`, \`{yy}\`, \`{mm}\`, \`{dd}\`, \`{counter}\`, \`{counter:N}\`. The pattern is editable and persistent.
 
 ### Date fields
-Invoice date, due date with quick-set chips (today, +7, +14, +30, +60), service date (single or range with end date).
+- Invoice date
+- Due date with quick chips +14 / +30 / +60 days
+- Service date (required for e-invoicing)
+- Service date end (optional, for date ranges; encoded as BillingSpecifiedPeriod in the XML)
 
 ### Tax modes
-Standard (S) with VAT, Reverse Charge (AE), Zero-rated (Z), Exempt (E), Out of scope (O). The PDF text adapts; the XML follows EN 16931 BT-95/BT-96 codes.
+Standard (S, with VAT), Reverse Charge (AE, B2B EU cross-border), Zero rate (Z), Exempt (E), Out of scope (O). For reverse charge, the legal note per Art. 196 of Council Directive 2006/112/EC is automatically inserted into both PDF and XML. The XML follows EN 16931 BT-95/BT-96 codes.
 
 ### Line items
-Description, quantity, unit price, VAT percent (only used in S mode). Multi-line descriptions are wrapped properly across all layouts and pages.
+Description (wraps if long), quantity, unit price, VAT rate. Multi-line descriptions wrap properly across all layouts and pages.
 
 ### Default texts (boilerplate)
-Per-invoice-language storage so DE invoices reach for German default texts and EN invoices for English.
+Intro, payment note, greeting, signature and footnote are stored per invoice language, separately. The \`{due}\` placeholder in the payment note is replaced with the actual due date at PDF time.
 
 ### Footnote presets
-Save footnote variants as named presets, switch between them via dropdown.
+Frequently-used explanations can be saved as named presets and inserted from a dropdown.
 
 ### Language selectors
-Three independent language axes: UI language, invoice content language, and (implicitly) buyer language inferred from the buyer country code.
+Two independent dropdowns: UI language and invoice language. You can keep the UI in German and still generate English invoices, for example.
 
 ### Fonts
-Choose between Courier Prime, Inconsolata, IBM Plex Mono, or JetBrains Mono for the PDF body. UI font stays the same.
+Five monospace fonts for the PDF (all embedded with proper Bold weight): Courier Prime, IBM Plex Mono, JetBrains Mono, Inconsolata, Space Mono.
 
 ### Filename pattern
-Token-based filename builder. Drop \`{nr}\`, \`{buyer}\`, \`{project}\`, \`{date}\`, \`{category}\`, \`{seller}\`, \`{layout}\` into a pattern; chips help insertion.
+Token-based filename builder with chips for one-click insertion. Default: \`{nr}_{buyer}_{project}\`. Tokens: \`{nr}\`, \`{date}\`, \`{buyer}\`, \`{seller}\`, \`{project}\`, \`{category}\`, \`{layout}\`. A live preview shows the resolved filename.
 
-### History & Statistics
-Every generated invoice is saved as a snapshot. Click the history icon to browse, clone, or remove past invoices. Click the chart icon for statistics: KPIs, monthly chart, top buyers, quarterly tax breakdown, year-over-year comparison, CSV export.
+### Invoice history
+A history icon in the top bar opens a modal with all generated invoices (up to 1000 entries, oldest dropped first):
+
+- **Clone** any past invoice back into the form. All fields including buyer, items, project, category, tax mode, language, font and layout are restored. Date fields stay empty so you fill them explicitly; the invoice number is auto-assigned to the next available one. Cloning closes the modal so you land back on the form.
+- **Add past invoice** to backfill older invoices generated elsewhere, so the statistics view can cover a complete period.
+- **Delete entry** to remove a single record.
+- **Delete all** to clear the history with a confirmation prompt.
+- **Save invoices to history** toggle. When off, new invoices won't be saved, but existing entries remain accessible.
+
+### Statistics
+A statistics icon in the top bar opens a modal with everything you need to look back at your billing. For each currency separately (EUR / USD / GBP / CHF), the **Overview** tab shows gross total, net, VAT, average per invoice, a 12-month bar chart with hover tooltips, and Top 3 buyers (each clickable to drill down into a buyer-specific view with their KPIs and chronological invoice list).
+
+The **Quarters** tab shows Q1 to Q4 totals with columns adapted to the tax mode, and a year selector to flip through past years.
+
+A **YoY toggle** in the header adds year-over-year arrows next to the KPIs and a comparison bar in the chart tooltip. If you only have history for the current year, a Set previous year button opens a small backfill form where you enter monthly totals manually for any past year and currency.
+
+Period filter on the Overview tab: this year, last 12 months, last 6 months, last 3 months, last 30 days, all time.
+
+A CSV export button in the header dumps the current view (overview, quarters, or buyer detail) as UTF-8 with semicolon separators, ready for Excel / Numbers.
+
+### XML validation
+The Validate XML button checks whether all EN 16931 mandatory fields are populated. Download XML only produces just the XML file, without a PDF.
+
+### Embed XML into existing PDF
+If you already have a finished invoice PDF (designed in InDesign, exported from another tool, etc.), the Embed XML button opens a modal where you drop the PDF in and get back a ZUGFeRD-compliant version with the XML attached. The form fields in the tool fill the XML side, the PDF visual is whatever you uploaded.
 
 ### Backup
-Export everything (seller, buyers, footnotes, settings, YoY backfill) to a JSON file; import to restore. Format is forward-compatible.
+Export and import the entire tool state as a JSON file, including history, buyer database, footnote presets and YoY backfill data. Migration handles older backup versions automatically; older backups without history or YoY data import cleanly, leaving the existing values untouched.
 
 ### Theme
-Dark / light toggle, persists across sessions, defaults to system preference.
+Light / dark / auto (follows OS preference).
 
 ## Compliance & standards
 
-Generated PDFs pass:
-- Quba Viewer
-- Mustang Validator
-- ELSTER E-Rechnungsviewer
-- verapdf (strict PDF/A-3 conformance check)
+- **Format**: ZUGFeRD 2.3 / Factur-X 1.0
+- **Profile**: EN 16931 (Comfort) \`urn:cen.eu:en16931:2017\`
+- **Mandatory fields**: BT-1 (invoice number), BT-2 (date), BT-3 (type 380), BT-5 (currency), BT-9 (due date), BT-10 (buyer reference, optional), seller / buyer addresses, tax breakdown, delivery date (BT-72)
+- **Reverse charge**: encoded as a tax category entry with an ExemptionReason
+- **PDF attachment**: XML is attached as embedded file \`factur-x.xml\`
+- **Validators**: Quba Viewer, Mustang, ELSTER E-Rechnungsviewer, verapdf
 
-XML follows EN 16931 BT numbering (Comfort profile). All required fields are populated; optional fields included where the tool collects them.
+## Privacy & offline guarantee
+
+No network calls at runtime. All libraries (pdf-lib, fontkit, pako), all fonts and all UI assets are embedded into the built HTML file. No server component. All input (including the invoice history) is stored in \`localStorage\`. Backup export produces a JSON file you download yourself; nothing is transmitted.
 
 ## Notes
 
@@ -4364,7 +4426,7 @@ function inlineMD(text) {
 }
 
 
-// Modal open / close
+// -------- Help modal --------
 
 function openHelpModal() {
   const modal = $('helpModal');
@@ -4403,7 +4465,7 @@ function closeHistoryModal() {
 }
 
 
-// -------- Embed-XML modal --------
+// -------- Embed-XML modal (was "upload mode" in the output section) --------
 
 function openEmbedModal() {
   const modal = $('embedModal');
