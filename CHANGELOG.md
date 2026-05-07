@@ -1,41 +1,52 @@
-## [1.5.2] - 2026-05-07
+## [1.5.3] - 2026-05-07
 
-Patch release. Typewriter layout text justification and a thorough
-refresh of the bundled help text.
+Adds a Last-year period filter in the statistics view, year-over-year
+overlay bars in the monthly chart, calendar-year chart alignment for
+"This year" and "Last year", and justified body text in the Typewriter
+PDF layout. No backup-format change.
 
 ### Added
 
-- **Justified body text in the Typewriter layout.** The intro,
-  footnote, and payment note now render with full justification: each
-  line is stretched so its words exactly fill the content width.
-  The last line of each paragraph stays left-aligned, as do
-  single-word lines, to avoid ugly gap distribution. Modern and
-  DIN 5008 layouts are unchanged.
+- **Last-year period filter** in the statistics view. Surfaces the
+  full previous calendar year (Jan 1 to Dec 31) and works as a
+  comparison anchor for the YoY toggle, which then compares against
+  the year before that. New entry at the end of the period dropdown
+  since it is a comparative special case rather than part of the
+  longest-to-shortest main sequence.
+- **Year-over-year overlay bars in the monthly chart.** When the YoY
+  toggle is on, each month also renders a thin outlined bar for the
+  same month one year earlier, sourced from history first then YoY
+  backfill. Bars are placed side-by-side at half width, with the
+  current period on the left and the previous year on the right.
+  Y-axis scale includes both years so the previous-year bars never
+  clip. When the YoY toggle is off the chart shows only current-period
+  bars regardless of period setting.
+- **Justified body text in the Typewriter PDF layout.** Multi-line
+  intro, footnote, and payment-note paragraphs now align flush on
+  both sides. The last line of each paragraph stays left-aligned so a
+  short final word doesn't get spread across the full column width.
 
 ### Changed
 
-- **Help modal content brought up to date with v1.5.0 / v1.5.1.**
-  The bundled README text inside the help modal was last touched
-  before the major v1.5.0 release and was missing several features
-  and contained a few factual errors.
+- **Calendar-year alignment for the chart in "This year" and "Last
+  year" periods.** The chart now shows Jan–Dec of the relevant year
+  instead of rolling 12 months ending in the current month, matching
+  the period-filtered KPIs and the user's mental model of a
+  calendar-year overview. Other periods (last 12, last 6, etc.) keep
+  the rolling-12 layout.
+- **Chart heading reflects the period.** Shows the current year for
+  "This year", the previous year for "Last year", and "Last 12 months"
+  for everything else. Was previously always "Last 12 months"
+  regardless of which period was active.
+- **Period dropdown order.** "Last year" sits at the end after "All
+  time" so the main longest-to-shortest sequence stays intact above
+  it.
 
-  Added: Embed-XML modal description, all three statistics tabs
-  (Overview / Quarters / Buyer drill-down), period filter options,
-  YoY toggle and backfill, CSV export, buyer reference / Leitweg-ID
-  (BT-10), seller-section collapse-and-summary behaviour, layout
-  descriptions matching the README.
+### Fixed
 
-  Fixed: font count corrected from four to five (Space Mono was
-  missing), due-date chip list corrected to +14 / +30 / +60 (the
-  previous text claimed five chips including "today" and "+7"
-  which never existed), filename-pattern token list expanded to
-  document the date-and-counter family (\`{yyyy}\`, \`{counter:N}\`,
-  etc.).
-
-### Internal
-
-- New shared helper \`drawJustifiedLines\` in \`layouts.js\` that
-  takes pre-wrapped lines, splits them into words, measures word
-  widths via \`widthAt\`, and distributes the remaining horizontal
-  space evenly between word gaps. Available to all layouts; only
-  Typewriter uses it currently.
+- **YoY outline bars in the stats chart now align exactly with their
+  filled counterparts.** SVG strokes are drawn centered on the path,
+  which made outlined bars visually slightly larger than filled bars
+  and sit half a pixel below the chart baseline. The path is now
+  inset by stroke-width/2 so the outer edges of the stroke match a
+  same-value filled bar's bounds exactly.

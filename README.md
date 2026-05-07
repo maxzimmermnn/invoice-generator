@@ -163,13 +163,17 @@ The **Quarters** tab shows Q1–Q4 totals with columns adapted to the tax
 mode, and a year selector to flip through past years.
 
 A **YoY toggle** in the header adds year-over-year arrows next to the
-KPIs and a comparison bar in the chart tooltip. If you only have history
-for the current year, a **Set previous year** button opens a small
-backfill form where you enter monthly totals manually for any past year
-and currency.
+KPIs, a comparison bar in the chart tooltip, and a thin outlined bar
+in the monthly chart for each month one year earlier. If you only have
+history for the current year, a **Set previous year** button opens a
+small backfill form where you enter monthly totals manually for any
+past year and currency. The backfill values flow into both KPIs and
+the outline bars.
 
 Period filter on the Overview tab: this year, last 12 months, last 6
-months, last 3 months, last 30 days, all time.
+months, last 3 months, last 30 days, all time, last year. The chart
+shows Jan–Dec of the relevant year for "this year" and "last year",
+and rolling 12 months for everything else.
 
 A **CSV export** button in the header dumps the current view (overview,
 quarters, or buyer detail) as UTF-8 with semicolon separators, ready
@@ -192,7 +196,7 @@ visual is whatever you uploaded.
 ### Backup
 Export / import the entire tool state as a JSON file, including history,
 buyer database, footnote presets and YoY backfill data. The migration
-path handles older backup versions automatically — older backups without
+path handles older backup versions automatically; older backups without
 history or YoY data import cleanly, leaving the existing values
 untouched.
 

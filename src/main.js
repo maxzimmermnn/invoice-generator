@@ -307,6 +307,7 @@ const I18N = {
     stats_period_last3: 'Letzte 3 Monate',
     stats_period_last6: 'Letzte 6 Monate',
     stats_period_ytd: 'Aktuelles Jahr',
+    stats_period_last_year: 'Letztes Jahr',
     stats_period_last12: 'Letzte 12 Monate',
     stats_period_all: 'Alles',
     // --- Stats: tax breakdown ---
@@ -646,6 +647,7 @@ const I18N = {
     stats_period_last3: 'Last 3 months',
     stats_period_last6: 'Last 6 months',
     stats_period_ytd: 'This year',
+    stats_period_last_year: 'Last year',
     stats_period_last12: 'Last 12 months',
     stats_period_all: 'All time',
     // --- Stats: tax breakdown ---
@@ -985,6 +987,7 @@ const I18N = {
     stats_period_last3: '3 derniers mois',
     stats_period_last6: '6 derniers mois',
     stats_period_ytd: 'Cette année',
+    stats_period_last_year: 'Année dernière',
     stats_period_last12: '12 derniers mois',
     stats_period_all: 'Tout',
     // --- Stats: tax breakdown ---
@@ -2054,7 +2057,7 @@ async function savePastInvoice() {
 // 'all' (everything). Per-currency results are returned as a Map keyed
 // by currency code.
 
-const STATS_PERIODS = ['ytd', 'last12', 'last6', 'last3', 'last_month', 'all'];
+const STATS_PERIODS = ['ytd', 'last12', 'last6', 'last3', 'last_month', 'all', 'last_year'];
 
 // Filter snapshots by period. Uses snapshot.date (invoice date), falling
 // back to ts (timestamp of save) for entries without a date.
@@ -2064,10 +2067,22 @@ const STATS_PERIODS = ['ytd', 'last12', 'last6', 'last3', 'last_month', 'all'];
 //   last3      — the last 3 calendar months including the current one
 //   last6      — the last 6 calendar months including the current one
 //   ytd        — start of current year through today
+//   last_year  — full previous calendar year (Jan 1 to Dec 31)
 //   last12     — the last 12 calendar months including the current one
 //   all        — everything
 function filterByPeriod(snapshots, period) {
   if (period === 'all') return snapshots.slice();
+  if (period === 'last_year') {
+    // Full previous calendar year: filter on date.getFullYear() rather
+    // than a cutoff, so a Dec 2024 snapshot read in March 2026 still
+    // counts as "last year" only when current year is 2025.
+    const yr = new Date().getFullYear() - 1;
+    return snapshots.filter(s => {
+      const ts = s.date ? new Date(s.date).getTime() : s.ts;
+      if (!Number.isFinite(ts)) return false;
+      return new Date(ts).getFullYear() === yr;
+    });
+  }
   const now = new Date();
   let cutoff;
   if (period === 'last_month') {
@@ -2149,6 +2164,14 @@ function periodWindow(period, yearShift = 0) {
   const now = new Date();
   const yr = now.getFullYear() - yearShift;
   if (period === 'all') return null;
+  if (period === 'last_year') {
+    // last_year = previous full calendar year. yearShift=0 -> last year,
+    // yearShift=1 -> the year before that (used as YoY baseline).
+    const targetYr = now.getFullYear() - 1 - yearShift;
+    const start = new Date(targetYr, 0, 1).getTime();
+    const end = new Date(targetYr, 11, 31, 23, 59, 59, 999).getTime();
+    return [start, end];
+  }
   if (period === 'ytd') {
     const start = new Date(yr, 0, 1).getTime();
     // For shifted year, until = today's date in that year. For current = now.
@@ -2279,11 +2302,32 @@ function topBuyers(snapshots, n = 3) {
 // Aggregate by month over the last 12 months ending in the current month.
 // Returns array of { ym: 'YYYY-MM', label: 'Apr', total: number } in
 // chronological order.
-function monthlyTotals(snapshots) {
+// Build a 12-month bucket array. The window depends on the period:
+//   ytd        — Jan-Dec of the current calendar year (months not yet
+//                reached are still shown but stay at 0)
+//   last_year  — Jan-Dec of the previous calendar year
+//   anything   — rolling 12 months ending in the current month
+//   else
+// Aligning ytd and last_year to the calendar year keeps the chart
+// consistent with the period-filtered KPIs and the user's mental model
+// of "this year" / "last year" as Jan-Dec.
+function monthlyTotals(snapshots, period = null) {
   const buckets = new Map();
   const now = new Date();
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+  let firstY, firstM;
+  if (period === 'last_year') {
+    firstY = now.getFullYear() - 1;
+    firstM = 0;
+  } else if (period === 'ytd') {
+    firstY = now.getFullYear();
+    firstM = 0;
+  } else {
+    const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    firstY = start.getFullYear();
+    firstM = start.getMonth();
+  }
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(firstY, firstM + i, 1);
     const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     buckets.set(ym, {
       ym,
@@ -2341,41 +2385,75 @@ function monthYoYValue(currency, ym) {
 }
 
 // Build SVG bar-chart for monthly totals. Inline SVG so no library needed.
+//
+// When state.yoyEnabled is true, each month also renders a thin outlined
+// bar for the same month one year earlier (sourced from history first,
+// then YoY backfill). The two bars share the slot: current year on the
+// left half, previous year on the right half, both at half the normal
+// width. The Y-axis is scaled to include both years' max so neither
+// gets clipped. The previous-year bar uses fill="none" + stroke so it
+// reads as a comparative reference rather than an equally-weighted bar.
 function renderMonthlyChartSVG(months, currency) {
   const W = 560, H = 140, P_TOP = 16, P_BOT = 28, P_LEFT = 8, P_RIGHT = 8;
-  const max = Math.max(1, ...months.map(m => m.total));
+  const yoyOn = state.yoyEnabled;
+
+  // Pre-compute previous-year values once so we can both scale and draw.
+  const prevByIdx = months.map(m => yoyOn ? monthYoYValue(currency, m.ym) : null);
+
+  // Scale must include previous-year peaks too, otherwise they'd clip
+  // when the previous year was a stronger month than anything current.
+  const allValues = months.map(m => m.total).concat(prevByIdx.filter(v => v !== null));
+  const max = Math.max(1, ...allValues);
+
   const innerW = W - P_LEFT - P_RIGHT;
   const innerH = H - P_TOP - P_BOT;
   const slot = innerW / months.length;
-  const barW = Math.max(3, slot * 0.45);
+  // When YoY bars are visible, narrow the bars and place them side by
+  // side; otherwise use the original wider single-bar layout.
+  const barW = yoyOn ? Math.max(2, slot * 0.225) : Math.max(3, slot * 0.45);
   const sym = currencySymbol(currency);
+
   const bars = months.map((m, i) => {
     const h = (m.total / max) * innerH;
-    const x = P_LEFT + i * slot + (slot - barW) / 2;
-    const y = P_TOP + (innerH - h);
+    // Current-year bar: left of slot center if YoY visible, else centered.
+    const xCur = yoyOn
+      ? P_LEFT + i * slot + (slot / 2 - barW - 1)
+      : P_LEFT + i * slot + (slot - barW) / 2;
+    const yCur = P_TOP + (innerH - h);
 
-    // Build tooltip text. Adds a YoY comparison line when the toggle is
-    // on and a previous-year value exists for this month. The HTML is
-    // sanitized via esc(), and the tooltip element renders innerHTML so
-    // we can include the <br> as a literal break.
+    let prevBarSVG = '';
     let tip = `${m.label}: ${fmt(m.total)} ${sym}`;
-    if (state.yoyEnabled) {
-      const prev = monthYoYValue(currency, m.ym);
+    if (yoyOn) {
+      const prev = prevByIdx[i];
       if (prev !== null) {
         const delta = yoyDelta(m.total, prev);
-        const arrowText = delta.pct
-          ? `${delta.glyph} ${delta.pct}`
-          : delta.glyph;
-        // Year derived from m.ym = 'YYYY-MM'
+        const arrowText = delta.pct ? `${delta.glyph} ${delta.pct}` : delta.glyph;
         const prevYear = Number(m.ym.split('-')[0]) - 1;
         tip += `\u2002\u00b7\u2002vs. ${prevYear}: ${fmt(prev)} ${sym} ${arrowText}`;
+        // Outlined bar for the previous year. SVG strokes are drawn
+        // centered on the path, so to keep the outer dimensions of the
+        // outline identical to the filled bar we inset the path by
+        // stroke-width/2 on each side. Without the inset the stroke
+        // would extend half a pixel below the chart baseline (which
+        // looked like the outline "sat too low").
+        const STROKE = 1;
+        const hPrev = (prev / max) * innerH;
+        if (hPrev > 0) {
+          const hPath = Math.max(0, hPrev - STROKE);
+          const xPath = P_LEFT + i * slot + (slot / 2 + 1) + STROKE / 2;
+          const yPath = P_TOP + (innerH - hPrev) + STROKE / 2;
+          const wPath = Math.max(0, barW - STROKE);
+          prevBarSVG = `<rect x="${xPath.toFixed(1)}" y="${yPath.toFixed(1)}" width="${wPath.toFixed(1)}" height="${hPath.toFixed(1)}" fill="none" stroke="currentColor" stroke-width="${STROKE}" opacity="0.6"></rect>`;
+        }
       }
     }
     // Full-slot transparent hitbox so the tooltip works even between bars.
     const hitX = P_LEFT + i * slot;
+    const labelX = P_LEFT + i * slot + slot / 2;
     return `<g>` +
-      `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="currentColor" opacity="0.7"></rect>` +
-      `<text x="${(x + barW / 2).toFixed(1)}" y="${(H - 8).toFixed(1)}" text-anchor="middle" font-size="8" fill="currentColor" opacity="0.55">${esc(m.label)}</text>` +
+      `<rect x="${xCur.toFixed(1)}" y="${yCur.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="currentColor" opacity="0.7"></rect>` +
+      prevBarSVG +
+      `<text x="${labelX.toFixed(1)}" y="${(H - 8).toFixed(1)}" text-anchor="middle" font-size="8" fill="currentColor" opacity="0.55">${esc(m.label)}</text>` +
       `<rect class="stats-bar-hit" x="${hitX.toFixed(1)}" y="${P_TOP}" width="${slot.toFixed(1)}" height="${innerH}" fill="transparent" data-tip="${esc(tip)}"></rect>` +
       `</g>`;
   }).join('');
@@ -2581,8 +2659,13 @@ function renderStatisticsOverview() {
   const blocks = ordered.map(({ cur, list, kpi }) => {
     const sym = currencySymbol(cur);
     const tops = topBuyers(list, 3);
-    const months = monthlyTotals(list);
+    const months = monthlyTotals(list, period);
     const prev = yoyByCurrency[cur];
+    const chartHeading = period === 'last_year'
+      ? String(new Date().getFullYear() - 1)
+      : period === 'ytd'
+      ? String(new Date().getFullYear())
+      : t('stats_last_12_months');
 
     const topsHTML = tops.length === 0 ? '' : `
       <div class="stats-tops">
@@ -2608,7 +2691,7 @@ function renderStatisticsOverview() {
         <div class="stats-block-head">${esc(cur)} <span class="stats-block-count">· ${kpi.count} ${esc(t(kpi.count === 1 ? 'stats_invoice' : 'stats_invoices'))}</span></div>
         ${kpisHTML}
         <div class="stats-chart-wrap">
-          <div class="stats-subhead">${esc(t('stats_last_12_months'))}</div>
+          <div class="stats-subhead">${esc(chartHeading)}</div>
           ${renderMonthlyChartSVG(months, cur)}
         </div>
         ${topsHTML}
