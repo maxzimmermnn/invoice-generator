@@ -57,6 +57,55 @@ function drawCenteredBankLine(seller, kit, { y, font, maxWidth, separator = '  \
 }
 
 
+// Draw an array of pre-wrapped lines with full justification: each line is
+// stretched so its words exactly fill `contentW` by inserting equal extra
+// space between each pair of words. Three exceptions stay left-aligned to
+// avoid ugly typography:
+//   - the last line of the paragraph (otherwise a short final word like
+//     "law)." would be spread across the full width)
+//   - any line that contains only one word (nothing to space)
+//   - any line whose words already exceed contentW (shouldn't happen after
+//     wrapText, but safe fallback)
+//
+// Works correctly with monospace fonts: word widths are measured via
+// widthAt and pdf-lib draws each word at a precise fractional x position,
+// so the inter-word gaps don't have to be integer multiples of the
+// character cell.
+//
+// Returns the y position below the last drawn line (yStart minus n *
+// lineHeight) so callers can chain layout cursors.
+function drawJustifiedLines({
+  lines, x, yStart, contentW, lineHeight,
+  font, size, color, drawText, widthAt,
+}) {
+  let yy = yStart;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const isLast = i === lines.length - 1;
+    const words = line.split(/\s+/).filter(Boolean);
+
+    let leftAlign = isLast || words.length < 2;
+    if (!leftAlign) {
+      const wordsW = words.reduce((s, w) => s + widthAt(w, font, size), 0);
+      const extra = contentW - wordsW;
+      if (extra <= 0) {
+        leftAlign = true;
+      } else {
+        const gap = extra / (words.length - 1);
+        let xx = x;
+        for (let w = 0; w < words.length; w++) {
+          drawText(words[w], xx, yy, font, size, color);
+          xx += widthAt(words[w], font, size) + gap;
+        }
+      }
+    }
+    if (leftAlign) drawText(line, x, yy, font, size, color);
+    yy -= lineHeight;
+  }
+  return yy;
+}
+
+
 // -------- Multi-page support --------
 //
 // Strategy: pre-compute item heights given the available width, then bucket
@@ -771,7 +820,11 @@ async function renderInvoiceTypewriter(pdfDoc, ctx) {
   }
   // Intro
   if (intro) {
-    for (const ln of wrapText(intro, mono, 9, contentW)) { drawText(ln, M_L, y, mono, 9); y -= LINE_H * 0.85; }
+    const introLines = wrapText(intro, mono, 9, contentW);
+    y = drawJustifiedLines({
+      lines: introLines, x: M_L, yStart: y, contentW, lineHeight: LINE_H * 0.85,
+      font: mono, size: 9, drawText, widthAt,
+    });
     y -= LINE_H * 0.8;
   }
   // Category
@@ -890,16 +943,20 @@ async function renderInvoiceTypewriter(pdfDoc, ctx) {
     yy -= LINE_H * 1.8;
 
     if (footnote) {
-      for (const ln of wrapText(footnote, mono, SIZE_BODY - 1, contentW)) {
-        drawText(ln, M_L, yy, mono, SIZE_BODY - 1, SOFT); yy -= LINE_TIGHT;
-      }
+      const footLines = wrapText(footnote, mono, SIZE_BODY - 1, contentW);
+      yy = drawJustifiedLines({
+        lines: footLines, x: M_L, yStart: yy, contentW, lineHeight: LINE_TIGHT,
+        font: mono, size: SIZE_BODY - 1, color: SOFT, drawText, widthAt,
+      });
       yy -= LINE_H * 0.8;
     } else { yy -= LINE_H * 0.2; }
 
     if (paymentNote) {
-      for (const ln of wrapText(paymentNote, mono, SIZE_BODY, contentW)) {
-        drawText(ln, M_L, yy, mono, SIZE_BODY); yy -= LINE_H;
-      }
+      const payLines = wrapText(paymentNote, mono, SIZE_BODY, contentW);
+      yy = drawJustifiedLines({
+        lines: payLines, x: M_L, yStart: yy, contentW, lineHeight: LINE_H,
+        font: mono, size: SIZE_BODY, drawText, widthAt,
+      });
       yy -= LINE_H * 0.8;
     }
     if (greeting)  { drawText(greeting,  M_L, yy, mono, SIZE_BODY); yy -= LINE_H; }
