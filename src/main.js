@@ -38,9 +38,69 @@ const state = {
 
 // -------- Helpers --------
 const $ = (id) => document.getElementById(id);
+// Coerce nullish values to a default; everything else (including the empty
+// string and 0) passes through as String(). Despite the short name, this is
+// nullish-only — NOT a falsy check. Empty input fields stay empty.
 const nz = (v, d = '') => (v === undefined || v === null) ? d : String(v);
 const esc = (s) => nz(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 const dateCompact = (iso) => iso ? iso.replace(/-/g, '') : '';
+// Parse 'YYYY-MM-DD' as LOCAL midnight, not UTC.
+// `new Date('YYYY-MM-DD')` parses as UTC, but .getFullYear/.getMonth/.getDate
+// return LOCAL components — in negative UTC offsets that off-by-ones the day.
+// Used by stats, YoY, history, and display formatting. Falsy/unparseable
+// input returns an Invalid Date (mirrors `new Date(iso)`).
+function parseInvoiceDate(iso) {
+  if (!iso) return new Date(NaN);
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return new Date(iso);
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+// Parse a money-like input. Accepts both German (1.234,56 / 1234,56) and
+// English (1,234.56 / 1234.56) conventions, as well as bare integers. The
+// LAST '.' or ',' is treated as the decimal separator, everything before it as
+// thousand grouping. Exception: a single separator followed by exactly three
+// digits is treated as a thousand separator ('1.234' → 1234), since money
+// inputs in this app never have 3 decimal places. Non-numeric input → 0.
+function parseMoneyInput(s) {
+  const clean = String(s || '').trim().replace(/[^\d.,\-]/g, '');
+  if (!clean) return 0;
+  const lastDot = clean.lastIndexOf('.');
+  const lastComma = clean.lastIndexOf(',');
+  const lastSep = Math.max(lastDot, lastComma);
+  if (lastSep === -1) return parseFloat(clean) || 0;
+  const sepChar = clean[lastSep];
+  const decPart = clean.slice(lastSep + 1);
+  const intPart = clean.slice(0, lastSep);
+  const otherSep = sepChar === '.' ? ',' : '.';
+  const onlyOneSeparator = intPart.indexOf(sepChar) === -1 && intPart.indexOf(otherSep) === -1;
+  if (onlyOneSeparator && /^\d{3}$/.test(decPart)) {
+    return parseFloat(intPart + decPart) || 0;
+  }
+  return parseFloat(intPart.replace(/[.,]/g, '') + '.' + decPart) || 0;
+}
+const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const isFiniteNum = (v) => typeof v === 'number' && Number.isFinite(v);
+// Strict IBAN check: length 15–34, CC + check digits + alphanumeric body, MOD-97
+// remainder of 1. Used by the validator (btnValidate) — does not block XML
+// emission, since the spec only requires syntactic well-formedness and users
+// may want to issue invoices with placeholder bank data.
+function isValidIBAN(s) {
+  const iban = String(s || '').replace(/\s+/g, '').toUpperCase();
+  if (iban.length < 15 || iban.length > 34) return false;
+  if (!/^[A-Z]{2}[0-9]{2}[A-Z0-9]+$/.test(iban)) return false;
+  // MOD-97: move first 4 chars to end, map letters (A=10..Z=35), reduce mod 97.
+  const rearranged = iban.slice(4) + iban.slice(0, 4);
+  let remainder = 0;
+  for (let i = 0; i < rearranged.length; i++) {
+    const c = rearranged.charCodeAt(i);
+    // 0-9 → 48-57; A-Z → 65-90 mapped to 10-35
+    const digits = c >= 65 ? String(c - 55) : String.fromCharCode(c);
+    for (let j = 0; j < digits.length; j++) {
+      remainder = (remainder * 10 + (digits.charCodeAt(j) - 48)) % 97;
+    }
+  }
+  return remainder === 1;
+}
 
 // -------- i18n: language dictionary --------
 const I18N = {
@@ -190,6 +250,7 @@ const I18N = {
     msg_save_failed: 'Speichern fehlgeschlagen.',
     msg_reset: 'Zurückgesetzt.',
     msg_buyer_saved: 'als neuer Kunde gespeichert.',
+    msg_footnote_saved: 'gespeichert.',
     msg_buyer_updated: 'aktualisiert.',
     msg_buyer_no_name: 'Bitte zuerst den Kundennamen eintragen.',
     msg_buyer_unnamed: '(ohne Namen)',
@@ -253,12 +314,26 @@ const I18N = {
     err_no_items: 'Mindestens eine Position erforderlich.',
     err_country_required: 'Land ist erforderlich (ISO-Code wie DE, FR, GB).',
     err_country_unknown: 'Unbekanntes Land: "{input}". Bitte ISO 3166-1 alpha-2 verwenden (z.B. DE, FR, GB).',
-    err_rc_seller_vat: 'Reverse-Charge: Verkäufer benötigt eine USt-IdNr (oder Handelsregistereintragung / Steuervertreter).',
-    err_rc_buyer_vat: 'Reverse-Charge: Käufer benötigt eine USt-IdNr (oder Handelsregistereintragung).',
-    th_desc: 'Beschreibung',
-    th_qty: 'Menge',
-    th_price: 'Einzelpreis',
-    th_vat: 'MwSt %',
+    err_rc_seller_vat: 'Reverse-Charge: Verkäufer benötigt eine USt-IdNr (BT-31). SIRET / Handelsregister-Nr. allein genügt nicht.',
+    err_rc_buyer_vat: 'Reverse-Charge: Käufer benötigt eine USt-IdNr (BT-48). SIRET / Handelsregister-Nr. allein genügt nicht.',
+    // --- XML validator checklist (btnValidate) ---
+    validate_xml_syntax_error: 'XML-Syntaxfehler: ',
+    validate_missing_number: 'Rechnungsnummer (BT-1) fehlt',
+    validate_missing_date: 'Rechnungsdatum (BT-2) fehlt',
+    validate_missing_seller_name: 'Verkäufer-Name (BT-27) fehlt',
+    validate_missing_buyer_name: 'Käufer-Name (BT-44) fehlt',
+    validate_missing_seller_country: 'Verkäufer-Land (BT-40) fehlt',
+    validate_missing_buyer_country: 'Käufer-Land (BT-55) fehlt',
+    validate_rc_seller_vat: 'Reverse Charge: deine USt-IdNr (BT-31) ist Pflicht',
+    validate_rc_buyer_vat: 'Reverse Charge: Käufer-USt-IdNr (BT-48) ist Pflicht',
+    validate_recommend_seller_vat: 'USt-IdNr Verkäufer (BT-31) empfohlen',
+    validate_missing_items: 'Mindestens eine Position erforderlich',
+    validate_negative_amounts: 'Negative Summen in Positionen',
+    validate_invalid_iban: 'IBAN ungültig (BT-84) — Prüfsumme oder Format stimmt nicht',
+    // --- PDF metadata (Info dictionary + XMP) ---
+    pdf_doc_title: 'Rechnung',
+    pdf_doc_subject: 'Factur-X / ZUGFeRD EN 16931 E-Rechnung',
+    pdf_doc_producer: 'E-Rechnung Browser-Tool',
     aria_remove_item: 'Position entfernen',
     // --- History feature ---
     section_history: 'Verlauf',
@@ -276,25 +351,19 @@ const I18N = {
     msg_history_no_select: 'Keinen Verlaufseintrag ausgewählt.',
     msg_history_cleared: 'Verlauf geleert.',
     // --- Past invoice entry ---
-    btn_history_add_past: 'Alte Rechnung hinzufügen',
+    // Keys that the later "UI restructure" block (see below) redefines with
+    // different wording are intentionally omitted here.
     past_modal_title: 'Alte Rechnung hinzufügen',
     past_modal_hint: 'Manuell erfasste Rechnungen erscheinen im Verlauf und in der Statistik. Klonen funktioniert eingeschränkt, da nur Grunddaten erfasst werden.',
     past_field_date: 'Rechnungsdatum',
     past_field_buyer: 'Käufer',
-    past_field_buyer_select: 'Aus Kunden wählen…',
     past_field_buyer_new: 'Oder neuen Namen eingeben',
     past_field_total: 'Gesamtbetrag (brutto)',
     past_field_currency: 'Währung',
     past_field_taxmode: 'Steuermodus',
-    past_field_vat_rate: 'USt-Satz (%)',
     past_field_number: 'Rechnungsnr. (optional)',
-    past_field_project: 'Projekt (optional)',
-    past_field_category: 'Kategorie (optional)',
     past_save: 'Hinzufügen',
     past_cancel: 'Abbrechen',
-    past_err_no_buyer: 'Käufer-Name fehlt.',
-    past_err_no_total: 'Gesamtbetrag muss positiv sein.',
-    past_err_no_date: 'Rechnungsdatum fehlt.',
     msg_history_added: 'Im Verlauf gespeichert.',
     msg_history_clone_partial: 'Geklont – einige Felder leer (manueller Eintrag).',
     history_imported_marker: 'manuell',
@@ -532,6 +601,7 @@ const I18N = {
     msg_save_failed: 'Saving failed.',
     msg_reset: 'Reset.',
     msg_buyer_saved: 'saved as new customer.',
+    msg_footnote_saved: 'saved.',
     msg_buyer_updated: 'updated.',
     msg_buyer_no_name: 'Please enter the customer name first.',
     msg_buyer_unnamed: '(unnamed)',
@@ -593,13 +663,27 @@ const I18N = {
     err_no_items: 'At least one line item is required.',
     err_country_required: 'Country is required (use ISO code like DE, FR, GB).',
     err_country_unknown: 'Unknown country: "{input}". Use ISO 3166-1 alpha-2 (e.g. DE, FR, GB).',
-    err_rc_seller_vat: 'Reverse charge requires a Seller VAT ID (or legal registration / tax representative).',
-    err_rc_buyer_vat: 'Reverse charge requires a Buyer VAT ID (or legal registration ID).',
-    th_desc: 'Description',
-    th_qty: 'Qty',
-    th_price: 'Unit price',
-    th_vat: 'VAT %',
-    aria_remove_item: 'Remove item',
+    err_rc_seller_vat: 'Reverse charge requires a Seller VAT ID (BT-31). SIRET / legal-registration ID alone is not sufficient.',
+    err_rc_buyer_vat: 'Reverse charge requires a Buyer VAT ID (BT-48). SIRET / legal-registration ID alone is not sufficient.',
+    // --- XML validator checklist (btnValidate) ---
+    validate_xml_syntax_error: 'XML syntax error: ',
+    validate_missing_number: 'Invoice number (BT-1) is missing',
+    validate_missing_date: 'Invoice date (BT-2) is missing',
+    validate_missing_seller_name: 'Seller name (BT-27) is missing',
+    validate_missing_buyer_name: 'Buyer name (BT-44) is missing',
+    validate_missing_seller_country: 'Seller country (BT-40) is missing',
+    validate_missing_buyer_country: 'Buyer country (BT-55) is missing',
+    validate_rc_seller_vat: 'Reverse charge: your VAT ID (BT-31) is required',
+    validate_rc_buyer_vat: 'Reverse charge: buyer VAT ID (BT-48) is required',
+    validate_recommend_seller_vat: 'Seller VAT ID (BT-31) recommended',
+    validate_missing_items: 'At least one line item is required',
+    validate_negative_amounts: 'Negative amounts in line items',
+    validate_invalid_iban: 'IBAN looks invalid (BT-84) — checksum or format mismatch',
+    // --- PDF metadata (Info dictionary + XMP) ---
+    pdf_doc_title: 'Invoice',
+    pdf_doc_subject: 'Factur-X / ZUGFeRD EN 16931 e-invoice',
+    pdf_doc_producer: 'E-Invoice Browser Tool',
+    aria_remove_item: 'Remove line item',
     // --- History feature ---
     section_history: 'History',
     section_history_hint: 'Generated invoices are saved here automatically · Clone loads all fields into the form',
@@ -616,25 +700,19 @@ const I18N = {
     msg_history_no_select: 'No history entry selected.',
     msg_history_cleared: 'History cleared.',
     // --- Past invoice entry ---
-    btn_history_add_past: 'Add past invoice',
+    // Keys that the later "UI restructure" block (see below) redefines with
+    // different wording are intentionally omitted here.
     past_modal_title: 'Add past invoice',
     past_modal_hint: 'Manually entered invoices appear in history and statistics. Cloning works partially since only basic fields are captured.',
     past_field_date: 'Invoice date',
     past_field_buyer: 'Buyer',
-    past_field_buyer_select: 'Pick from customers…',
     past_field_buyer_new: 'Or enter a new name',
     past_field_total: 'Total (gross)',
     past_field_currency: 'Currency',
     past_field_taxmode: 'Tax mode',
-    past_field_vat_rate: 'VAT rate (%)',
     past_field_number: 'Invoice no. (optional)',
-    past_field_project: 'Project (optional)',
-    past_field_category: 'Category (optional)',
     past_save: 'Add',
     past_cancel: 'Cancel',
-    past_err_no_buyer: 'Buyer name is missing.',
-    past_err_no_total: 'Total must be a positive number.',
-    past_err_no_date: 'Invoice date is missing.',
     msg_history_added: 'Saved to history.',
     msg_history_clone_partial: 'Cloned with partial data (manual entry).',
     history_imported_marker: 'manual',
@@ -872,6 +950,7 @@ const I18N = {
     msg_save_failed: 'Échec de l\'enregistrement.',
     msg_reset: 'Réinitialisé.',
     msg_buyer_saved: 'enregistré comme nouveau client.',
+    msg_footnote_saved: 'enregistrée.',
     msg_buyer_updated: 'mis à jour.',
     msg_buyer_no_name: 'Veuillez d\'abord saisir le nom du client.',
     msg_buyer_unnamed: '(sans nom)',
@@ -933,12 +1012,26 @@ const I18N = {
     err_no_items: 'Au moins une ligne est requise.',
     err_country_required: 'Pays requis (utilisez un code ISO tel que DE, FR, GB).',
     err_country_unknown: 'Pays inconnu : « {input} ». Utilisez ISO 3166-1 alpha-2 (ex. DE, FR, GB).',
-    err_rc_seller_vat: 'Autoliquidation : le vendeur doit avoir un numéro de TVA (ou immatriculation légale / représentant fiscal).',
-    err_rc_buyer_vat: 'Autoliquidation : l\'acheteur doit avoir un numéro de TVA (ou immatriculation légale).',
-    th_desc: 'Description',
-    th_qty: 'Qté',
-    th_price: 'Prix unitaire',
-    th_vat: 'TVA %',
+    err_rc_seller_vat: 'Autoliquidation : numéro de TVA vendeur requis (BT-31). Le SIRET seul ne suffit pas.',
+    err_rc_buyer_vat: 'Autoliquidation : numéro de TVA acheteur requis (BT-48). Le SIRET seul ne suffit pas.',
+    // --- XML validator checklist (btnValidate) ---
+    validate_xml_syntax_error: 'Erreur de syntaxe XML : ',
+    validate_missing_number: 'Numéro de facture (BT-1) manquant',
+    validate_missing_date: 'Date de facture (BT-2) manquante',
+    validate_missing_seller_name: 'Nom du vendeur (BT-27) manquant',
+    validate_missing_buyer_name: 'Nom de l\'acheteur (BT-44) manquant',
+    validate_missing_seller_country: 'Pays du vendeur (BT-40) manquant',
+    validate_missing_buyer_country: 'Pays de l\'acheteur (BT-55) manquant',
+    validate_rc_seller_vat: 'Autoliquidation : votre n° de TVA (BT-31) est obligatoire',
+    validate_rc_buyer_vat: 'Autoliquidation : n° de TVA acheteur (BT-48) obligatoire',
+    validate_recommend_seller_vat: 'N° de TVA vendeur (BT-31) recommandé',
+    validate_missing_items: 'Au moins une ligne est requise',
+    validate_negative_amounts: 'Montants négatifs dans les lignes',
+    validate_invalid_iban: 'IBAN invalide (BT-84) — somme de contrôle ou format incorrect',
+    // --- PDF metadata (Info dictionary + XMP) ---
+    pdf_doc_title: 'Facture',
+    pdf_doc_subject: 'Facture électronique Factur-X / ZUGFeRD EN 16931',
+    pdf_doc_producer: 'Outil de facturation électronique (navigateur)',
     aria_remove_item: 'Supprimer la ligne',
     // --- History feature ---
     section_history: 'Historique',
@@ -956,25 +1049,19 @@ const I18N = {
     msg_history_no_select: 'Aucune entrée de l\'historique sélectionnée.',
     msg_history_cleared: 'Historique effacé.',
     // --- Past invoice entry ---
-    btn_history_add_past: 'Ajouter ancienne facture',
+    // Keys that the later "UI restructure" block (see below) redefines with
+    // different wording are intentionally omitted here.
     past_modal_title: 'Ajouter ancienne facture',
     past_modal_hint: 'Les factures saisies manuellement apparaissent dans l\'historique et les statistiques. Le clonage fonctionne partiellement car seuls les champs de base sont saisis.',
     past_field_date: 'Date de facture',
     past_field_buyer: 'Acheteur',
-    past_field_buyer_select: 'Choisir parmi les clients…',
     past_field_buyer_new: 'Ou saisir un nouveau nom',
     past_field_total: 'Total (TTC)',
     past_field_currency: 'Devise',
     past_field_taxmode: 'Mode de TVA',
-    past_field_vat_rate: 'Taux de TVA (%)',
     past_field_number: 'N° de facture (facultatif)',
-    past_field_project: 'Projet (facultatif)',
-    past_field_category: 'Catégorie (facultatif)',
     past_save: 'Ajouter',
     past_cancel: 'Annuler',
-    past_err_no_buyer: 'Nom de l\'acheteur manquant.',
-    past_err_no_total: 'Le total doit être un nombre positif.',
-    past_err_no_date: 'Date de facture manquante.',
     msg_history_added: 'Enregistré dans l\'historique.',
     msg_history_clone_partial: 'Cloné avec données partielles (saisie manuelle).',
     history_imported_marker: 'manuel',
@@ -1081,9 +1168,33 @@ const I18N = {
   },
 };
 
-const LANG_KEY = 'erechnung:lang';
-const INVOICE_LANG_KEY = 'erechnung:invoice_lang';
-const THEME_KEY = 'erechnung:theme';
+const LANG_KEY = 'erechnung:lang:v1';
+const INVOICE_LANG_KEY = 'erechnung:invoice_lang:v1';
+const THEME_KEY = 'erechnung:theme:v1';
+
+// One-time storage-key migration helper. The convention is `erechnung:<name>:v1`
+// (see CLAUDE.md). Use this when you bump a key version OR rename a key
+// (e.g. v1 → v2 schema change): pass the old and new names, plus an optional
+// `transform` to convert old-shape values to the new schema. Idempotent —
+// the migration is a no-op once the new key has been written.
+//
+// Synchronous because the three keys below (lang/invoice_lang/theme) are read
+// synchronously at init to avoid theme/language flashes.
+function migrateLocalStorageKey(oldKey, newKey, transform) {
+  try {
+    if (localStorage.getItem(newKey) !== null) return;
+    const v = localStorage.getItem(oldKey);
+    if (v === null) return;
+    const next = transform ? transform(v) : v;
+    if (next !== null && next !== undefined) localStorage.setItem(newKey, next);
+    localStorage.removeItem(oldKey);
+  } catch (_) { /* quota/security errors — ignore */ }
+}
+// v1.5.4: align lang/invoice_lang/theme with the :v1 convention used by every
+// other key in this app. Pure rename — no value transformation.
+migrateLocalStorageKey('erechnung:lang', LANG_KEY);
+migrateLocalStorageKey('erechnung:invoice_lang', INVOICE_LANG_KEY);
+migrateLocalStorageKey('erechnung:theme', THEME_KEY);
 let CURRENT_LANG = 'en';     // UI language
 let INVOICE_LANG = null;     // invoice output language; null = follow UI
 
@@ -1122,21 +1233,25 @@ function tInvoice(key, vars) {
   return s;
 }
 
-function applyTranslations() {
-  // text content
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    const key = el.getAttribute('data-i18n');
-    el.textContent = t(key);
+// Resolve every `data-i18n*` attribute under `root` (default: document).
+// Callers that just freshly injected innerHTML containing data-i18n nodes
+// should pass that container — sweeping the whole document is wasteful when
+// only a small subtree needs translating. Page-wide effects (the <title> tag,
+// the lang attribute, full re-render of pickers/totals) only fire on the
+// global call.
+function applyTranslations(root) {
+  const scope = root || document;
+  scope.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.getAttribute('data-i18n'));
   });
-  // placeholders
-  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+  scope.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     el.setAttribute('placeholder', t(el.getAttribute('data-i18n-placeholder')));
   });
-  // titles (for accessibility)
-  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+  scope.querySelectorAll('[data-i18n-title]').forEach(el => {
     el.setAttribute('title', t(el.getAttribute('data-i18n-title')));
   });
-  // <title>
+  if (root) return;
+  // Global pass: page-wide side effects.
   const titleEl = document.querySelector('title');
   if (titleEl) titleEl.textContent = t('title');
   document.documentElement.lang = CURRENT_LANG;
@@ -1202,7 +1317,10 @@ const store = {
     return null;
   },
   async set(key, value) {
-    try { localStorage.setItem(key, value); return true; } catch (_) {}
+    try { localStorage.setItem(key, value); return true; } catch (e) {
+      // Most common: QuotaExceededError when history + yoy + buyers approach 5 MB.
+      console.warn(`[erechnung] localStorage.setItem(${key}) failed:`, e?.message || e);
+    }
     if (typeof window !== 'undefined' && window.storage && window.storage.set) {
       try { await window.storage.set(key, value); return true; } catch (_) {}
     }
@@ -1221,7 +1339,7 @@ async function loadSeller() {
   try {
     const v = await store.get(STORAGE_KEY);
     if (v) applySellerStammdaten(JSON.parse(v));
-  } catch (e) { /* ignore */ }
+  } catch (e) { console.warn('[erechnung] Failed to load seller profile:', e?.message || e); }
   // Load boilerplate for currently effective invoice language
   await loadBoilerplateForLang(effectiveInvoiceLang());
 }
@@ -1235,7 +1353,9 @@ async function saveSeller() {
   try {
     const raw = await store.get(BOILERPLATE_KEY);
     if (raw) bMap = JSON.parse(raw) || {};
-  } catch (_) {}
+  } catch (e) {
+    console.warn('[erechnung] Failed to read existing boilerplate map; current language will overwrite:', e?.message || e);
+  }
   bMap[effectiveInvoiceLang()] = boilerplate;
   const ok2 = await store.set(BOILERPLATE_KEY, JSON.stringify(bMap));
   if (ok1 && ok2) {
@@ -1294,6 +1414,9 @@ function applySellerStammdaten(s) {
   $('s_line1').value = nz(s.line1);
   $('s_zip').value = nz(s.zip);
   $('s_city').value = nz(s.city);
+  // Asymmetric defaults are deliberate: this app was originally tailored to a
+  // German seller billing French clients. Seller defaults to DE, buyer (see
+  // applyBuyer) defaults to FR. Users from elsewhere overwrite both on first use.
   $('s_country').value = nz(s.country, 'DE');
   $('s_vat').value = nz(s.vat);
   $('s_siret').value = nz(s.siret);
@@ -1325,21 +1448,15 @@ async function loadBoilerplateForLang(lang) {
   try {
     const raw = await store.get(BOILERPLATE_KEY);
     if (raw) bMap = JSON.parse(raw) || {};
-  } catch (_) {}
+  } catch (e) {
+    console.warn('[erechnung] Failed to load boilerplate:', e?.message || e);
+  }
   if (bMap[lang]) {
     applyBoilerplate(bMap[lang]);
   } else {
     // No saved boilerplate for this language → clear the boilerplate fields
     applyBoilerplate({});
   }
-}
-
-// Save current boilerplate field state back to its language bucket
-// (used during language switch so unsaved edits aren't lost between switches).
-async function persistCurrentBoilerplateInMemory(lang) {
-  // Note: This intentionally does NOT save to storage — only used
-  // implicitly by saveSeller(). The user must hit "save as template"
-  // to persist boilerplate per language.
 }
 
 // -------- Buyer profiles (persisted list) --------
@@ -1379,7 +1496,10 @@ async function loadBuyers() {
   try {
     const v = await store.get(BUYERS_KEY);
     if (v) state.buyers = JSON.parse(v) || [];
-  } catch (e) { state.buyers = []; }
+  } catch (e) {
+    console.warn('[erechnung] Failed to load buyers:', e?.message || e);
+    state.buyers = [];
+  }
   renderBuyerPicker();
 }
 async function persistBuyers() {
@@ -1480,6 +1600,40 @@ function resolveNumberPattern(pattern, counterValue) {
   return result;
 }
 
+// Build a regex that matches numbers conforming to the saved pattern,
+// capturing the counter value. Used by recordInvoiceNumber to avoid mistaking
+// an unrelated trailing number (e.g. the "-V2" in "INV-2026-00042-V2") for the
+// counter. Returns null if the pattern has no {counter} token.
+function patternToCounterRegex(pattern) {
+  const p = pattern || DEFAULT_NUMBER_PATTERN;
+  const escape = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let out = '';
+  let i = 0;
+  let hasCounter = false;
+  while (i < p.length) {
+    if (p[i] === '{') {
+      const close = p.indexOf('}', i);
+      if (close === -1) { out += escape('{'); i++; continue; }
+      const tok = p.slice(i + 1, close);
+      i = close + 1;
+      if (tok === 'yyyy') out += '\\d{4}';
+      else if (tok === 'yy' || tok === 'mm' || tok === 'dd') out += '\\d{2}';
+      else if (tok === 'counter') { out += '(\\d+)'; hasCounter = true; }
+      else if (tok.startsWith('counter:')) {
+        const n = parseInt(tok.slice('counter:'.length), 10);
+        out += Number.isFinite(n) && n > 0 ? `(\\d{${n}})` : '(\\d+)';
+        hasCounter = true;
+      } else {
+        out += escape('{' + tok + '}');
+      }
+    } else {
+      out += escape(p[i]);
+      i++;
+    }
+  }
+  return hasCounter ? new RegExp('^' + out + '$') : null;
+}
+
 async function suggestNextInvoiceNumber() {
   const pattern = await getNumberPattern();
   const counter = await getCounterValue();
@@ -1505,11 +1659,18 @@ async function applyNextInvoiceNumber() {
   updateFilenamePreview && updateFilenamePreview();
 }
 
-// Record after successful PDF: extract the rightmost number, store as new counter.
+// Record after successful PDF: extract the counter value if (and only if) the
+// typed number conforms to the saved pattern. Avoids being fooled by trailing
+// numbers in custom suffixes like "INV-2026-00042-V2" which previously reset
+// the counter to 2.
 async function recordInvoiceNumber(num) {
-  const m = String(num).match(/(\d+)\s*$/);
-  if (!m) return;
+  const pattern = await getNumberPattern();
+  const re = patternToCounterRegex(pattern);
+  if (!re) return;
+  const m = String(num).trim().match(re);
+  if (!m || !m[1]) return;
   const value = parseInt(m[1], 10);
+  if (!Number.isFinite(value)) return;
   const current = await getCounterValue();
   if (value > current) await setCounterValue(value);
 }
@@ -1540,14 +1701,10 @@ function resolveFilenamePattern(pattern) {
     '{category}': $('r_category').value.trim(),
     '{seller}':   $('s_name').value.trim(),
     '{layout}':   $('invoiceLayoutSelect').value,
-    // Backwards compatibility: early versions used German token names.
-    // These are still resolved if they slip through migration somewhere.
-    '{projekt}':   $('r_project').value.trim(),
-    '{kunde}':     $('b_name').value.trim(),
-    '{datum}':     $('r_date').value ? $('r_date').value.replace(/-/g, '') : '',
-    '{kategorie}': $('r_category').value.trim(),
-    '{verkäufer}': $('s_name').value.trim(),
   };
+  // Legacy German tokens ({verkäufer}, {projekt}, ...) are rewritten to the
+  // English form by migrateLegacyFilenameTokens at the only two entry points
+  // (loadFilenamePattern, importData), so the resolver never sees them.
   let result = pattern || '{nr}';
   for (const [tok, val] of Object.entries(tokens)) {
     result = result.replaceAll(tok, val);
@@ -1565,7 +1722,9 @@ async function loadFilenamePattern() {
   try {
     const v = await store.get(FILENAME_KEY);
     if (v) $('r_filename').value = migrateLegacyFilenameTokens(v);
-  } catch (_) {}
+  } catch (e) {
+    console.warn('[erechnung] Failed to load filename pattern:', e?.message || e);
+  }
   updateFilenamePreview();
 }
 
@@ -1594,7 +1753,10 @@ async function loadFootnotes() {
   try {
     const v = await store.get(FOOTNOTES_KEY);
     if (v) state.footnotes = JSON.parse(v) || [];
-  } catch (e) { state.footnotes = []; }
+  } catch (e) {
+    console.warn('[erechnung] Failed to load footnotes:', e?.message || e);
+    state.footnotes = [];
+  }
   renderFootnotePicker();
 }
 async function persistFootnotes() {
@@ -1637,7 +1799,7 @@ async function saveFootnote() {
   renderFootnotePicker();
   const newIdx = state.footnotes.findIndex(f => f.name === trimName);
   if (newIdx >= 0) $('footnotePicker').value = newIdx;
-  flash(`"${trimName}" ${t('msg_buyer_saved').replace(/^.*\s/, '')}`, 'ok');
+  flash(`"${trimName}" ${t('msg_footnote_saved')}`, 'ok');
 }
 async function deleteFootnote() {
   const picker = $('footnotePicker');
@@ -1665,20 +1827,30 @@ async function loadHistory() {
   try {
     const v = await store.get(HISTORY_KEY);
     if (v) state.history = JSON.parse(v) || [];
-  } catch (e) { state.history = []; }
+  } catch (e) {
+    console.warn('[erechnung] Failed to load history:', e?.message || e);
+    state.history = [];
+  }
   // Enabled flag
   try {
     const v = await store.get(HISTORY_ENABLED_KEY);
     state.historyEnabled = v === null || v === undefined ? true : v !== 'false';
-  } catch (e) { state.historyEnabled = true; }
+  } catch (e) {
+    console.warn('[erechnung] Failed to load history-enabled flag:', e?.message || e);
+    state.historyEnabled = true;
+  }
 }
 
 async function persistHistory() {
-  return store.set(HISTORY_KEY, JSON.stringify(state.history));
+  const ok = await store.set(HISTORY_KEY, JSON.stringify(state.history));
+  if (!ok) flash(t('msg_save_failed'), 'err');
+  return ok;
 }
 
 async function persistHistoryEnabled() {
-  return store.set(HISTORY_ENABLED_KEY, String(state.historyEnabled));
+  const ok = await store.set(HISTORY_ENABLED_KEY, String(state.historyEnabled));
+  if (!ok) flash(t('msg_save_failed'), 'err');
+  return ok;
 }
 
 // -------- Year-over-Year backfill --------
@@ -1698,19 +1870,29 @@ async function loadYoY() {
   try {
     const v = await store.get(YOY_ENABLED_KEY);
     state.yoyEnabled = v === 'true';
-  } catch (e) { state.yoyEnabled = false; }
+  } catch (e) {
+    console.warn('[erechnung] Failed to load YoY-enabled flag:', e?.message || e);
+    state.yoyEnabled = false;
+  }
   try {
     const v = await store.get(YOY_DATA_KEY);
     state.yoyData = v ? (JSON.parse(v) || {}) : {};
-  } catch (e) { state.yoyData = {}; }
+  } catch (e) {
+    console.warn('[erechnung] Failed to load YoY data:', e?.message || e);
+    state.yoyData = {};
+  }
 }
 
 async function persistYoYEnabled() {
-  return store.set(YOY_ENABLED_KEY, String(state.yoyEnabled));
+  const ok = await store.set(YOY_ENABLED_KEY, String(state.yoyEnabled));
+  if (!ok) flash(t('msg_save_failed'), 'err');
+  return ok;
 }
 
 async function persistYoYData() {
-  return store.set(YOY_DATA_KEY, JSON.stringify(state.yoyData));
+  const ok = await store.set(YOY_DATA_KEY, JSON.stringify(state.yoyData));
+  if (!ok) flash(t('msg_save_failed'), 'err');
+  return ok;
 }
 
 // Save 12 monthly values for one (currency, year). Pass null to delete.
@@ -1814,7 +1996,7 @@ function renderHistoryPicker() {
   const formatDate = (iso) => {
     if (!iso) return '';
     // Display format follows UI lang for readability in the picker
-    try { return new Date(iso).toLocaleDateString(CURRENT_LANG); } catch { return iso; }
+    try { return parseInvoiceDate(iso).toLocaleDateString(CURRENT_LANG); } catch { return iso; }
   };
   const opts = [`<option value="" disabled selected>${esc(placeholder)}</option>`];
   for (let i = 0; i < state.history.length; i++) {
@@ -2004,6 +2186,10 @@ async function savePastInvoice() {
     : round2(total);
 
   const buyerIdx = $('past_buyer_select').value;
+  // Shallow spread is intentional: buyer records are flat objects of string
+  // primitives (see collectBuyer). If that schema ever grows nested fields,
+  // switch to structuredClone(state.buyers[buyerIdx]) to avoid sharing refs
+  // between the live buyer and the snapshot stored in history.
   const buyerData = (buyerIdx !== '' && state.buyers[buyerIdx])
     ? { ...state.buyers[buyerIdx], name: buyerName }
     : { name: buyerName };
@@ -2057,8 +2243,6 @@ async function savePastInvoice() {
 // 'all' (everything). Per-currency results are returned as a Map keyed
 // by currency code.
 
-const STATS_PERIODS = ['ytd', 'last12', 'last6', 'last3', 'last_month', 'all', 'last_year'];
-
 // Filter snapshots by period. Uses snapshot.date (invoice date), falling
 // back to ts (timestamp of save) for entries without a date.
 //
@@ -2078,7 +2262,7 @@ function filterByPeriod(snapshots, period) {
     // counts as "last year" only when current year is 2025.
     const yr = new Date().getFullYear() - 1;
     return snapshots.filter(s => {
-      const ts = s.date ? new Date(s.date).getTime() : s.ts;
+      const ts = s.date ? parseInvoiceDate(s.date).getTime() : s.ts;
       if (!Number.isFinite(ts)) return false;
       return new Date(ts).getFullYear() === yr;
     });
@@ -2099,7 +2283,7 @@ function filterByPeriod(snapshots, period) {
     return snapshots.slice();
   }
   return snapshots.filter(s => {
-    const ts = s.date ? new Date(s.date).getTime() : s.ts;
+    const ts = s.date ? parseInvoiceDate(s.date).getTime() : s.ts;
     return Number.isFinite(ts) && ts >= cutoff;
   });
 }
@@ -2201,7 +2385,7 @@ function filterByWindow(snapshots, win) {
   if (!win) return [];
   const [from, to] = win;
   return snapshots.filter(s => {
-    const ts = s.date ? new Date(s.date).getTime() : s.ts;
+    const ts = s.date ? parseInvoiceDate(s.date).getTime() : s.ts;
     return Number.isFinite(ts) && ts >= from && ts <= to;
   });
 }
@@ -2224,7 +2408,7 @@ function computeYoYBaseline(currency, prevWindow, prevYear) {
   const covered = new Set();
   for (const s of histInWin) {
     if (!s.date) continue;
-    const d = new Date(s.date);
+    const d = parseInvoiceDate(s.date);
     if (Number.isNaN(d.getTime())) continue;
     covered.add(`${d.getFullYear()}-${d.getMonth()}`);
   }
@@ -2236,8 +2420,8 @@ function computeYoYBaseline(currency, prevWindow, prevYear) {
   if (state.yoyData[currency]) {
     // The window may straddle two calendar years (e.g. last_month rolling
     // window in January). Walk month-by-month from `from` to `to`.
-    const fromD = new Date(from);
-    const toD = new Date(to);
+    const fromD = parseInvoiceDate(from);
+    const toD = parseInvoiceDate(to);
     const cursor = new Date(fromD.getFullYear(), fromD.getMonth(), 1);
     while (cursor.getTime() <= toD.getTime()) {
       const y = cursor.getFullYear();
@@ -2337,7 +2521,7 @@ function monthlyTotals(snapshots, period = null) {
   }
   for (const s of snapshots) {
     if (!s.date) continue;
-    const d = new Date(s.date);
+    const d = parseInvoiceDate(s.date);
     if (Number.isNaN(d.getTime())) continue;
     const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const bucket = buckets.get(ym);
@@ -2361,7 +2545,7 @@ function monthYoYValue(currency, ym) {
   for (const s of state.history) {
     if (!s.date) continue;
     if ((s.currency || 'EUR') !== currency) continue;
-    const d = new Date(s.date);
+    const d = parseInvoiceDate(s.date);
     if (Number.isNaN(d.getTime())) continue;
     if (d.getFullYear() === prevY && d.getMonth() === monthIdx) {
       total += Number(s.total) || 0;
@@ -2510,7 +2694,7 @@ function updateBuyerHistoryHint() {
   // Days since last invoice
   let daysAgo = null;
   if (last.date) {
-    const diff = Date.now() - new Date(last.date).getTime();
+    const diff = Date.now() - parseInvoiceDate(last.date).getTime();
     if (Number.isFinite(diff) && diff >= 0) daysAgo = Math.floor(diff / 86400000);
   }
   const totalStr = `${fmt(last.total)} ${currencySymbol(last.currency)}`;
@@ -2559,7 +2743,7 @@ function computeQuarterlyBreakdown(snapshots, year) {
 
   for (const s of snapshots) {
     if (!s.date) continue;
-    const d = new Date(s.date);
+    const d = parseInvoiceDate(s.date);
     if (Number.isNaN(d.getTime())) continue;
     if (d.getFullYear() !== year) continue;
     const q = Math.floor(d.getMonth() / 3);
@@ -2605,7 +2789,7 @@ function availableYearsInHistory() {
   const set = new Set();
   for (const s of state.history) {
     if (!s.date) continue;
-    const d = new Date(s.date);
+    const d = parseInvoiceDate(s.date);
     if (!Number.isNaN(d.getTime())) set.add(d.getFullYear());
   }
   if (set.size === 0) set.add(new Date().getFullYear());
@@ -2733,7 +2917,7 @@ function renderStatisticsQuarters() {
   // Snapshots in the selected year only
   const inYear = state.history.filter(s => {
     if (!s.date) return false;
-    const d = new Date(s.date);
+    const d = parseInvoiceDate(s.date);
     return !Number.isNaN(d.getTime()) && d.getFullYear() === statsYear;
   });
 
@@ -2839,7 +3023,7 @@ function renderStatisticsBuyer(buyerName) {
         <button class="tiny-btn stats-back-btn" id="statsBackBtn" type="button" data-i18n="stats_back"></button>
         <div class="stats-empty">${esc(t('stats_empty'))}</div>
       </div>`;
-    applyTranslations();
+    applyTranslations(body);
     return;
   }
 
@@ -2852,21 +3036,21 @@ function renderStatisticsBuyer(buyerName) {
   // Date range across all currencies (first / last invoice for this buyer)
   const datedSorted = matched
     .filter(s => s.date)
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    .sort((a, b) => parseInvoiceDate(a.date).getTime() - parseInvoiceDate(b.date).getTime());
   const firstInv = datedSorted[0];
   const lastInv  = datedSorted[datedSorted.length - 1];
 
   const formatDate = (iso) => {
     if (!iso) return '';
-    try { return new Date(iso).toLocaleDateString(CURRENT_LANG); } catch { return iso; }
+    try { return parseInvoiceDate(iso).toLocaleDateString(CURRENT_LANG); } catch { return iso; }
   };
 
   const blocks = ordered.map(({ cur, list, kpi }) => {
     const sym = currencySymbol(cur);
     // Sort newest first for the invoice list
     const sortedList = list.slice().sort((a, b) => {
-      const ta = a.date ? new Date(a.date).getTime() : a.ts;
-      const tb = b.date ? new Date(b.date).getTime() : b.ts;
+      const ta = a.date ? parseInvoiceDate(a.date).getTime() : a.ts;
+      const tb = b.date ? parseInvoiceDate(b.date).getTime() : b.ts;
       return tb - ta;
     });
     const rows = sortedList.map(s => `
@@ -2908,7 +3092,7 @@ function renderStatisticsBuyer(buyerName) {
       </div>
       ${blocks}
     </div>`;
-  applyTranslations();
+  applyTranslations(body);
 }
 
 // Update the visibility of the period-vs-year controls and the active-tab
@@ -3037,7 +3221,7 @@ async function saveYoYBackfill() {
   let anyNonZero = false;
   for (let i = 0; i < 12; i++) {
     const inp = $(`yoyMonth_${i}`);
-    const v = parseFloat((inp && inp.value || '').replace(',', '.')) || 0;
+    const v = parseMoneyInput(inp && inp.value);
     if (v < 0) { flash(t('msg_yoy_invalid_value'), 'err'); return; }
     values.push(v);
     if (v > 0) anyNonZero = true;
@@ -3107,8 +3291,8 @@ function exportOverviewCSV() {
   if (filtered.length === 0) { flash(t('msg_csv_no_data'), 'err'); return; }
   // Newest first
   const sorted = filtered.slice().sort((a, b) => {
-    const ta = a.date ? new Date(a.date).getTime() : a.ts;
-    const tb = b.date ? new Date(b.date).getTime() : b.ts;
+    const ta = a.date ? parseInvoiceDate(a.date).getTime() : a.ts;
+    const tb = b.date ? parseInvoiceDate(b.date).getTime() : b.ts;
     return tb - ta;
   });
   const headers = ['Date', 'Number', 'Buyer', 'Currency', 'Net', 'VAT', 'Gross', 'Mode', 'Category', 'Project', 'Source'];
@@ -3140,7 +3324,7 @@ function exportOverviewCSV() {
 function exportQuartersCSV() {
   const inYear = state.history.filter(s => {
     if (!s.date) return false;
-    const d = new Date(s.date);
+    const d = parseInvoiceDate(s.date);
     return !Number.isNaN(d.getTime()) && d.getFullYear() === statsYear;
   });
   if (inYear.length === 0) { flash(t('msg_csv_no_data'), 'err'); return; }
@@ -3179,8 +3363,8 @@ function exportBuyerCSV() {
     (s.buyerName || '').toLowerCase().trim() === target);
   if (matched.length === 0) { flash(t('msg_csv_no_data'), 'err'); return; }
   const sorted = matched.slice().sort((a, b) => {
-    const ta = a.date ? new Date(a.date).getTime() : a.ts;
-    const tb = b.date ? new Date(b.date).getTime() : b.ts;
+    const ta = a.date ? parseInvoiceDate(a.date).getTime() : a.ts;
+    const tb = b.date ? parseInvoiceDate(b.date).getTime() : b.ts;
     return tb - ta;
   });
   const headers = ['Date', 'Number', 'Currency', 'Net', 'VAT', 'Gross', 'Mode', 'Category', 'Project', 'Source'];
@@ -3270,7 +3454,7 @@ function renderItems() {
       <div class="cell num" data-label="${esc(t('th_price'))}">
         <input type="number" step="0.01" data-k="price" value="${it.price}">
       </div>
-      <div class="cell num" data-label="${esc(t('th_vat'))}">
+      <div class="cell num" data-label="${esc(t('th_vat_pct'))}">
         <input type="number" step="0.1" data-k="vat" value="${it.vat}">
       </div>
       <div class="cell">
@@ -3280,11 +3464,28 @@ function renderItems() {
     container.appendChild(row);
 
     row.querySelectorAll('[data-k]').forEach(el => {
+      const isNumeric = (k) => k === 'qty' || k === 'price' || k === 'vat';
+      // On every keystroke, update from a finite number — skip mid-edit
+      // invalid states (empty / lone minus / trailing dot) so the on-screen
+      // totals don't flicker to 0 between digits.
       el.addEventListener('input', () => {
         const k = el.dataset.k;
-        let v = el.value;
-        if (['qty','price','vat'].includes(k)) v = parseFloat(v) || 0;
-        it[k] = v;
+        if (isNumeric(k)) {
+          const n = el.valueAsNumber;
+          if (!Number.isFinite(n)) return;
+          it[k] = n;
+        } else {
+          it[k] = el.value;
+        }
+        calcTotals();
+      });
+      // On commit (blur / Enter), force a final value so an intentionally
+      // cleared field becomes 0 instead of carrying the previous number.
+      el.addEventListener('change', () => {
+        const k = el.dataset.k;
+        if (!isNumeric(k)) return;
+        const n = el.valueAsNumber;
+        it[k] = Number.isFinite(n) ? n : 0;
         calcTotals();
       });
     });
@@ -3297,15 +3498,32 @@ function renderItems() {
 }
 
 function calcTotals() {
+  // EN 16931 canonical computation. Single source of truth for the screen
+  // totals, history snapshots, the XML monetary summation, and the PDF.
+  //   1. Per line: lineNet = round(qty * price)               [BR-CO-22]
+  //   2. Per VAT group: basis = sum(lineNet);
+  //      categoryTax = round(basis * rate / 100)              [BR-CO-17]
+  //   3. Header line total = sum(lineNet) = sum(basis); tax total = sum(categoryTax);
+  //      grand = lineTotal + taxTotal.
+  // Defensive round2() on running sums absorbs FP drift on already-rounded inputs.
   const mode = $('r_taxmode').value;
-  let net = 0, tax = 0;
+  const groups = {};
+  let net = 0;
   for (const it of state.items) {
-    const line = (Number(it.qty) || 0) * (Number(it.price) || 0);
-    net += line;
-    if (mode === 'S') tax += line * (Number(it.vat) || 0) / 100;
+    const qty = Number(it.qty) || 0;
+    const price = Number(it.price) || 0;
+    const rate = mode === 'S' ? (Number(it.vat) || 0) : 0;
+    const lineNet = round2(qty * price);
+    const key = rate.toFixed(2);
+    if (!groups[key]) groups[key] = { rate, basis: 0, amount: 0 };
+    groups[key].basis = round2(groups[key].basis + lineNet);
+    net = round2(net + lineNet);
   }
-  net = round2(net);
-  tax = round2(tax);
+  let tax = 0;
+  for (const g of Object.values(groups)) {
+    g.amount = round2(g.basis * g.rate / 100);
+    tax = round2(tax + g.amount);
+  }
   const grand = round2(net + tax);
 
   $('t_net').textContent = fmt(net);
@@ -3315,7 +3533,7 @@ function calcTotals() {
   $('t_tax_label').textContent = t('total_tax_' + mode) || t('total_tax_S');
   $('taxNote').textContent = mode === 'S' ? '' : t('rc_note' + (mode === 'AE' ? '' : '_' + mode));
 
-  return { net, tax, grand };
+  return { net, tax, grand, groups };
 }
 
 // -------- PDF drop --------
@@ -3427,12 +3645,15 @@ function validateInvoiceForReverseCharge(seller, buyer, itemsXML, taxBreakdownXM
   const combined = String(itemsXML || '') + String(taxBreakdownXML || '');
   const usesReverseCharge = /<ram:CategoryCode>AE<\/ram:CategoryCode>/.test(combined);
   if (!usesReverseCharge) return;
-  // BR-AE-02: Seller side
-  if (!seller.vat && !seller.siret) {
+  // BR-AE-02: Seller VAT identifier (BT-31) is required on reverse-charge invoices.
+  // BT-32 (Seller tax registration ID) and BT-63 (tax representative VAT ID) are
+  // also acceptable substitutes per the rule, but this app doesn't have UI fields
+  // for them — SIRET maps to BT-30 (legal registration), which is NOT a substitute.
+  if (!seller.vat) {
     throw new Error(t('err_rc_seller_vat'));
   }
-  // BR-AE-02: Buyer side
-  if (!buyer.vat && !buyer.siret) {
+  // BR-AE-04: Buyer VAT identifier (BT-48) is required — no substitute permitted.
+  if (!buyer.vat) {
     throw new Error(t('err_rc_buyer_vat'));
   }
 }
@@ -3457,17 +3678,9 @@ function buildXML() {
   if (state.items.length === 0) throw new Error(t('err_no_items'));
 
   const totals = calcTotals();
-
-  // Group items by VAT rate for tax breakdown
-  const taxGroups = {};
-  for (const it of state.items) {
-    const rate = mode === 'S' ? (Number(it.vat) || 0) : 0;
-    const key = rate.toFixed(2);
-    if (!taxGroups[key]) taxGroups[key] = { rate, basis: 0, amount: 0 };
-    const line = round2((Number(it.qty) || 0) * (Number(it.price) || 0));
-    taxGroups[key].basis = round2(taxGroups[key].basis + line);
-    if (mode === 'S') taxGroups[key].amount = round2(taxGroups[key].amount + line * rate / 100);
-  }
+  // VAT-rate groups are computed canonically inside calcTotals (BR-CO-17 etc.);
+  // reuse them so the breakdown is consistent with the header monetary summation.
+  const taxGroups = totals.groups;
 
   const reverseChargeNote = mode === 'S' ? '' : tInvoice('rc_note' + (mode === 'AE' ? '' : '_' + mode));
 
@@ -3651,11 +3864,20 @@ function buildXML() {
 }
 
 // -------- Actions --------
+let _flashTimer = null;
 function flash(msg, kind = '') {
   const s = $('status');
   s.className = 'status show ' + (kind || '');
   s.textContent = msg;
-  if (kind === 'ok') setTimeout(() => s.classList.remove('show'), 3500);
+  if (_flashTimer) { clearTimeout(_flashTimer); _flashTimer = null; }
+  // Errors stay longer than successes so the user has time to read, but they
+  // do auto-hide — previously sticky errors were silently replaced by the next
+  // success flash, which was indistinguishable from no error having occurred.
+  const hideAfterMs = kind === 'err' ? 7000 : 3500;
+  _flashTimer = setTimeout(() => {
+    s.classList.remove('show');
+    _flashTimer = null;
+  }, hideAfterMs);
 }
 
 function downloadBlob(blob, filename) {
@@ -3682,22 +3904,29 @@ $('btnValidate').addEventListener('click', () => {
     const xml = buildXML();
     const parser = new DOMParser();
     const doc = parser.parseFromString(xml, 'application/xml');
-    const errNode = doc.querySelector('parsererror');
-    if (errNode) throw new Error('XML-Syntaxfehler: ' + errNode.textContent);
+    // Firefox emits <parsererror> in a non-default namespace; querySelector
+    // without explicit namespace syntax won't match it. getElementsByTagName
+    // is namespace-agnostic and catches all engines.
+    const errNode = doc.getElementsByTagName('parsererror')[0]
+      || (doc.documentElement && doc.documentElement.tagName === 'parsererror' ? doc.documentElement : null);
+    if (errNode) throw new Error(t('validate_xml_syntax_error') + errNode.textContent);
     const nums = state.items.map(it => (Number(it.qty)||0) * (Number(it.price)||0));
     const mode = $('r_taxmode').value;
     const checks = [
-      $('r_number').value.trim() ? null : 'Rechnungsnummer (BT-1) fehlt',
-      $('r_date').value ? null : 'Rechnungsdatum (BT-2) fehlt',
-      $('s_name').value.trim() ? null : 'Verkäufer-Name (BT-27) fehlt',
-      $('b_name').value.trim() ? null : 'Käufer-Name (BT-44) fehlt',
-      $('s_country').value.trim() ? null : 'Verkäufer-Land (BT-40) fehlt',
-      $('b_country').value.trim() ? null : 'Käufer-Land (BT-55) fehlt',
-      mode === 'AE' && !$('s_vat').value.trim() ? 'Reverse Charge: deine USt-IdNr (BT-31) ist Pflicht' : null,
-      mode === 'AE' && !$('b_vat').value.trim() ? 'Reverse Charge: Käufer-USt-IdNr (BT-48) ist Pflicht' : null,
-      mode === 'S' && !$('s_vat').value.trim() ? 'USt-IdNr Verkäufer (BT-31) empfohlen' : null,
-      state.items.length > 0 ? null : 'Mindestens eine Position erforderlich',
-      nums.every(x => x >= 0) ? null : 'Negative Summen in Positionen',
+      $('r_number').value.trim() ? null : t('validate_missing_number'),
+      $('r_date').value ? null : t('validate_missing_date'),
+      $('s_name').value.trim() ? null : t('validate_missing_seller_name'),
+      $('b_name').value.trim() ? null : t('validate_missing_buyer_name'),
+      $('s_country').value.trim() ? null : t('validate_missing_seller_country'),
+      $('b_country').value.trim() ? null : t('validate_missing_buyer_country'),
+      mode === 'AE' && !$('s_vat').value.trim() ? t('validate_rc_seller_vat') : null,
+      mode === 'AE' && !$('b_vat').value.trim() ? t('validate_rc_buyer_vat') : null,
+      mode === 'S' && !$('s_vat').value.trim() ? t('validate_recommend_seller_vat') : null,
+      state.items.length > 0 ? null : t('validate_missing_items'),
+      nums.every(x => x >= 0) ? null : t('validate_negative_amounts'),
+      // IBAN: only flag when present-but-malformed — leaving it blank is fine
+      // (the XML then emits payment-means type 1 instead of SEPA).
+      $('s_iban').value.trim() && !isValidIBAN($('s_iban').value) ? t('validate_invalid_iban') : null,
     ].filter(Boolean);
     if (checks.length === 0) {
       flash(t('msg_xml_valid'), 'ok');
@@ -3712,6 +3941,9 @@ $('btnValidate').addEventListener('click', () => {
 // -------- Font loader: 5 monospace options embedded as base64 --------
 // All font data lives in FONT_DATA (defined at the bottom of this script).
 // The tool runs fully offline; no network calls at runtime.
+// Descriptions are deliberately bilingual (German · English) so the font
+// dropdown is readable to both audiences without expanding the i18n surface
+// for what is essentially a marketing blurb.
 const FONT_OPTIONS = {
   'courier-prime':  { label: 'Courier Prime',  description: 'Klassische Schreibmaschine · classic typewriter' },
   'ibm-plex-mono':  { label: 'IBM Plex Mono',  description: 'Moderne Slab-Serifen · modern slab serifs' },
@@ -3722,7 +3954,11 @@ const FONT_OPTIONS = {
 const DEFAULT_FONT_KEY = 'courier-prime';
 const FONT_KEY = 'erechnung:font:v1';
 
-// Per-font cache so repeated PDF generation doesn't re-decode the WOFF.
+// Per-font cache of decoded SFNT byte buffers (~50–80 KB each). Bounded by
+// the 5 entries in FONT_OPTIONS, so at worst ~300 KB resident if the user
+// previews every font in a session. Not actively evicted — acceptable for a
+// browser app that re-reads on reload; revisit if this ever runs in an
+// embedded / constrained environment.
 const _fontDataCache = {};
 
 async function getCurrentFontKey() {
@@ -3887,7 +4123,7 @@ async function buildInvoiceContext(pdfDoc) {
   const signature = ($('r_signature').value.trim() || seller.name || '');
   const footnote = $('r_footnote').value.trim();
   const totals = calcTotals();
-  const currencySym = { EUR: '\u20ac', USD: '$', GBP: '\u00a3', CHF: 'CHF' }[currency] || currency;
+  const currencySym = currencySymbol(currency) || currency;
 
   const fmtDate = (iso) => {
     if (!iso) return '';
@@ -4032,19 +4268,26 @@ async function embedFacturXIntoPDF(pdfDoc, xml) {
     afRelationship: AFRelationship.Alternative,
   });
 
-  const number = $('r_number').value.trim() || 'Rechnung';
+  const docTitleWord = tInvoice('pdf_doc_title');
+  const number = $('r_number').value.trim() || docTitleWord;
   const sellerName = $('s_name').value.trim();
-  pdfDoc.setTitle(`Rechnung ${number}`);
+  const producer = tInvoice('pdf_doc_producer');
+  pdfDoc.setTitle(`${docTitleWord} ${number}`);
   pdfDoc.setAuthor(sellerName);
-  pdfDoc.setSubject('Factur-X / ZUGFeRD EN 16931 E-Rechnung');
+  pdfDoc.setSubject(tInvoice('pdf_doc_subject'));
   pdfDoc.setKeywords(['factur-x', 'zugferd', 'einvoice', 'en16931', 'rechnung']);
-  pdfDoc.setProducer('E-Rechnung Browser-Tool');
-  pdfDoc.setCreator('E-Rechnung Browser-Tool');
+  pdfDoc.setProducer(producer);
+  pdfDoc.setCreator(producer);
 
   addPDFAOutputIntent(pdfDoc);                              // ← NEU
 
-  try { injectFacturXMP(pdfDoc, 'EN 16931'); }
-  catch (e) { console.warn('XMP injection skipped:', e); }
+  try {
+    injectFacturXMP(pdfDoc, 'EN 16931', {
+      title: `${docTitleWord} ${number}`,
+      creator: sellerName,
+      producer,
+    });
+  } catch (e) { console.warn('XMP injection skipped:', e); }
 }
 
 $('btnPDF').addEventListener('click', async () => {
@@ -4079,9 +4322,28 @@ $('btnPDF').addEventListener('click', async () => {
 });
 
 // Inject Factur-X conformance metadata into the PDF XMP stream
-function injectFacturXMP(pdfDoc, conformance) {
-  // pdf-lib exposes the metadata stream via the catalog
-  // We build an XMP extension schema declaring Factur-X
+function injectFacturXMP(pdfDoc, conformance, meta = {}) {
+  // pdf-lib exposes the metadata stream via the catalog. We build an XMP
+  // packet that declares Factur-X compliance AND mirrors the Info dictionary
+  // (dc:title, dc:creator, xmp:CreateDate, pdf:Producer) \u2014 strict PDF/A-3
+  // verifiers expect the standard Dublin Core / XMP basic schema fields
+  // present in XMP, not only in the legacy Info dictionary.
+  const xmpEsc = (s) => String(s || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const isoDate = (d) => {
+    const pad = (n) => String(n).padStart(2, '0');
+    const tzMin = -d.getTimezoneOffset();
+    const sign = tzMin >= 0 ? '+' : '-';
+    const abs = Math.abs(tzMin);
+    const tz = `${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+      `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${tz}`;
+  };
+  const now = meta.modifyDate || new Date();
+  const created = meta.createDate || now;
+  const title = xmpEsc(meta.title || '');
+  const creator = xmpEsc(meta.creator || '');
+  const producer = xmpEsc(meta.producer || 'Factur-X Browser Tool');
   const xmp = `<?xpacket begin="\ufeff" id="W5M0MpCehiHzreSzNTczkc9d"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Factur-X Browser Tool">
   <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
@@ -4096,6 +4358,11 @@ function injectFacturXMP(pdfDoc, conformance) {
       xmlns:fx="urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#">
       <pdfaid:part>3</pdfaid:part>
       <pdfaid:conformance>B</pdfaid:conformance>
+      <dc:title><rdf:Alt><rdf:li xml:lang="x-default">${title}</rdf:li></rdf:Alt></dc:title>
+      <dc:creator><rdf:Seq><rdf:li>${creator}</rdf:li></rdf:Seq></dc:creator>
+      <xmp:CreateDate>${isoDate(created)}</xmp:CreateDate>
+      <xmp:ModifyDate>${isoDate(now)}</xmp:ModifyDate>
+      <pdf:Producer>${producer}</pdf:Producer>
       <fx:DocumentType>INVOICE</fx:DocumentType>
       <fx:DocumentFileName>factur-x.xml</fx:DocumentFileName>
       <fx:Version>1.0</fx:Version>
@@ -4161,9 +4428,10 @@ async function exportData() {
   const filenamePattern = await store.get(FILENAME_KEY);
   const fontKey = await store.get(FONT_KEY);
   const layoutKey = await store.get(LAYOUT_KEY);
+  const numberPattern = await store.get(NUMBER_PATTERN_KEY);
   const payload = {
     format: 'erechnung-backup',
-    version: 4,
+    version: 5,
     exported_at: new Date().toISOString(),
     seller: sellerJSON ? JSON.parse(sellerJSON) : null,
     boilerplate: boilerplateJSON ? JSON.parse(boilerplateJSON) : {},
@@ -4175,6 +4443,13 @@ async function exportData() {
     layout: layoutKey || null,
     yoy_data: state.yoyData || {},
     yoy_enabled: state.yoyEnabled,
+    // v5+
+    history: Array.isArray(state.history) ? state.history : [],
+    history_enabled: state.historyEnabled,
+    number_pattern: numberPattern || null,
+    lang: localStorage.getItem(LANG_KEY),
+    invoice_lang: localStorage.getItem(INVOICE_LANG_KEY),
+    theme: localStorage.getItem(THEME_KEY),
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const ts = new Date().toISOString().slice(0, 10);
@@ -4182,13 +4457,112 @@ async function exportData() {
   flash(`${t('msg_backup_export')} 1 ${t('msg_backup_seller')}, ${payload.buyers.length} ${t('msg_backup_buyers')}, ${payload.footnotes.length} ${t('msg_backup_footnotes')}.`, 'ok');
 }
 
+// Validate every section of a backup payload before it touches storage or
+// state. Returns a sanitized copy (sections with wrong shape are dropped,
+// arrays are filtered to well-formed entries) plus an `issues` list for
+// console diagnostics. The shape checks here are about preventing crashes
+// downstream — they don't try to validate semantic correctness.
+function sanitizeBackupPayload(raw) {
+  const issues = [];
+  const clean = { format: raw.format };
+  if (isFiniteNum(raw.version)) clean.version = raw.version;
+  if (raw.exported_at !== undefined) clean.exported_at = raw.exported_at;
+  // seller: flat object of string fields.
+  if (raw.seller !== undefined && raw.seller !== null) {
+    if (isPlainObject(raw.seller)) clean.seller = raw.seller;
+    else issues.push('seller');
+  }
+  // boilerplate: { lang: { intro, payment_note, greeting, signature, footnote } }
+  if (raw.boilerplate !== undefined) {
+    if (isPlainObject(raw.boilerplate)) {
+      const out = {};
+      for (const [lang, body] of Object.entries(raw.boilerplate)) {
+        if (isPlainObject(body)) out[lang] = body;
+      }
+      clean.boilerplate = out;
+    } else issues.push('boilerplate');
+  }
+  // buyers: array of objects with at least a string `name`.
+  if (raw.buyers !== undefined) {
+    if (Array.isArray(raw.buyers)) {
+      clean.buyers = raw.buyers.filter(b => isPlainObject(b) && typeof b.name === 'string');
+      if (clean.buyers.length !== raw.buyers.length) issues.push('buyers (partial)');
+    } else issues.push('buyers');
+  }
+  // footnotes: array of { name: string, text: string }.
+  if (raw.footnotes !== undefined) {
+    if (Array.isArray(raw.footnotes)) {
+      clean.footnotes = raw.footnotes.filter(f =>
+        isPlainObject(f) && typeof f.name === 'string' && typeof f.text === 'string'
+      );
+      if (clean.footnotes.length !== raw.footnotes.length) issues.push('footnotes (partial)');
+    } else issues.push('footnotes');
+  }
+  // last_invoice: stringified counter (or legacy full invoice number).
+  if (raw.last_invoice !== undefined && raw.last_invoice !== null) {
+    if (typeof raw.last_invoice === 'string' || isFiniteNum(raw.last_invoice)) {
+      clean.last_invoice = String(raw.last_invoice);
+    } else issues.push('last_invoice');
+  }
+  if (raw.filename_pattern !== undefined && raw.filename_pattern !== null) {
+    if (typeof raw.filename_pattern === 'string') clean.filename_pattern = raw.filename_pattern;
+    else issues.push('filename_pattern');
+  }
+  // font / layout: enum-check happens at restore time, just forward.
+  if (raw.font !== undefined) clean.font = raw.font;
+  if (raw.layout !== undefined) clean.layout = raw.layout;
+  // yoy_data: { CUR: { YEAR: number[12] } }
+  if (raw.yoy_data !== undefined) {
+    if (isPlainObject(raw.yoy_data)) {
+      const out = {};
+      let droppedAny = false;
+      for (const [cur, yearMap] of Object.entries(raw.yoy_data)) {
+        if (!isPlainObject(yearMap)) { droppedAny = true; continue; }
+        const years = {};
+        for (const [yr, vals] of Object.entries(yearMap)) {
+          if (Array.isArray(vals) && vals.length === 12 &&
+              vals.every(v => v == null || isFiniteNum(v))) {
+            years[yr] = vals.map(v => v == null ? 0 : v);
+          } else {
+            droppedAny = true;
+          }
+        }
+        if (Object.keys(years).length) out[cur] = years;
+      }
+      clean.yoy_data = out;
+      if (droppedAny) issues.push('yoy_data (partial)');
+    } else issues.push('yoy_data');
+  }
+  if (typeof raw.yoy_enabled === 'boolean') clean.yoy_enabled = raw.yoy_enabled;
+  // history: array of snapshots; require ts (number) and form (object).
+  if (raw.history !== undefined) {
+    if (Array.isArray(raw.history)) {
+      clean.history = raw.history.filter(h =>
+        isPlainObject(h) && isPlainObject(h.form) && isFiniteNum(h.ts)
+      );
+      if (clean.history.length !== raw.history.length) issues.push('history (partial)');
+    } else issues.push('history');
+  }
+  if (typeof raw.history_enabled === 'boolean') clean.history_enabled = raw.history_enabled;
+  if (raw.number_pattern !== undefined && raw.number_pattern !== null) {
+    if (typeof raw.number_pattern === 'string') clean.number_pattern = raw.number_pattern;
+    else issues.push('number_pattern');
+  }
+  // lang / invoice_lang / theme: enum/null checks happen at restore time.
+  if (raw.lang !== undefined) clean.lang = raw.lang;
+  if (raw.invoice_lang !== undefined) clean.invoice_lang = raw.invoice_lang;
+  if (Object.prototype.hasOwnProperty.call(raw, 'theme')) clean.theme = raw.theme;
+  return { payload: clean, issues };
+}
+
 async function importData(file) {
   try {
     const text = await file.text();
-    const payload = JSON.parse(text);
-    if (payload.format !== 'erechnung-backup') {
+    const raw = JSON.parse(text);
+    if (!isPlainObject(raw) || raw.format !== 'erechnung-backup') {
       throw new Error(t('msg_backup_invalid'));
     }
+    const { payload, issues } = sanitizeBackupPayload(raw);
     const sellerCount = payload.seller ? 1 : 0;
     const buyerCount = Array.isArray(payload.buyers) ? payload.buyers.length : 0;
     const footnoteCount = Array.isArray(payload.footnotes) ? payload.footnotes.length : 0;
@@ -4255,7 +4629,49 @@ async function importData(file) {
       state.yoyEnabled = payload.yoy_enabled;
       await persistYoYEnabled();
     }
+    // History, history-toggle, number pattern, lang, theme (v5+).
+    // Older backups won't have these keys; leave existing values untouched.
+    if (Array.isArray(payload.history)) {
+      state.history = payload.history;
+      await persistHistory();
+    }
+    if (typeof payload.history_enabled === 'boolean') {
+      state.historyEnabled = payload.history_enabled;
+      await persistHistoryEnabled();
+      const cb = document.getElementById('historyEnable');
+      if (cb) cb.checked = state.historyEnabled;
+    }
+    if (typeof payload.number_pattern === 'string' && payload.number_pattern) {
+      await store.set(NUMBER_PATTERN_KEY, payload.number_pattern);
+      const inp = $('r_number_pattern');
+      if (inp) inp.value = payload.number_pattern;
+      if (typeof updateSuggestNumberChipPreview === 'function') {
+        await updateSuggestNumberChipPreview();
+      }
+    }
+    if (typeof payload.lang === 'string' && I18N[payload.lang]) {
+      $('langSelect').value = payload.lang;
+      setLang(payload.lang);
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, 'invoice_lang')) {
+      const v = payload.invoice_lang;
+      const next = (typeof v === 'string' && I18N[v]) ? v : '';
+      $('invoiceLangSelect').value = next;
+      setInvoiceLang(next);
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, 'theme')) {
+      if (payload.theme === null) {
+        localStorage.removeItem(THEME_KEY);
+        applyTheme(null);
+      } else if (typeof payload.theme === 'string') {
+        localStorage.setItem(THEME_KEY, payload.theme);
+        applyTheme(payload.theme);
+      }
+    }
     flash(`${t('msg_backup_import_done')} ${sellerCount} ${t('msg_backup_seller')}, ${buyerCount} ${t('msg_backup_buyers')}, ${footnoteCount} ${t('msg_backup_footnotes')}.`, 'ok');
+    if (issues.length) {
+      console.warn('[erechnung] Backup import: malformed sections were skipped or partially loaded:', issues);
+    }
   } catch (e) {
     flash(t('msg_backup_failed') + ' ' + e.message, 'err');
   }
@@ -4289,7 +4705,10 @@ async function loadSellerCollapsed() {
   try {
     const v = await store.get(SELLER_COLLAPSED_KEY);
     sellerCollapsed = v === 'true';
-  } catch (e) { sellerCollapsed = false; }
+  } catch (e) {
+    console.warn('[erechnung] Failed to load seller-collapsed flag:', e?.message || e);
+    sellerCollapsed = false;
+  }
 }
 
 async function setSellerCollapsed(v, persist = true) {
@@ -4495,6 +4914,21 @@ function renderMarkdown(md) {
   return out.join('\n');
 }
 
+// Allow http(s), mailto, tel, anchors, and relative paths; reject everything
+// else (javascript:, data:, vbscript:, file:, ...). The markdown body is bundled
+// today, so this is prophylactic — if any user-controlled text ever flows in,
+// `[click](javascript:alert(1))` won't become a working XSS vector.
+function isSafeHref(url) {
+  const normalized = String(url || '').trim().toLowerCase();
+  if (!normalized) return false;
+  if (normalized.startsWith('#')) return true;
+  if (normalized.startsWith('/') || normalized.startsWith('./') || normalized.startsWith('../')) return true;
+  const schemeMatch = normalized.match(/^([a-z][a-z0-9+\-.]*):/);
+  if (!schemeMatch) return true; // scheme-less → treated as relative
+  const scheme = schemeMatch[1];
+  return scheme === 'http' || scheme === 'https' || scheme === 'mailto' || scheme === 'tel';
+}
+
 // Inline Markdown: **bold**, *italic*, \`code\`, [text](url).
 function inlineMD(text) {
   let s = esc(text);
@@ -4503,8 +4937,11 @@ function inlineMD(text) {
   // Bold then italic (bold wraps double * which would otherwise eat italic)
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   s = s.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
-  // Links
-  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  // Links — sanitize URL schemes; unsafe hrefs collapse to '#'.
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
+    const href = isSafeHref(url) ? url : '#';
+    return `<a href="${href}" target="_blank" rel="noopener">${label}</a>`;
+  });
   return s;
 }
 
@@ -4515,7 +4952,9 @@ function openHelpModal() {
   const modal = $('helpModal');
   const body = $('helpBody');
   if (!modal || !body) return;
-  // Render once on first open, reuse afterwards
+  // Render once on first open, reuse afterwards. The bundled README is
+  // English-only by design — translating it would multiply the bundle size,
+  // so the help body stays English even when the surrounding UI is de/fr.
   if (!body.dataset.rendered) {
     body.innerHTML = renderMarkdown(HELP_README_TEXT);
     body.dataset.rendered = '1';
@@ -4590,7 +5029,7 @@ async function runEmbedXML() {
     const blob = new Blob([finalBytes], { type: 'application/pdf' });
     downloadBlob(blob, outName);
 
-    saveHistorySnapshot();
+    await recordHistoryEntry();
     closeEmbedModal();
     flash(t('msg_embed_done'), 'ok');
   } catch (e) {
@@ -4764,7 +5203,9 @@ $('suggestNumber').addEventListener('click', applyNextInvoiceNumber);
 
 // Invoice number pattern editor
 $('numberPatternChips').addEventListener('click', (e) => {
-  const token = e.target.dataset?.token;
+  // closest() lets the chip have child markup (icon, span) without breaking
+  // the handler — e.target would otherwise resolve to the inner node.
+  const token = e.target.closest('[data-token]')?.dataset.token;
   if (!token) return;
   const input = $('r_number_pattern');
   const pos = input.selectionStart ?? input.value.length;
@@ -4792,8 +5233,6 @@ async function updateSuggestNumberChipPreview() {
 
 // Live-Update: bei jeder Pattern-Änderung
 $('r_number_pattern').addEventListener('input', updateSuggestNumberChipPreview);
-// Auch nach Speichern aktualisieren
-$('saveNumberPattern').addEventListener('click', () => setTimeout(updateSuggestNumberChipPreview, 50));
 
 // Load pattern into the field on init
 (async () => {
@@ -4812,7 +5251,7 @@ $('deleteFootnote').addEventListener('click', deleteFootnote);
 
 // Filename pattern: chips insert tokens at cursor, live preview updates on any field change
 $('filenameChips').addEventListener('click', (e) => {
-  const token = e.target.dataset?.token;
+  const token = e.target.closest('[data-token]')?.dataset.token;
   if (!token) return;
   const input = $('r_filename');
   const pos = input.selectionStart ?? input.value.length;
