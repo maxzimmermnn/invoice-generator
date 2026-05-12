@@ -263,7 +263,11 @@
     <label><span data-i18n="f_signature"></span>
       <input type="text" id="r_signature" data-i18n-placeholder="f_signature_placeholder">
     </label>
-    <label class="full"><span data-i18n="f_note"></span>
+    <label class="full">
+      <span class="label-row">
+        <span data-i18n="f_note"></span>
+        <button class="tiny-btn" id="clearNote" type="button" data-i18n="btn_clear"></button>
+      </span>
       <textarea id="r_note" rows="2"></textarea>
       <span class="note-small" id="taxNote"></span>
     </label>
@@ -274,6 +278,7 @@
         </select>
         <button class="tiny-btn" id="saveFootnote" type="button" data-i18n="btn_save_footnote"></button>
         <button class="tiny-btn" id="deleteFootnote" type="button" data-i18n="btn_delete_footnote"></button>
+        <button class="tiny-btn" id="clearFootnote" type="button" data-i18n="btn_clear"></button>
       </div>
       <textarea id="r_footnote" rows="3" data-i18n-placeholder="f_footnote_placeholder"></textarea>
       <span class="note-small" data-i18n="f_footnote_hint"></span>

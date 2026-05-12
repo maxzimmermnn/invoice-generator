@@ -747,6 +747,18 @@ button.secondary:hover { background: var(--ink); color: var(--paper); }
   gap: 8px;
   align-items: center;
 }
+
+/* Label text on the left, a small action button on the right of the same
+   line. Used for fields where the action belongs to the label rather than
+   the input row (e.g. "Additional note  [clear]"). The .tiny-btn margin-left
+   override drops the default 8px since flex-gap already spaces siblings. */
+.label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.label-row .tiny-btn { margin-left: 0; }
 .input-with-action input { flex: 1; }
 
 .buyer-history-hint {

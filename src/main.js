@@ -1812,6 +1812,12 @@ async function deleteFootnote() {
   renderFootnotePicker();
   flash(t('msg_deleted'), 'ok');
 }
+// Empty the textarea and reset the preset picker so the dropdown selection
+// no longer claims to be showing content that the textarea has just dropped.
+function clearFootnote() {
+  $('r_footnote').value = '';
+  $('footnotePicker').value = '';
+}
 
 // -------- History --------
 // Snapshots of generated invoices, persisted across sessions. Each entry
@@ -5180,6 +5186,7 @@ $('clearDeliveryEnd').addEventListener('click', () => {
   el.defaultValue = '';
   el.dispatchEvent(new Event('change', { bubbles: true }));
 });
+$('clearNote').addEventListener('click', () => { $('r_note').value = ''; });
 $('r_delivery').addEventListener('change', () => {
   const start = $('r_delivery').value;
   const end = $('r_delivery_end').value;
@@ -5248,6 +5255,7 @@ $('footnotePicker').addEventListener('change', (e) => {
 });
 $('saveFootnote').addEventListener('click', saveFootnote);
 $('deleteFootnote').addEventListener('click', deleteFootnote);
+$('clearFootnote').addEventListener('click', clearFootnote);
 
 // Filename pattern: chips insert tokens at cursor, live preview updates on any field change
 $('filenameChips').addEventListener('click', (e) => {
