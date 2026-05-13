@@ -93,6 +93,7 @@ conformance carry over from 1.6.0.
 - `applyTranslations` also processes `data-i18n-aria-label`.
 
 
+## [1.6.0] - 2026-05-12
 
 Code-review sweep across the whole codebase. Tightens EN 16931 / PDF/A-3
 compliance in places where strict validators disagreed with the previous
