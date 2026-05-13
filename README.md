@@ -29,10 +29,12 @@ carries machine-readable XML data per EN 16931 (ZUGFeRD 2.3 / Factur-X 1.0,
 Comfort profile) embedded inside it, making it compliant with German
 e-invoicing law (§14 UStG, in force since 2025) and valid as a Factur-X
 invoice for French customers. Three UI languages (German, English, French),
-five fonts, three layouts, per-language storage of default texts, an
-invoice history with cloning (and the option to backfill older invoices
-manually), and a full statistics view with quarterly tax breakdowns,
-year-over-year comparison, buyer drill-down, and CSV export.
+five fonts, three layouts, per-language storage of default texts, a
+searchable invoice history with cloning and status pills (and the option
+to backfill older invoices manually), non-blocking inline validation for
+IBAN/VAT/date fields, a first-run setup wizard with demo data, and a full
+statistics view with quarterly tax breakdowns, year-over-year comparison,
+buyer drill-down, and CSV export.
 
 ## Layouts
 
@@ -60,6 +62,24 @@ external dependencies, without any account.
 
 ## Features
 
+### First-run experience
+On a fresh start (empty `localStorage`), a prominent setup card guides you
+to fill in the seller stammdaten before anything else. A secondary "Start
+with demo data" link populates the form with a realistic DE-to-FR
+reverse-charge example (placeholder IBAN with a valid mod-97 checksum so
+nothing accidentally points to a real account); nothing is persisted
+until you save explicitly.
+
+Once the seller is configured, a second card appears for the
+invoice-number scheme: pick the pattern (default `{yyyy}-{counter:5}`)
+and the start value, with a live preview of the next number. It shows
+only when neither the pattern nor the counter has ever been written,
+so existing users see no change.
+
+A `?` next to a few key fields (service date, VAT mode, IBAN) opens a
+short tooltip explaining when to pick what. Tooltips close on Esc,
+outside-click, or a second click on the same `?`.
+
 ### Seller profile
 Master data (address, VAT ID, IBAN, BIC, bank, optional SIRET) is stored
 locally. The seller section collapses to a one-line summary
@@ -73,11 +93,18 @@ fields. Buyer reference / Leitweg-ID is stored as BT-10 in the XML
 tool also shows the date and amount of the most recent invoice you sent
 them, so you have context without leaving the form.
 
+The customer-name input is also backed by a memory of names from past
+invoices (deduplicated, most recent first, capped at 20). Typing or
+picking a known name autofills the rest of the address block when those
+fields are still empty; manual entries are never overwritten.
+
 ### Invoice number with pattern
 Default pattern: `{yyyy}-{counter:5}` e.g. `2026-00042`. An internal
 counter increments by 1 after each invoice. Available tokens: `{yyyy}`,
 `{yy}`, `{mm}`, `{dd}`, `{counter}`, `{counter:N}`. The pattern is
-editable and persistent.
+editable and persistent. On first run the setup wizard (see above) lets
+you set the start value explicitly, which is useful if you're migrating
+from another tool and want to continue an existing series.
 
 ### Date fields
 - Invoice date
@@ -96,9 +123,28 @@ editable and persistent.
 For reverse charge, the legal note per Art. 196 of Council Directive
 2006/112/EC is automatically inserted into both PDF and XML.
 
+### Inline validation
+Non-blocking checks run as you type:
+
+- **IBAN**: structural format plus the mod-97 checksum. A mistyped digit
+  shows up immediately.
+- **VAT ID**: strict patterns for DE (`DE` + 9 digits) and FR (`FR` + 2
+  chars + 9 digits) keyed off the neighbouring country code; a generic
+  shape check for other countries.
+- **Dates**: invoice date far in the future, due date before invoice
+  date, delivery end before delivery start.
+
+Failures get a red underline and a short hint span under the field. PDF
+and XML generation are never blocked by these hints, so you can still
+export drafts.
+
 ### Line items
 Description (wraps if long), quantity, unit price, VAT rate. As many rows
-as you need.
+as you need. Pressing Enter on the VAT field inserts a new row directly
+below and jumps focus to its description. The remove button uses a
+two-step inline confirm (first click turns into "delete?", second click
+removes, Esc or 3 s timeout cancels) so an accidental click never wipes
+a row.
 
 ### Default texts (boilerplate)
 Intro, payment note, greeting, signature and footnote are stored
@@ -107,7 +153,11 @@ payment note is replaced with the actual due date at PDF time.
 
 ### Footnote presets
 Frequently-used explanations can be saved as named presets and inserted
-from a dropdown.
+from a dropdown. If the chosen preset reads like a reverse-charge note
+(matched on keywords like "reverse charge", "autoliquidation",
+"Steuerschuldnerschaft"), the precise Art. 196 legal sentence is
+automatically prepended in the active invoice language, unless the
+citation is already present.
 
 ### Language selectors
 Two independent dropdowns:
@@ -130,21 +180,37 @@ filename.
 
 ### Invoice history
 A history icon in the top bar opens a modal with all generated invoices
-(up to 1000 entries, oldest dropped first):
+(up to 1000 entries, oldest dropped first). Once at least one invoice
+exists, a second icon in the top bar offers **Duplicate last invoice**
+as a one-click shortcut (same effect as opening the modal and cloning
+the topmost entry).
 
-- **Clone** any past invoice back into the form. All fields including
-  buyer, items, project, category, tax mode, language, font and layout
-  are restored. Date fields stay empty so you fill them explicitly; the
-  invoice number is auto-assigned to the next available one. Cloning
-  closes the modal so you land back on the form.
+Inside the modal:
+
+- A **search field** does full-text matching across invoice number,
+  buyer name, formatted total, project, and category. A **period
+  filter** narrows the list by time range (YTD, last 12 / 6 / 3 months,
+  last 30 days, last year, all). The list updates live as you type.
+- The entries render as a scrollable list (no dropdowns) with per-row
+  **Clone** and **Delete** buttons. Clone restores buyer, items,
+  project, category, tax mode, language, font and layout, sets the
+  date to today, auto-assigns the next invoice number, and closes the
+  modal. Delete uses the same two-step inline confirm as the line
+  items (first click turns into "delete?", Esc or 3 s cancels).
+- A **status pill** on each row distinguishes manually backfilled
+  entries (neutral "Entwurf") from tool-generated invoices ("Exportiert"
+  in blue). The schema reserves room for a future "paid" stage.
 - **Add past invoice** to backfill older invoices generated elsewhere,
   so the statistics view can cover a complete period. A small form
   captures the minimum fields (date, buyer, total, currency, tax mode);
-  these entries are flagged as manual in the picker.
-- **Delete entry** to remove a single record.
+  these entries are flagged as Entwurf in the list.
 - **Delete all** to clear the history with a confirmation prompt.
 - **Save invoices to history** toggle. When off, new invoices won't be
   saved, but existing entries remain accessible.
+
+When the history is empty, an empty-state card prompts you to create
+your first invoice. When the filter narrows to zero matches, a
+"Reset filters" CTA clears the search and period in one click.
 
 History is stored in `localStorage` like everything else and is included
 in the JSON backup export.
