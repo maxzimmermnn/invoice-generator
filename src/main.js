@@ -102,6 +102,135 @@ function isValidIBAN(s) {
   return remainder === 1;
 }
 
+// -------- Inline validation --------
+// Non-blocking: validators run on input/blur and decorate the field with a
+// red underline + .field-error span. They never abort save or PDF emission.
+
+// Returns null if valid (or empty), else an i18n key for the error message.
+function validateIBANInline(value) {
+  const iban = String(value || '').replace(/\s+/g, '').toUpperCase();
+  if (!iban) return null;
+  if (!/^[A-Z]{2}[0-9]{2}[A-Z0-9]+$/.test(iban) || iban.length < 15 || iban.length > 34) {
+    return 'err_iban_format';
+  }
+  return isValidIBAN(iban) ? null : 'err_iban_checksum';
+}
+
+// Returns null if valid (or empty). countryCode is the ISO-2 from the
+// neighbouring country field; we only know strict patterns for DE and FR.
+function validateVatInline(value, countryCode) {
+  const v = String(value || '').replace(/\s+/g, '').toUpperCase();
+  if (!v) return null;
+  const cc = String(countryCode || '').trim().toUpperCase();
+  if (cc === 'DE') return /^DE\d{9}$/.test(v) ? null : 'err_vat_format_de';
+  if (cc === 'FR') return /^FR[A-Z0-9]{2}\d{9}$/.test(v) ? null : 'err_vat_format_fr';
+  // Generic shape: country prefix + body of digits/letters, total 4-14 chars.
+  return /^[A-Z]{2}[A-Z0-9]{2,12}$/.test(v) ? null : 'err_vat_format_generic';
+}
+
+// Helper: toggle invalid class + the field-error sibling. msgKey null → clear.
+function setFieldError(input, msgKey) {
+  if (!input) return;
+  const id = input.id + 'Error';
+  let span = input.parentElement && input.parentElement.querySelector(`.field-error[data-for="${input.id}"]`);
+  if (msgKey) {
+    input.classList.add('invalid');
+    input.setAttribute('aria-invalid', 'true');
+    if (!span) {
+      span = document.createElement('span');
+      span.className = 'field-error';
+      span.dataset.for = input.id;
+      span.id = id;
+      // Insert after the input but keep it inside the same <label> so the hint
+      // sits directly below the field.
+      input.insertAdjacentElement('afterend', span);
+    }
+    span.textContent = t(msgKey);
+  } else {
+    input.classList.remove('invalid');
+    input.removeAttribute('aria-invalid');
+    if (span) span.remove();
+  }
+}
+
+// Wire up validators. Called once at init and again on language change
+// (re-renders existing error messages).
+function setupInlineValidation() {
+  const wire = (inputId, validator) => {
+    const el = document.getElementById(inputId);
+    if (!el) return;
+    const run = () => setFieldError(el, validator());
+    el.addEventListener('input', run);
+    el.addEventListener('blur', run);
+  };
+  wire('s_iban', () => validateIBANInline($('s_iban').value));
+  wire('s_vat',  () => validateVatInline($('s_vat').value, $('s_country').value));
+  wire('b_vat',  () => validateVatInline($('b_vat').value, $('b_country').value));
+  // Re-validate VAT when its country code changes.
+  $('s_country')?.addEventListener('input', () => setFieldError($('s_vat'), validateVatInline($('s_vat').value, $('s_country').value)));
+  $('b_country')?.addEventListener('input', () => setFieldError($('b_vat'), validateVatInline($('b_vat').value, $('b_country').value)));
+
+  // Soft date checks — chained re-evaluations because they share state.
+  function checkDates() {
+    const date = $('r_date').value;
+    const due = $('r_due').value;
+    const dStart = $('r_delivery').value;
+    const dEnd = $('r_delivery_end').value;
+    // Invoice date far in the future (> 1 year)
+    let dateErr = null;
+    if (date) {
+      const d = parseInvoiceDate(date);
+      const horizon = new Date();
+      horizon.setFullYear(horizon.getFullYear() + 1);
+      if (d.getTime() > horizon.getTime()) dateErr = 'err_date_future';
+    }
+    setFieldError($('r_date'), dateErr);
+    setFieldError($('r_due'), (date && due && due < date) ? 'err_due_before_date' : null);
+    setFieldError($('r_delivery_end'), (dStart && dEnd && dEnd < dStart) ? 'err_delivery_end_order' : null);
+  }
+  ['r_date', 'r_due', 'r_delivery', 'r_delivery_end'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', checkDates);
+    el.addEventListener('blur', checkDates);
+  });
+}
+
+// Refresh all currently visible inline-validation messages (after language
+// change). Clears existing spans and re-runs validators against current vals.
+function refreshInlineValidation() {
+  ['s_iban', 's_vat', 'b_vat', 'r_date', 'r_due', 'r_delivery', 'r_delivery_end'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('invalid');
+    const old = el.parentElement && el.parentElement.querySelector(`.field-error[data-for="${id}"]`);
+    if (old) old.remove();
+  });
+  // Re-trigger validation via change-equivalent paths.
+  ['s_iban', 's_vat', 'b_vat'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (id === 's_iban') setFieldError(el, validateIBANInline(el.value));
+    if (id === 's_vat')  setFieldError(el, validateVatInline(el.value, $('s_country').value));
+    if (id === 'b_vat')  setFieldError(el, validateVatInline(el.value, $('b_country').value));
+  });
+  // Date soft-checks — replicate logic from setupInlineValidation.checkDates.
+  const date = $('r_date').value;
+  const due = $('r_due').value;
+  const dStart = $('r_delivery').value;
+  const dEnd = $('r_delivery_end').value;
+  let dateErr = null;
+  if (date) {
+    const d = parseInvoiceDate(date);
+    const horizon = new Date();
+    horizon.setFullYear(horizon.getFullYear() + 1);
+    if (d.getTime() > horizon.getTime()) dateErr = 'err_date_future';
+  }
+  setFieldError($('r_date'), dateErr);
+  setFieldError($('r_due'), (date && due && due < date) ? 'err_due_before_date' : null);
+  setFieldError($('r_delivery_end'), (dStart && dEnd && dEnd < dStart) ? 'err_delivery_end_order' : null);
+}
+
 // -------- i18n: language dictionary --------
 const I18N = {
   de: {
@@ -127,6 +256,24 @@ const I18N = {
     section_output_hint: 'PDF-Quelle wählen',
     section_filename: 'Dateiname',
     section_filename_hint: 'Bausteine anklicken zum Einfügen · Muster wird gespeichert',
+    // First-run setup card
+    setup_card_title: 'Stammdaten einrichten',
+    setup_card_intro: 'Bevor du Rechnungen erstellst, hinterlege deine Absender-Daten: Firma, Steuer-IDs, IBAN/BIC. Alles bleibt lokal im Browser.',
+    setup_card_cta: 'Jetzt einrichten',
+    setup_card_demo_cta: 'Mit Beispieldaten starten',
+    msg_demo_loaded: 'Beispieldaten geladen · nichts gespeichert',
+    number_setup_title: 'Nummern-Schema einrichten',
+    number_setup_intro: 'Lege Format und Startwert deiner Rechnungsnummern fest. Spätere Anpassung jederzeit über die Rechnungsnummer im Formular.',
+    number_setup_pattern_label: 'Format',
+    number_setup_start_label: 'Startwert',
+    number_setup_preview_label: 'Nächste Nummer',
+    number_setup_cta: 'Übernehmen',
+    number_setup_default: 'Default verwenden',
+    msg_number_setup_done: 'Nummern-Schema gespeichert',
+    msg_number_setup_start_invalid: 'Startwert muss eine positive Ganzzahl sein.',
+    format_info_title: 'Was ist ZUGFeRD / Factur-X?',
+    format_info_body: 'ZUGFeRD und Factur-X bezeichnen dasselbe hybride Format: eine PDF/A-3-Datei mit zusätzlich eingebettetem strukturierten XML nach EN 16931. Das PDF bleibt lesbar wie gewohnt, das XML erlaubt automatische Buchungsläufe beim Empfänger. Für B2B-Rechnungen in Deutschland ab 2025 (Empfang) bzw. 2027 (Versand) Pflicht.',
+    format_info_link_label: 'Factur-X-Spezifikation (FNFE-MPE)',
     // Buttons
     btn_save_template: 'als Vorlage speichern',
     btn_reset: 'zurücksetzen',
@@ -184,6 +331,10 @@ const I18N = {
     chip_counter5: 'Counter (5-stellig)',
     f_date: 'Rechnungsdatum',
     f_delivery: 'Leistungsdatum',
+    tip_delivery: 'Datum oder Zeitraum, an dem die Leistung erbracht wurde. Für Einzeltage reicht das Start-Datum; mit End-Datum wird daraus ein Zeitraum.',
+    tip_taxmode: 'Inland mit Umsatzsteuer: Standard. EU-B2B-Kunde mit USt-IdNr.: Reverse Charge. Kleinunternehmer §19 oder echte Steuerbefreiung: Steuerbefreit. Nullsatz und Nicht steuerbar sind Sonderfälle.',
+    tip_iban: 'IBAN ist Pflicht für SEPA. BIC ist optional bei reinen DE-DE-Zahlungen, aber empfohlen bei Auslandsüberweisungen.',
+    aria_tooltip_open: 'Hilfe anzeigen',
     f_delivery_end: 'Leistungsdatum bis (optional)',
     f_due: 'Fälligkeit',
     chip_days: 'Tage',
@@ -217,6 +368,8 @@ const I18N = {
     f_footnote: 'Erklärung / Fußnote auf der PDF (optional)',
     f_footnote_placeholder: 'z.B. Erklärung zu einer Leistungsposition oder zu Aufschlägen',
     f_footnote_hint: 'Erscheint kursiv unter der VAT-Zeile auf der PDF.',
+    rc_legal_text: 'Steuerschuldnerschaft des Leistungsempfängers gemäß Art. 196 MwStSystRL, keine Umsatzsteuer ausgewiesen.',
+    msg_rc_legal_added: 'Reverse-Charge-Hinweis ergänzt',
     f_footnote_picker: 'Vorgefertigte Fußnote auswählen',
     // Items table
     th_desc: 'Beschreibung',
@@ -316,6 +469,15 @@ const I18N = {
     err_country_unknown: 'Unbekanntes Land: "{input}". Bitte ISO 3166-1 alpha-2 verwenden (z.B. DE, FR, GB).',
     err_rc_seller_vat: 'Reverse-Charge: Verkäufer benötigt eine USt-IdNr (BT-31). SIRET / Handelsregister-Nr. allein genügt nicht.',
     err_rc_buyer_vat: 'Reverse-Charge: Käufer benötigt eine USt-IdNr (BT-48). SIRET / Handelsregister-Nr. allein genügt nicht.',
+    // --- Inline validation (non-blocking) ---
+    err_iban_format: 'IBAN-Format ungültig (2 Buchstaben + Ziffern, 15-34 Zeichen).',
+    err_iban_checksum: 'IBAN-Prüfsumme stimmt nicht.',
+    err_vat_format_de: 'Format: DE + 9 Ziffern.',
+    err_vat_format_fr: 'Format: FR + 2 Zeichen + 9 Ziffern.',
+    err_vat_format_generic: 'USt-IdNr.-Format ungültig (Länderkürzel + Ziffern/Buchstaben).',
+    err_date_future: 'Rechnungsdatum liegt weit in der Zukunft.',
+    err_due_before_date: 'Fälligkeit liegt vor dem Rechnungsdatum.',
+    err_delivery_end_order: 'Endedatum liegt vor dem Startdatum.',
     // --- XML validator checklist (btnValidate) ---
     validate_xml_syntax_error: 'XML-Syntaxfehler: ',
     validate_missing_number: 'Rechnungsnummer (BT-1) fehlt',
@@ -335,6 +497,8 @@ const I18N = {
     pdf_doc_subject: 'Factur-X / ZUGFeRD EN 16931 E-Rechnung',
     pdf_doc_producer: 'E-Rechnung Browser-Tool',
     aria_remove_item: 'Position entfernen',
+    aria_remove_confirm: 'Löschen bestätigen',
+    item_remove_confirm_text: 'löschen?',
     // --- History feature ---
     section_history: 'Verlauf',
     section_history_hint: 'Generierte Rechnungen werden automatisch hier gespeichert · Klonen lädt alle Felder ins Formular',
@@ -345,6 +509,8 @@ const I18N = {
     btn_history_clear_all: 'Alle löschen',
     history_clear_confirm: 'Wirklich alle {count} Einträge aus dem Verlauf löschen?',
     history_empty: 'Noch keine Rechnungen im Verlauf',
+    history_search_placeholder: 'Suche: Empfänger, Nummer, Betrag, Projekt…',
+    history_no_match: 'Keine Treffer für Filter',
     msg_history_saved: 'Im Verlauf gespeichert.',
     msg_history_cloned: 'Aus Verlauf geklont.',
     msg_history_deleted: 'Eintrag gelöscht.',
@@ -367,6 +533,16 @@ const I18N = {
     msg_history_added: 'Im Verlauf gespeichert.',
     msg_history_clone_partial: 'Geklont – einige Felder leer (manueller Eintrag).',
     history_imported_marker: 'manuell',
+    history_status_draft: 'Entwurf',
+    history_status_exported: 'Exportiert',
+    empty_history_title: 'Noch kein Verlauf',
+    empty_history_body: 'Sobald du eine Rechnung generierst, taucht sie hier auf.',
+    empty_history_cta: 'Erste Rechnung anlegen',
+    empty_filter_title: 'Keine Treffer',
+    empty_filter_body: 'Kein Verlaufseintrag passt zum aktuellen Filter.',
+    empty_filter_cta: 'Filter zurücksetzen',
+    fresh_form_hint: 'Bei null anfangen?',
+    fresh_form_cta: 'Letzte Rechnung duplizieren',
     // --- Statistics + buyer history hint ---
     btn_open_stats: 'Statistik',
     stats_title: 'Statistik',
@@ -436,6 +612,9 @@ const I18N = {
     msg_yoy_invalid_value: 'Negative Werte sind nicht erlaubt.',
     // --- UI restructure: top-bar icons, help/embed modals, past-invoice extras ---
     btn_open_history: 'Historie',
+    btn_duplicate_last: 'Letzte Rechnung duplizieren',
+    msg_duplicated_last: 'Letzte Rechnung dupliziert · Nummer & Datum aktualisiert',
+    msg_duplicate_no_history: 'Noch keine Rechnung im Verlauf zum Duplizieren.',
     btn_open_help: 'Hilfe',
     help_title: 'Hilfe & Dokumentation',
     embed_title: 'XML in vorhandenes PDF einbetten',
@@ -488,6 +667,23 @@ const I18N = {
     section_output_hint: 'Choose PDF source',
     section_filename: 'Filename',
     section_filename_hint: 'Click tokens to insert · pattern is saved',
+    setup_card_title: 'Set up your master data',
+    setup_card_intro: 'Before creating invoices, enter your sender details: company, tax IDs, IBAN/BIC. Everything stays local in your browser.',
+    setup_card_cta: 'Set up now',
+    setup_card_demo_cta: 'Start with demo data',
+    msg_demo_loaded: 'Demo data loaded · nothing saved',
+    number_setup_title: 'Set up your invoice numbers',
+    number_setup_intro: 'Choose the format and starting value for invoice numbers. You can tweak it any time via the number field in the form.',
+    number_setup_pattern_label: 'Format',
+    number_setup_start_label: 'Start value',
+    number_setup_preview_label: 'Next number',
+    number_setup_cta: 'Apply',
+    number_setup_default: 'Use default',
+    msg_number_setup_done: 'Number scheme saved',
+    msg_number_setup_start_invalid: 'Start value must be a positive integer.',
+    format_info_title: 'What is ZUGFeRD / Factur-X?',
+    format_info_body: 'ZUGFeRD and Factur-X are the same hybrid format: a PDF/A-3 file with structured XML (EN 16931) embedded inside. The PDF stays readable for humans; the XML lets the recipient post the invoice automatically. Mandatory for German B2B from 2025 (receiving) and 2027 (sending).',
+    format_info_link_label: 'Factur-X specification (FNFE-MPE)',
     btn_save_template: 'save as template',
     btn_reset: 'reset',
     btn_save_buyer: 'save as customer',
@@ -540,6 +736,10 @@ const I18N = {
     chip_counter5: 'Counter (5-digit)',
     f_date: 'Invoice date',
     f_delivery: 'Service date',
+    tip_delivery: 'The date (or period) when the service was actually delivered. For a single day, the start date alone is enough; add an end date for a range.',
+    tip_taxmode: 'Domestic with VAT: Standard. EU B2B customer with a VAT ID: Reverse Charge. Small-business or true exemption: Exempt. Zero rate and Out of scope are edge cases.',
+    tip_iban: 'IBAN is required for SEPA transfers. BIC is optional for domestic payments but expected for cross-border transfers.',
+    aria_tooltip_open: 'Show help',
     f_delivery_end: 'Service date end (optional)',
     f_due: 'Due date',
     chip_days: 'days',
@@ -573,6 +773,8 @@ const I18N = {
     f_footnote: 'Note / footnote on the PDF (optional)',
     f_footnote_placeholder: 'e.g. explanation for a service item or surcharge',
     f_footnote_hint: 'Appears in italic below the VAT line on the PDF.',
+    rc_legal_text: 'Reverse charge applies: VAT to be accounted for by the recipient under Art. 196 of Council Directive 2006/112/EC.',
+    msg_rc_legal_added: 'Reverse-charge note added',
     f_footnote_picker: 'Select preset footnote',
     th_desc: 'Description',
     th_qty: 'Qty',
@@ -665,6 +867,15 @@ const I18N = {
     err_country_unknown: 'Unknown country: "{input}". Use ISO 3166-1 alpha-2 (e.g. DE, FR, GB).',
     err_rc_seller_vat: 'Reverse charge requires a Seller VAT ID (BT-31). SIRET / legal-registration ID alone is not sufficient.',
     err_rc_buyer_vat: 'Reverse charge requires a Buyer VAT ID (BT-48). SIRET / legal-registration ID alone is not sufficient.',
+    // --- Inline validation (non-blocking) ---
+    err_iban_format: 'IBAN format invalid (2 letters + digits, 15-34 chars).',
+    err_iban_checksum: 'IBAN checksum mismatch.',
+    err_vat_format_de: 'Format: DE + 9 digits.',
+    err_vat_format_fr: 'Format: FR + 2 chars + 9 digits.',
+    err_vat_format_generic: 'VAT ID format invalid (country prefix + digits/letters).',
+    err_date_future: 'Invoice date is far in the future.',
+    err_due_before_date: 'Due date is before invoice date.',
+    err_delivery_end_order: 'End date is before start date.',
     // --- XML validator checklist (btnValidate) ---
     validate_xml_syntax_error: 'XML syntax error: ',
     validate_missing_number: 'Invoice number (BT-1) is missing',
@@ -684,6 +895,8 @@ const I18N = {
     pdf_doc_subject: 'Factur-X / ZUGFeRD EN 16931 e-invoice',
     pdf_doc_producer: 'E-Invoice Browser Tool',
     aria_remove_item: 'Remove line item',
+    aria_remove_confirm: 'Confirm delete',
+    item_remove_confirm_text: 'delete?',
     // --- History feature ---
     section_history: 'History',
     section_history_hint: 'Generated invoices are saved here automatically · Clone loads all fields into the form',
@@ -694,6 +907,8 @@ const I18N = {
     btn_history_clear_all: 'Delete all',
     history_clear_confirm: 'Really delete all {count} history entries?',
     history_empty: 'No invoices in history yet',
+    history_search_placeholder: 'Search: buyer, number, total, project…',
+    history_no_match: 'No matches for current filter',
     msg_history_saved: 'Saved to history.',
     msg_history_cloned: 'Cloned from history.',
     msg_history_deleted: 'Entry deleted.',
@@ -716,6 +931,16 @@ const I18N = {
     msg_history_added: 'Saved to history.',
     msg_history_clone_partial: 'Cloned with partial data (manual entry).',
     history_imported_marker: 'manual',
+    history_status_draft: 'Draft',
+    history_status_exported: 'Exported',
+    empty_history_title: 'No history yet',
+    empty_history_body: 'Generated invoices will show up here.',
+    empty_history_cta: 'Create your first invoice',
+    empty_filter_title: 'No matches',
+    empty_filter_body: 'No history entry fits the current filter.',
+    empty_filter_cta: 'Reset filters',
+    fresh_form_hint: 'Start from scratch?',
+    fresh_form_cta: 'Duplicate last invoice',
     // --- Statistics + buyer history hint ---
     btn_open_stats: 'Statistics',
     stats_title: 'Statistics',
@@ -785,6 +1010,9 @@ const I18N = {
     msg_yoy_invalid_value: 'Negative values are not allowed.',
     // --- UI restructure: top-bar icons, help/embed modals, past-invoice extras ---
     btn_open_history: 'History',
+    btn_duplicate_last: 'Duplicate last invoice',
+    msg_duplicated_last: 'Last invoice duplicated · number & date refreshed',
+    msg_duplicate_no_history: 'No history entry yet to duplicate.',
     btn_open_help: 'Help',
     help_title: 'Help & documentation',
     embed_title: 'Embed XML in existing PDF',
@@ -837,6 +1065,23 @@ const I18N = {
     section_output_hint: 'Choisir la source PDF',
     section_filename: 'Nom de fichier',
     section_filename_hint: 'Cliquez sur les blocs pour les insérer · le modèle est enregistré',
+    setup_card_title: 'Configurer vos données',
+    setup_card_intro: 'Avant de créer des factures, renseignez votre profil émetteur : société, numéros fiscaux, IBAN/BIC. Tout reste local dans le navigateur.',
+    setup_card_cta: 'Configurer maintenant',
+    setup_card_demo_cta: 'Démarrer avec un exemple',
+    msg_demo_loaded: 'Données de démo chargées · rien enregistré',
+    number_setup_title: 'Configurer la numérotation',
+    number_setup_intro: 'Choisissez le format et le numéro de départ. Ajustable à tout moment depuis le champ numéro dans le formulaire.',
+    number_setup_pattern_label: 'Format',
+    number_setup_start_label: 'Numéro de départ',
+    number_setup_preview_label: 'Prochain numéro',
+    number_setup_cta: 'Appliquer',
+    number_setup_default: 'Utiliser la valeur par défaut',
+    msg_number_setup_done: 'Schéma de numérotation enregistré',
+    msg_number_setup_start_invalid: 'Le numéro de départ doit être un entier positif.',
+    format_info_title: 'Qu\'est-ce que ZUGFeRD / Factur-X ?',
+    format_info_body: 'ZUGFeRD et Factur-X désignent le même format hybride : un PDF/A-3 avec un XML structuré (EN 16931) intégré. Le PDF reste lisible normalement ; le XML permet le traitement automatique chez le destinataire. Obligatoire pour le B2B allemand à partir de 2025 (réception) et 2027 (émission).',
+    format_info_link_label: 'Spécification Factur-X (FNFE-MPE)',
     btn_save_template: 'enregistrer comme modèle',
     btn_reset: 'réinitialiser',
     btn_save_buyer: 'enregistrer le client',
@@ -889,6 +1134,10 @@ const I18N = {
     chip_counter5: 'Compteur (5 chiffres)',
     f_date: 'Date de facture',
     f_delivery: 'Date de prestation',
+    tip_delivery: 'Date ou période où la prestation a été effectivement réalisée. Pour une seule journée, la date de début suffit ; ajoutez une fin pour un intervalle.',
+    tip_taxmode: 'National avec TVA : Standard. Client UE B2B avec n° TVA : Autoliquidation. Micro-entrepreneur ou exonération réelle : Exonéré. Taux zéro et Hors champ sont des cas particuliers.',
+    tip_iban: 'L\'IBAN est obligatoire pour les virements SEPA. Le BIC est facultatif pour les paiements domestiques, recommandé pour l\'international.',
+    aria_tooltip_open: 'Afficher l\'aide',
     f_delivery_end: 'Date de fin (optionnelle)',
     f_due: 'Échéance',
     chip_days: 'jours',
@@ -922,6 +1171,8 @@ const I18N = {
     f_footnote: 'Note / mention sur la PDF (optionnelle)',
     f_footnote_placeholder: 'ex. explication d\'une ligne ou d\'un supplément',
     f_footnote_hint: 'Apparaît en italique sous la ligne TVA sur la PDF.',
+    rc_legal_text: 'Autoliquidation par le preneur : TVA due par le destinataire conformément à l\'art. 196 de la directive 2006/112/CE.',
+    msg_rc_legal_added: 'Mention d\'autoliquidation ajoutée',
     f_footnote_picker: 'Sélectionner une note enregistrée',
     th_desc: 'Description',
     th_qty: 'Qté',
@@ -1014,6 +1265,15 @@ const I18N = {
     err_country_unknown: 'Pays inconnu : « {input} ». Utilisez ISO 3166-1 alpha-2 (ex. DE, FR, GB).',
     err_rc_seller_vat: 'Autoliquidation : numéro de TVA vendeur requis (BT-31). Le SIRET seul ne suffit pas.',
     err_rc_buyer_vat: 'Autoliquidation : numéro de TVA acheteur requis (BT-48). Le SIRET seul ne suffit pas.',
+    // --- Inline validation (non-blocking) ---
+    err_iban_format: 'Format IBAN invalide (2 lettres + chiffres, 15-34 caractères).',
+    err_iban_checksum: 'Somme de contrôle IBAN incorrecte.',
+    err_vat_format_de: 'Format : DE + 9 chiffres.',
+    err_vat_format_fr: 'Format : FR + 2 caractères + 9 chiffres.',
+    err_vat_format_generic: 'Format numéro de TVA invalide (préfixe pays + chiffres/lettres).',
+    err_date_future: 'Date de facture loin dans le futur.',
+    err_due_before_date: 'Échéance avant la date de facture.',
+    err_delivery_end_order: 'Date de fin avant la date de début.',
     // --- XML validator checklist (btnValidate) ---
     validate_xml_syntax_error: 'Erreur de syntaxe XML : ',
     validate_missing_number: 'Numéro de facture (BT-1) manquant',
@@ -1033,6 +1293,8 @@ const I18N = {
     pdf_doc_subject: 'Facture électronique Factur-X / ZUGFeRD EN 16931',
     pdf_doc_producer: 'Outil de facturation électronique (navigateur)',
     aria_remove_item: 'Supprimer la ligne',
+    aria_remove_confirm: 'Confirmer la suppression',
+    item_remove_confirm_text: 'supprimer ?',
     // --- History feature ---
     section_history: 'Historique',
     section_history_hint: 'Les factures générées sont enregistrées ici automatiquement · Cloner charge tous les champs dans le formulaire',
@@ -1043,6 +1305,8 @@ const I18N = {
     btn_history_clear_all: 'Supprimer tout',
     history_clear_confirm: 'Supprimer vraiment les {count} entrées de l\'historique ?',
     history_empty: 'Aucune facture dans l\'historique',
+    history_search_placeholder: 'Rechercher : client, numéro, montant, projet…',
+    history_no_match: 'Aucun résultat pour ce filtre',
     msg_history_saved: 'Enregistré dans l\'historique.',
     msg_history_cloned: 'Cloné depuis l\'historique.',
     msg_history_deleted: 'Entrée supprimée.',
@@ -1065,6 +1329,16 @@ const I18N = {
     msg_history_added: 'Enregistré dans l\'historique.',
     msg_history_clone_partial: 'Cloné avec données partielles (saisie manuelle).',
     history_imported_marker: 'manuel',
+    history_status_draft: 'Brouillon',
+    history_status_exported: 'Exporté',
+    empty_history_title: 'Pas encore d\'historique',
+    empty_history_body: 'Les factures générées apparaîtront ici.',
+    empty_history_cta: 'Créer la première facture',
+    empty_filter_title: 'Aucun résultat',
+    empty_filter_body: 'Aucune entrée ne correspond au filtre actuel.',
+    empty_filter_cta: 'Réinitialiser les filtres',
+    fresh_form_hint: 'Repartir de zéro ?',
+    fresh_form_cta: 'Dupliquer la dernière facture',
     // --- Statistics + buyer history hint ---
     btn_open_stats: 'Statistiques',
     stats_title: 'Statistiques',
@@ -1134,6 +1408,9 @@ const I18N = {
     msg_yoy_invalid_value: 'Les valeurs négatives ne sont pas autorisées.',
     // --- UI restructure: top-bar icons, help/embed modals, past-invoice extras ---
     btn_open_history: 'Historique',
+    btn_duplicate_last: 'Dupliquer la dernière facture',
+    msg_duplicated_last: 'Dernière facture dupliquée · numéro et date mis à jour',
+    msg_duplicate_no_history: 'Aucune facture dans l\'historique à dupliquer.',
     btn_open_help: 'Aide',
     help_title: 'Aide et documentation',
     embed_title: 'Intégrer XML dans un PDF existant',
@@ -1250,6 +1527,9 @@ function applyTranslations(root) {
   scope.querySelectorAll('[data-i18n-title]').forEach(el => {
     el.setAttribute('title', t(el.getAttribute('data-i18n-title')));
   });
+  scope.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
+    el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria-label')));
+  });
   if (root) return;
   // Global pass: page-wide side effects.
   const titleEl = document.querySelector('title');
@@ -1273,6 +1553,7 @@ function setLang(lang) {
   CURRENT_LANG = lang;
   localStorage.setItem(LANG_KEY, lang);
   applyTranslations();
+  if (typeof refreshInlineValidation === 'function') refreshInlineValidation();
   // Boilerplate follows the invoice-output language, which by default
   // tracks the UI; only reload it here if the invoice lang follows UI.
   if (!INVOICE_LANG && typeof loadBoilerplateForLang === 'function') {
@@ -1342,6 +1623,7 @@ async function loadSeller() {
   } catch (e) { console.warn('[erechnung] Failed to load seller profile:', e?.message || e); }
   // Load boilerplate for currently effective invoice language
   await loadBoilerplateForLang(effectiveInvoiceLang());
+  updateSetupCardVisibility();
 }
 async function saveSeller() {
   // Stammdaten go into one bucket, boilerplate goes into a per-language bucket.
@@ -1359,14 +1641,16 @@ async function saveSeller() {
   bMap[effectiveInvoiceLang()] = boilerplate;
   const ok2 = await store.set(BOILERPLATE_KEY, JSON.stringify(bMap));
   if (ok1 && ok2) {
-    flash(t('msg_seller_saved'), 'ok');
+    toast(t('msg_seller_saved'), 'ok');
     // Auto-collapse after a successful save when the seller has data.
     // Refresh the summary first so the collapsed view shows current values.
     if (isSellerConfigured()) {
       await setSellerCollapsed(true);
     }
+    updateSetupCardVisibility();
+    updateNumberSetupCardVisibility();
   } else {
-    flash(t('msg_save_failed'), 'err');
+    toast(t('msg_save_failed'), 'err');
   }
 }
 async function clearSeller() {
@@ -1377,7 +1661,9 @@ async function clearSeller() {
     .forEach(id => $(id).value = id === 's_country' ? 'DE' : '');
   // After clearing, the seller is empty — force expanded so the user can re-enter
   await setSellerCollapsed(false);
-  flash(t('msg_reset'), 'ok');
+  updateSetupCardVisibility();
+  updateNumberSetupCardVisibility();
+  toast(t('msg_reset'), 'ok');
 }
 function collectSellerStammdaten() {
   return {
@@ -1425,6 +1711,7 @@ function applySellerStammdaten(s) {
   $('s_iban').value = nz(s.iban);
   $('s_bic').value = nz(s.bic);
   $('s_bank').value = nz(s.bank);
+  if (typeof refreshInlineValidation === 'function') refreshInlineValidation();
 }
 function applyBoilerplate(b) {
   $('r_intro').value = nz(b.intro);
@@ -1481,6 +1768,7 @@ function applyBuyer(b) {
   $('b_vat').value = nz(b.vat);
   $('b_siret').value = nz(b.siret);
   $('b_reference').value = nz(b.reference);
+  if (typeof refreshInlineValidation === 'function') refreshInlineValidation();
 }
 function clearBuyer() {
   $('b_name').value = '';
@@ -1504,7 +1792,7 @@ async function loadBuyers() {
 }
 async function persistBuyers() {
   const ok = await store.set(BUYERS_KEY, JSON.stringify(state.buyers));
-  if (!ok) flash(t('msg_save_failed'), 'err');
+  if (!ok) toast(t('msg_save_failed'), 'err');
 }
 function renderBuyerPicker() {
   const picker = $('buyerPicker');
@@ -1515,26 +1803,72 @@ function renderBuyerPicker() {
       .join('');
   if (current && state.buyers[current]) picker.value = current;
 }
+
+// Datalist suggestions for the buyer name input, derived live from history.
+// Deduplicated by lowercased name, most recent first, capped at 20.
+const BUYER_MEMORY_LIMIT = 20;
+function renderBuyerNamesMemory() {
+  const dl = document.getElementById('buyerNamesMemory');
+  if (!dl) return;
+  const seen = new Set();
+  const opts = [];
+  for (const s of state.history) {
+    const name = (s.buyerName || '').trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const city = (s.form && s.form.buyer && s.form.buyer.city) ? s.form.buyer.city : '';
+    const label = city ? `${name} · ${city}` : name;
+    opts.push(`<option value="${esc(name)}" label="${esc(label)}"></option>`);
+    if (opts.length >= BUYER_MEMORY_LIMIT) break;
+  }
+  dl.innerHTML = opts.join('');
+}
+
+// Find the most recent history snapshot whose buyer name matches exactly
+// (case-insensitive). Returns the form.buyer object or null.
+function findHistoryBuyerByName(name) {
+  const target = (name || '').toLowerCase().trim();
+  if (!target) return null;
+  for (const s of state.history) {
+    if ((s.buyerName || '').toLowerCase().trim() === target) {
+      return (s.form && s.form.buyer) ? s.form.buyer : null;
+    }
+  }
+  return null;
+}
+
+// True iff every buyer address field except the name is empty. Used to
+// decide whether a datalist pick should autofill without clobbering input.
+function buyerAddressEmpty() {
+  return !$('b_line1').value.trim()
+    && !$('b_zip').value.trim()
+    && !$('b_city').value.trim()
+    && !$('b_vat').value.trim()
+    && !$('b_siret').value.trim()
+    && !$('b_reference').value.trim();
+}
 async function saveBuyer() {
   const data = collectBuyer();
-  if (!data.name) { flash(t('msg_buyer_no_name'), 'err'); return; }
+  if (!data.name) { toast(t('msg_buyer_no_name'), 'err'); return; }
   const picker = $('buyerPicker');
   const idx = picker.value;
   if (idx !== '' && state.buyers[idx]) {
     state.buyers[idx] = data;
-    flash(`"${data.name}" ${t('msg_buyer_updated')}`, 'ok');
+    toast(`"${data.name}" ${t('msg_buyer_updated')}`, 'ok');
   } else {
     const existing = state.buyers.findIndex(b => b.name.toLowerCase() === data.name.toLowerCase());
     if (existing >= 0) {
       state.buyers[existing] = data;
-      flash(`"${data.name}" ${t('msg_buyer_updated')}`, 'ok');
+      toast(`"${data.name}" ${t('msg_buyer_updated')}`, 'ok');
       await persistBuyers();
       renderBuyerPicker();
       $('buyerPicker').value = existing;
       return;
     }
     state.buyers.push(data);
-    flash(`"${data.name}" ${t('msg_buyer_saved')}`, 'ok');
+    toast(`"${data.name}" ${t('msg_buyer_saved')}`, 'ok');
   }
   await persistBuyers();
   renderBuyerPicker();
@@ -1545,14 +1879,14 @@ async function saveBuyer() {
 async function deleteBuyer() {
   const picker = $('buyerPicker');
   const idx = picker.value;
-  if (idx === '' || !state.buyers[idx]) { flash(t('msg_buyer_no_select'), 'err'); return; }
+  if (idx === '' || !state.buyers[idx]) { toast(t('msg_buyer_no_select'), 'err'); return; }
   const name = state.buyers[idx].name;
   if (!confirm(`"${name}" ${t('msg_buyer_confirm_delete')}`)) return;
   state.buyers.splice(idx, 1);
   await persistBuyers();
   renderBuyerPicker();
   clearBuyer();
-  flash(t('msg_deleted'), 'ok');
+  toast(t('msg_deleted'), 'ok');
 }
 
 // -------- Invoice number counter --------
@@ -1744,8 +2078,8 @@ function migrateLegacyFilenameTokens(pattern) {
 
 async function saveFilenamePattern() {
   const ok = await store.set(FILENAME_KEY, $('r_filename').value);
-  if (ok) flash(t('msg_filename_saved'), 'ok');
-  else flash(t('msg_save_failed'), 'err');
+  if (ok) toast(t('msg_filename_saved'), 'ok');
+  else toast(t('msg_save_failed'), 'err');
 }
 
 // -------- Footnote presets (named templates) --------
@@ -1761,7 +2095,7 @@ async function loadFootnotes() {
 }
 async function persistFootnotes() {
   const ok = await store.set(FOOTNOTES_KEY, JSON.stringify(state.footnotes));
-  if (!ok) flash(t('msg_save_failed'), 'err');
+  if (!ok) toast(t('msg_save_failed'), 'err');
 }
 function renderFootnotePicker() {
   const picker = $('footnotePicker');
@@ -1774,7 +2108,7 @@ function renderFootnotePicker() {
 }
 async function saveFootnote() {
   const text = $('r_footnote').value.trim();
-  if (!text) { flash(t('msg_footnote_no_text'), 'err'); return; }
+  if (!text) { toast(t('msg_footnote_no_text'), 'err'); return; }
   const picker = $('footnotePicker');
   const idx = picker.value;
   if (idx !== '' && state.footnotes[idx]) {
@@ -1782,7 +2116,7 @@ async function saveFootnote() {
     if (!confirm(`"${state.footnotes[idx].name}" ${t('msg_footnote_overwrite')}`)) return;
     state.footnotes[idx].text = text;
     await persistFootnotes();
-    flash(`"${state.footnotes[idx].name}" ${t('msg_buyer_updated')}`, 'ok');
+    toast(`"${state.footnotes[idx].name}" ${t('msg_buyer_updated')}`, 'ok');
     return;
   }
   const name = prompt(t('msg_footnote_name_prompt'));
@@ -1799,18 +2133,18 @@ async function saveFootnote() {
   renderFootnotePicker();
   const newIdx = state.footnotes.findIndex(f => f.name === trimName);
   if (newIdx >= 0) $('footnotePicker').value = newIdx;
-  flash(`"${trimName}" ${t('msg_footnote_saved')}`, 'ok');
+  toast(`"${trimName}" ${t('msg_footnote_saved')}`, 'ok');
 }
 async function deleteFootnote() {
   const picker = $('footnotePicker');
   const idx = picker.value;
-  if (idx === '' || !state.footnotes[idx]) { flash(t('msg_footnote_no_select'), 'err'); return; }
+  if (idx === '' || !state.footnotes[idx]) { toast(t('msg_footnote_no_select'), 'err'); return; }
   const name = state.footnotes[idx].name;
   if (!confirm(`"${name}" ${t('msg_buyer_confirm_delete')}`)) return;
   state.footnotes.splice(idx, 1);
   await persistFootnotes();
   renderFootnotePicker();
-  flash(t('msg_deleted'), 'ok');
+  toast(t('msg_deleted'), 'ok');
 }
 // Empty the textarea and reset the preset picker so the dropdown selection
 // no longer claims to be showing content that the textarea has just dropped.
@@ -1845,17 +2179,20 @@ async function loadHistory() {
     console.warn('[erechnung] Failed to load history-enabled flag:', e?.message || e);
     state.historyEnabled = true;
   }
+  renderBuyerNamesMemory();
+  updateDuplicateLastVisibility();
+  if (typeof updateItemsFreshHint === 'function') updateItemsFreshHint();
 }
 
 async function persistHistory() {
   const ok = await store.set(HISTORY_KEY, JSON.stringify(state.history));
-  if (!ok) flash(t('msg_save_failed'), 'err');
+  if (!ok) toast(t('msg_save_failed'), 'err');
   return ok;
 }
 
 async function persistHistoryEnabled() {
   const ok = await store.set(HISTORY_ENABLED_KEY, String(state.historyEnabled));
-  if (!ok) flash(t('msg_save_failed'), 'err');
+  if (!ok) toast(t('msg_save_failed'), 'err');
   return ok;
 }
 
@@ -1891,13 +2228,13 @@ async function loadYoY() {
 
 async function persistYoYEnabled() {
   const ok = await store.set(YOY_ENABLED_KEY, String(state.yoyEnabled));
-  if (!ok) flash(t('msg_save_failed'), 'err');
+  if (!ok) toast(t('msg_save_failed'), 'err');
   return ok;
 }
 
 async function persistYoYData() {
   const ok = await store.set(YOY_DATA_KEY, JSON.stringify(state.yoyData));
-  if (!ok) flash(t('msg_save_failed'), 'err');
+  if (!ok) toast(t('msg_save_failed'), 'err');
   return ok;
 }
 
@@ -1966,15 +2303,22 @@ function buildHistorySnapshot() {
 
 // Save a generated invoice to history (no-op when disabled).
 // Hard cap of HISTORY_LIMIT entries — oldest is dropped when full.
-async function recordHistoryEntry() {
+// `mode` records the trigger: 'exported' (PDF generated here, default),
+// 'final' (XML embedded into an existing PDF). Past-invoice manual entries
+// set status separately via buildPastInvoiceSnapshot.
+async function recordHistoryEntry(mode = 'exported') {
   if (!state.historyEnabled) return;
   const snap = buildHistorySnapshot();
+  snap.status = mode;
   state.history.unshift(snap);
   if (state.history.length > HISTORY_LIMIT) {
     state.history.length = HISTORY_LIMIT;
   }
   await persistHistory();
   renderHistoryPicker();
+  renderBuyerNamesMemory();
+  updateDuplicateLastVisibility();
+  if (typeof updateItemsFreshHint === 'function') updateItemsFreshHint();
 }
 
 // Currency code → display symbol. Used by history picker and statistics.
@@ -1985,51 +2329,148 @@ function currencySymbol(code) {
   return CURRENCY_SYMBOLS[code] || code || '';
 }
 
-// Render the picker. Each option label combines number, date, buyer, total
-// for at-a-glance scanning. Empty state shows the localized "empty" hint.
+// History modal filter state. Survives modal close; reset only on backup
+// import or explicit user click on the "Reset filters" empty-state CTA.
+const historyFilter = { search: '', period: 'all' };
+
+function resetHistoryFilter() {
+  historyFilter.search = '';
+  historyFilter.period = 'all';
+  const s = document.getElementById('historySearch');
+  const p = document.getElementById('historyPeriod');
+  if (s) s.value = '';
+  if (p) p.value = 'all';
+  renderHistoryPicker();
+}
+
+// Derive a snapshot's status from the new `status` field, falling back to
+// the legacy `imported` flag for backwards compatibility. Current values:
+// 'draft' | 'exported'. Schema reserves room for future stages (e.g. 'paid').
+function getSnapshotStatus(snap) {
+  if (snap.status === 'draft' || snap.status === 'exported') return snap.status;
+  return snap.imported ? 'draft' : 'exported';
+}
+
+// Pre-render formatted total + date strings once per snapshot so the search
+// can match against the same text the user sees in the option label.
+function snapshotSearchHaystack(s) {
+  const parts = [
+    s.number || '',
+    s.date || '',
+    s.buyerName || '',
+    `${fmt(s.total)} ${currencySymbol(s.currency)}`,
+    s.form?.project || '',
+    s.form?.category || '',
+  ];
+  return parts.join(' ').toLowerCase();
+}
+
+// Apply period + text filter. Returns array of {snap, idx} keeping the
+// original index so clone/delete still operate on state.history[idx].
+function getFilteredHistory() {
+  const period = historyFilter.period || 'all';
+  const tokens = (historyFilter.search || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const indexed = state.history.map((snap, idx) => ({ snap, idx }));
+  let out = indexed;
+  if (period !== 'all') {
+    const allowed = new Set(filterByPeriod(state.history, period));
+    out = out.filter(({ snap }) => allowed.has(snap));
+  }
+  if (tokens.length) {
+    out = out.filter(({ snap }) => {
+      const hay = snapshotSearchHaystack(snap);
+      return tokens.every(tok => hay.includes(tok));
+    });
+  }
+  return out;
+}
+
+// Render the history list. Each row shows number/date/buyer/total plus
+// per-row Clone + Delete actions. Reuses the inline-confirm pattern
+// (armRemoveConfirm) for the delete button.
 function renderHistoryPicker() {
-  const picker = $('historyPicker');
-  if (!picker) return;
-  const placeholder = t('option_history_select');
-  const empty = t('history_empty');
+  const list = $('historyList');
+  if (!list) return;
+  // A previously-armed delete confirm refers to a button we're about to
+  // destroy — clear the singleton before re-rendering.
+  resetRemoveConfirm();
+  list.innerHTML = '';
   if (state.history.length === 0) {
-    picker.innerHTML = `<option value="" disabled selected>${esc(empty)}</option>`;
-    picker.disabled = true;
+    list.innerHTML = `<li class="history-row-empty">
+      <div class="empty-state">
+        <h3>${esc(t('empty_history_title'))}</h3>
+        <p>${esc(t('empty_history_body'))}</p>
+        <button type="button" class="primary" id="emptyHistoryCta">${esc(t('empty_history_cta'))}</button>
+      </div>
+    </li>`;
+    document.getElementById('emptyHistoryCta')?.addEventListener('click', closeHistoryModal);
     return;
   }
-  picker.disabled = false;
+  const filtered = getFilteredHistory();
+  if (filtered.length === 0) {
+    list.innerHTML = `<li class="history-row-empty">
+      <div class="empty-state">
+        <h3>${esc(t('empty_filter_title'))}</h3>
+        <p>${esc(t('empty_filter_body'))}</p>
+        <button type="button" class="tiny-btn" id="emptyFilterCta">${esc(t('empty_filter_cta'))}</button>
+      </div>
+    </li>`;
+    document.getElementById('emptyFilterCta')?.addEventListener('click', resetHistoryFilter);
+    return;
+  }
   const formatTotal = (n, currency) => `${fmt(n)} ${currencySymbol(currency)}`.trim();
   const formatDate = (iso) => {
     if (!iso) return '';
-    // Display format follows UI lang for readability in the picker
     try { return parseInvoiceDate(iso).toLocaleDateString(CURRENT_LANG); } catch { return iso; }
   };
-  const opts = [`<option value="" disabled selected>${esc(placeholder)}</option>`];
-  for (let i = 0; i < state.history.length; i++) {
-    const e = state.history[i];
-    const parts = [
-      e.number || '—',
-      formatDate(e.date),
-      e.buyerName || '—',
-      formatTotal(e.total, e.currency),
-    ];
-    if (e.imported) parts.push(`(${t('history_imported_marker')})`);
-    opts.push(`<option value="${i}">${esc(parts.join(' · '))}</option>`);
+  for (const { snap: e, idx: i } of filtered) {
+    const li = document.createElement('li');
+    li.className = 'history-row';
+    li.dataset.idx = String(i);
+    const status = getSnapshotStatus(e);
+    const statusLabel = t('history_status_' + status);
+    li.innerHTML = `
+      <div class="history-row-info">
+        <span class="num">${esc(e.number || '—')}</span>
+        <span class="date">${esc(formatDate(e.date))}</span>
+        <span class="buyer">${esc(e.buyerName || '—')}</span>
+        <span class="total">${esc(formatTotal(e.total, e.currency))}</span>
+        <span class="status-pill ${status}">${esc(statusLabel)}</span>
+      </div>
+      <div class="history-row-actions">
+        <button class="tiny-btn history-clone-btn" type="button" data-idx="${i}">${esc(t('btn_history_clone'))}</button>
+        <button class="remove history-delete-btn" type="button" data-idx="${i}" aria-label="${esc(t('aria_remove_item'))}">×</button>
+      </div>
+    `;
+    list.appendChild(li);
   }
-  picker.innerHTML = opts.join('');
+  // Per-row clone handler
+  list.querySelectorAll('.history-clone-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.dataset.idx);
+      cloneFromHistory(idx);
+    });
+  });
+  // Per-row delete handler — reuses inline-confirm pattern.
+  list.querySelectorAll('.history-delete-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (btn.classList.contains('confirming')) {
+        resetRemoveConfirm();
+        const idx = Number(btn.dataset.idx);
+        await deleteHistoryEntry(idx);
+      } else {
+        armRemoveConfirm(btn);
+        btn.focus();
+      }
+    });
+  });
 }
 
-// Clone a history entry back into the form. All fields from the snapshot are
-// applied, including the buyer (overwrites whatever is currently there).
+// Apply a history snapshot back into the form. All fields from the snapshot
+// are applied, including the buyer (overwrites whatever is currently there).
 // Date fields stay empty so the user fills them explicitly. Invoice number
 // is auto-assigned via applyNextInvoiceNumber.
-async function cloneFromHistory() {
-  const picker = $('historyPicker');
-  const idx = picker.value;
-  if (idx === '' || !state.history[idx]) {
-    flash(t('msg_history_no_select'), 'err'); return;
-  }
-  const snap = state.history[idx];
+async function applyHistorySnapshot(snap) {
   const f = snap.form || {};
 
   // Buyer — full overwrite
@@ -2073,27 +2514,50 @@ async function cloneFromHistory() {
   // Auto-assign the next invoice number
   await applyNextInvoiceNumber();
 
-  // Reset picker so user sees the placeholder again
-  picker.value = '';
-
   calcTotals();
   updateFilenamePreview();
   updateBuyerHistoryHint();
-  // Auto-close the history modal so the user is back at the form, ready to edit.
-  closeHistoryModal();
-  flash(snap.imported ? t('msg_history_clone_partial') : t('msg_history_cloned'), 'ok');
 }
 
-async function deleteHistoryEntry() {
-  const picker = $('historyPicker');
-  const idx = picker.value;
-  if (idx === '' || !state.history[idx]) {
-    flash(t('msg_history_no_select'), 'err'); return;
+async function cloneFromHistory(idx) {
+  if (idx === undefined || !state.history[idx]) {
+    toast(t('msg_history_no_select'), 'err'); return;
+  }
+  const snap = state.history[idx];
+  await applyHistorySnapshot(snap);
+  // Auto-close the history modal so the user is back at the form, ready to edit.
+  closeHistoryModal();
+  toast(snap.imported ? t('msg_history_clone_partial') : t('msg_history_cloned'), 'ok');
+}
+
+// One-click duplicate of the most recent history entry. No modal involvement.
+async function duplicateLastInvoice() {
+  if (state.history.length === 0) {
+    toast(t('msg_duplicate_no_history'), 'err');
+    return;
+  }
+  await applyHistorySnapshot(state.history[0]);
+  toast(t('msg_duplicated_last'), 'ok');
+}
+
+// Hide the top-bar duplicate button when there's nothing to duplicate.
+function updateDuplicateLastVisibility() {
+  const btn = document.getElementById('duplicateLast');
+  if (!btn) return;
+  btn.hidden = state.history.length === 0;
+}
+
+async function deleteHistoryEntry(idx) {
+  if (idx === undefined || !state.history[idx]) {
+    toast(t('msg_history_no_select'), 'err'); return;
   }
   state.history.splice(idx, 1);
   await persistHistory();
   renderHistoryPicker();
-  flash(t('msg_history_deleted'), 'ok');
+  renderBuyerNamesMemory();
+  updateDuplicateLastVisibility();
+  if (typeof updateItemsFreshHint === 'function') updateItemsFreshHint();
+  toast(t('msg_history_deleted'), 'ok');
 }
 
 async function clearAllHistory() {
@@ -2103,7 +2567,10 @@ async function clearAllHistory() {
   state.history = [];
   await persistHistory();
   renderHistoryPicker();
-  flash(t('msg_history_cleared'), 'ok');
+  renderBuyerNamesMemory();
+  updateDuplicateLastVisibility();
+  if (typeof updateItemsFreshHint === 'function') updateItemsFreshHint();
+  toast(t('msg_history_cleared'), 'ok');
 }
 
 // -------- Past invoice entry (manual) --------
@@ -2180,9 +2647,9 @@ async function savePastInvoice() {
   const project = $('past_project').value.trim();
   const category = $('past_category').value.trim();
 
-  if (!date)         { flash(t('past_err_no_date'), 'err'); return; }
-  if (!buyerName)    { flash(t('past_err_no_buyer'), 'err'); return; }
-  if (!Number.isFinite(total) || total <= 0) { flash(t('past_err_no_total'), 'err'); return; }
+  if (!date)         { toast(t('past_err_no_date'), 'err'); return; }
+  if (!buyerName)    { toast(t('past_err_no_buyer'), 'err'); return; }
+  if (!Number.isFinite(total) || total <= 0) { toast(t('past_err_no_total'), 'err'); return; }
 
   // Build a minimal-but-valid snapshot. To make statistics' net/tax math
   // work, we synthesize a single line item that sums to the gross total.
@@ -2204,6 +2671,7 @@ async function savePastInvoice() {
     v: 1,
     ts: Date.now(),
     imported: true,             // flag for UI marker + partial-clone warning
+    status: 'draft',
     number: number || '',
     date,
     total: round2(total),
@@ -2237,8 +2705,11 @@ async function savePastInvoice() {
   if (state.history.length > HISTORY_LIMIT) state.history.length = HISTORY_LIMIT;
   await persistHistory();
   renderHistoryPicker();
+  renderBuyerNamesMemory();
+  updateDuplicateLastVisibility();
+  if (typeof updateItemsFreshHint === 'function') updateItemsFreshHint();
   closePastInvoiceModal();
-  flash(t('msg_history_added'), 'ok');
+  toast(t('msg_history_added'), 'ok');
 }
 
 // -------- Statistics --------
@@ -3222,23 +3693,23 @@ function closeYoYBackfillModal() {
 async function saveYoYBackfill() {
   const cur = $('yoyBackfillCurrency').value.trim().toUpperCase() || 'EUR';
   const yr = Number($('yoyBackfillYear').value);
-  if (!yr || yr < 1900 || yr > 2200) { flash(t('msg_yoy_invalid_year'), 'err'); return; }
+  if (!yr || yr < 1900 || yr > 2200) { toast(t('msg_yoy_invalid_year'), 'err'); return; }
   const values = [];
   let anyNonZero = false;
   for (let i = 0; i < 12; i++) {
     const inp = $(`yoyMonth_${i}`);
     const v = parseMoneyInput(inp && inp.value);
-    if (v < 0) { flash(t('msg_yoy_invalid_value'), 'err'); return; }
+    if (v < 0) { toast(t('msg_yoy_invalid_value'), 'err'); return; }
     values.push(v);
     if (v > 0) anyNonZero = true;
   }
   if (!anyNonZero) {
     // Saving all zeros = clear this year/currency combo
     await saveYoYYear(cur, yr, null);
-    flash(t('msg_yoy_cleared'), 'ok');
+    toast(t('msg_yoy_cleared'), 'ok');
   } else {
     await saveYoYYear(cur, yr, values);
-    flash(t('msg_yoy_saved'), 'ok');
+    toast(t('msg_yoy_saved'), 'ok');
   }
   closeYoYBackfillModal();
   renderStatistics();
@@ -3294,7 +3765,7 @@ function csvNum(n) {
 function exportOverviewCSV() {
   const period = $('statsPeriod').value;
   const filtered = filterByPeriod(state.history, period);
-  if (filtered.length === 0) { flash(t('msg_csv_no_data'), 'err'); return; }
+  if (filtered.length === 0) { toast(t('msg_csv_no_data'), 'err'); return; }
   // Newest first
   const sorted = filtered.slice().sort((a, b) => {
     const ta = a.date ? parseInvoiceDate(a.date).getTime() : a.ts;
@@ -3323,7 +3794,7 @@ function exportOverviewCSV() {
   const periodLabel = period.replace(/[^a-z0-9]/gi, '_');
   downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }),
     `erechnung-stats-${periodLabel}-${ts}.csv`);
-  flash(t('msg_csv_exported'), 'ok');
+  toast(t('msg_csv_exported'), 'ok');
 }
 
 // Export the quarterly tax breakdown for the selected year.
@@ -3333,7 +3804,7 @@ function exportQuartersCSV() {
     const d = parseInvoiceDate(s.date);
     return !Number.isNaN(d.getTime()) && d.getFullYear() === statsYear;
   });
-  if (inYear.length === 0) { flash(t('msg_csv_no_data'), 'err'); return; }
+  if (inYear.length === 0) { toast(t('msg_csv_no_data'), 'err'); return; }
   const groups = groupByCurrency(inYear);
   const headers = ['Currency', 'Quarter',
     'Standard Net', 'Standard VAT',
@@ -3358,16 +3829,16 @@ function exportQuartersCSV() {
   const csv = buildCSV(headers, rows);
   downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }),
     `erechnung-quarters-${statsYear}.csv`);
-  flash(t('msg_csv_exported'), 'ok');
+  toast(t('msg_csv_exported'), 'ok');
 }
 
 // Export the buyer drill-down: all invoices for the currently-drilled buyer.
 function exportBuyerCSV() {
-  if (!statsBuyerDrillDown) { flash(t('msg_csv_no_data'), 'err'); return; }
+  if (!statsBuyerDrillDown) { toast(t('msg_csv_no_data'), 'err'); return; }
   const target = statsBuyerDrillDown.toLowerCase().trim();
   const matched = state.history.filter(s =>
     (s.buyerName || '').toLowerCase().trim() === target);
-  if (matched.length === 0) { flash(t('msg_csv_no_data'), 'err'); return; }
+  if (matched.length === 0) { toast(t('msg_csv_no_data'), 'err'); return; }
   const sorted = matched.slice().sort((a, b) => {
     const ta = a.date ? parseInvoiceDate(a.date).getTime() : a.ts;
     const tb = b.date ? parseInvoiceDate(b.date).getTime() : b.ts;
@@ -3394,12 +3865,12 @@ function exportBuyerCSV() {
   const slug = statsBuyerDrillDown.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
   downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }),
     `erechnung-buyer-${slug || 'export'}.csv`);
-  flash(t('msg_csv_exported'), 'ok');
+  toast(t('msg_csv_exported'), 'ok');
 }
 
 // Dispatcher: exports based on the active stats view.
 function exportStatsCSV() {
-  if (state.history.length === 0) { flash(t('msg_csv_no_data'), 'err'); return; }
+  if (state.history.length === 0) { toast(t('msg_csv_no_data'), 'err'); return; }
   if (statsView === 'quarters') {
     exportQuartersCSV();
   } else if (statsBuyerDrillDown) {
@@ -3439,6 +3910,47 @@ function addItem(data = {}) {
   };
   state.items.push(item);
   renderItems();
+}
+
+// Insert a new line item directly after the given index. Returns the new
+// item's id so callers can focus its first input after the re-render.
+function addItemAfter(idx, data = {}) {
+  const item = {
+    id: crypto.randomUUID(),
+    desc: data.desc || '',
+    qty: data.qty ?? 1,
+    unit: data.unit || 'C62',
+    price: data.price ?? 0,
+    vat: data.vat ?? 20,
+  };
+  state.items.splice(idx + 1, 0, item);
+  renderItems();
+  return item.id;
+}
+
+// Inline-delete-confirmation state. At most one row is ever in the
+// confirming state; tracked here so Escape and outside-click can clear it.
+const REMOVE_CONFIRM_TIMEOUT_MS = 3000;
+let _removeConfirmBtn = null;
+let _removeConfirmTimer = null;
+function resetRemoveConfirm() {
+  if (_removeConfirmTimer) { clearTimeout(_removeConfirmTimer); _removeConfirmTimer = null; }
+  const btn = _removeConfirmBtn;
+  _removeConfirmBtn = null;
+  if (btn && btn.isConnected) {
+    btn.classList.remove('confirming');
+    btn.textContent = '×';
+    btn.setAttribute('aria-label', t('aria_remove_item'));
+  }
+}
+function armRemoveConfirm(btn) {
+  if (_removeConfirmBtn && _removeConfirmBtn !== btn) resetRemoveConfirm();
+  _removeConfirmBtn = btn;
+  btn.classList.add('confirming');
+  btn.textContent = t('item_remove_confirm_text');
+  btn.setAttribute('aria-label', t('aria_remove_confirm'));
+  if (_removeConfirmTimer) clearTimeout(_removeConfirmTimer);
+  _removeConfirmTimer = setTimeout(resetRemoveConfirm, REMOVE_CONFIRM_TIMEOUT_MS);
 }
 
 function renderItems() {
@@ -3484,6 +3996,7 @@ function renderItems() {
           it[k] = el.value;
         }
         calcTotals();
+        updateItemsFreshHint();
       });
       // On commit (blur / Enter), force a final value so an intentionally
       // cleared field becomes 0 instead of carrying the previous number.
@@ -3494,13 +4007,49 @@ function renderItems() {
         it[k] = Number.isFinite(n) ? n : 0;
         calcTotals();
       });
+      // Enter on the last field of a row (vat) inserts a new row right after
+      // and jumps focus to its description input.
+      el.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Enter' || el.dataset.k !== 'vat') return;
+        ev.preventDefault();
+        const idx = state.items.findIndex(x => x.id === it.id);
+        if (idx < 0) return;
+        const newId = addItemAfter(idx);
+        const newRow = $('items').querySelector(`.row[data-id="${newId}"]`);
+        const target = newRow && newRow.querySelector('input[data-k="desc"]');
+        if (target) target.focus();
+      });
     });
-    row.querySelector('[data-remove]').addEventListener('click', () => {
-      state.items = state.items.filter(x => x.id !== it.id);
-      renderItems();
+    const removeBtn = row.querySelector('[data-remove]');
+    removeBtn.addEventListener('click', () => {
+      if (removeBtn.classList.contains('confirming')) {
+        resetRemoveConfirm();
+        state.items = state.items.filter(x => x.id !== it.id);
+        renderItems();
+      } else {
+        armRemoveConfirm(removeBtn);
+        // Force focus to the button so Esc reaches our reset logic and not
+        // the previously-focused input (macOS Safari/Firefox don't auto-focus
+        // buttons on mouse-click, which otherwise causes a date/number input
+        // to receive native Esc behavior and blur).
+        removeBtn.focus();
+      }
     });
   }
   calcTotals();
+  updateItemsFreshHint();
+}
+
+// Show the fresh-form hint only when the items area is in its pristine
+// default (one empty row) AND there is at least one history entry to
+// duplicate from. Hidden otherwise.
+function updateItemsFreshHint() {
+  const hint = document.getElementById('itemsFreshHint');
+  if (!hint) return;
+  const fresh = state.items.length === 1
+    && !(state.items[0].desc || '').trim()
+    && (Number(state.items[0].price) || 0) === 0;
+  hint.hidden = !(fresh && state.history.length > 0);
 }
 
 function calcTotals() {
@@ -3558,7 +4107,7 @@ fileInput.addEventListener('change', e => { if (e.target.files[0]) setFile(e.tar
 
 function setFile(f) {
   if (!f.name.toLowerCase().endsWith('.pdf') && f.type !== 'application/pdf') {
-    flash(t('msg_pdf_select_first'), 'err'); return;
+    toast(t('msg_pdf_select_first'), 'err'); return;
   }
   state.pdfFile = f;
   drop.classList.add('has-file');
@@ -3869,21 +4418,80 @@ function buildXML() {
   return xml;
 }
 
+// -------- Field tooltips --------
+// Single shared popover positioned next to whichever .tooltip-btn was clicked.
+// Closes on Esc, outside-click, or re-click of the same button.
+let _tipOwner = null;
+function showTooltip(btn) {
+  const pop = document.getElementById('tooltipPopover');
+  if (!pop) return;
+  const key = btn.getAttribute('data-tip-key');
+  pop.textContent = t(key);
+  pop.hidden = false;
+  // Position after layout so we have measured dimensions.
+  const rect = btn.getBoundingClientRect();
+  const popW = pop.offsetWidth;
+  const popH = pop.offsetHeight;
+  let left = rect.left;
+  let top = rect.bottom + 6;
+  // Clamp into viewport with a small margin.
+  const margin = 8;
+  if (left + popW > window.innerWidth - margin) left = window.innerWidth - popW - margin;
+  if (left < margin) left = margin;
+  if (top + popH > window.innerHeight - margin) top = rect.top - popH - 6;
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
+  btn.setAttribute('aria-expanded', 'true');
+  _tipOwner = btn;
+}
+function hideTooltip() {
+  const pop = document.getElementById('tooltipPopover');
+  if (pop) pop.hidden = true;
+  if (_tipOwner) _tipOwner.setAttribute('aria-expanded', 'false');
+  _tipOwner = null;
+}
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.tooltip-btn');
+  if (btn) {
+    // Don't let the surrounding <label> focus its associated input.
+    e.preventDefault();
+    e.stopPropagation();
+    if (_tipOwner === btn) { hideTooltip(); return; }
+    showTooltip(btn);
+    return;
+  }
+  // Click outside an active tooltip dismisses it.
+  if (_tipOwner && !e.target.closest('#tooltipPopover')) hideTooltip();
+});
+
 // -------- Actions --------
-let _flashTimer = null;
-function flash(msg, kind = '') {
-  const s = $('status');
-  s.className = 'status show ' + (kind || '');
-  s.textContent = msg;
-  if (_flashTimer) { clearTimeout(_flashTimer); _flashTimer = null; }
-  // Errors stay longer than successes so the user has time to read, but they
-  // do auto-hide — previously sticky errors were silently replaced by the next
-  // success flash, which was indistinguishable from no error having occurred.
-  const hideAfterMs = kind === 'err' ? 7000 : 3500;
-  _flashTimer = setTimeout(() => {
-    s.classList.remove('show');
-    _flashTimer = null;
-  }, hideAfterMs);
+
+// Toast — transient feedback in the top-right stack. Replaces the legacy
+// bottom-bar status. kind ∈ {'', 'ok', 'err'}; errors linger longer so
+// they're actually readable. Stack is capped at TOAST_MAX_VISIBLE; oldest
+// is evicted when full.
+const TOAST_MAX_VISIBLE = 4;
+const TOAST_DURATION = { ok: 2000, err: 5000, '': 2500 };
+function toast(msg, kind = '') {
+  const host = document.getElementById('toastHost');
+  if (!host) return;
+  // Evict oldest if at capacity (newest is prepended, so oldest is last child).
+  while (host.children.length >= TOAST_MAX_VISIBLE) {
+    host.lastElementChild?.remove();
+  }
+  const el = document.createElement('div');
+  el.className = 'toast' + (kind ? ' ' + kind : '');
+  el.setAttribute('role', kind === 'err' ? 'alert' : 'status');
+  el.textContent = msg;
+  host.prepend(el);
+  // Enter on next frame so the transition runs.
+  requestAnimationFrame(() => el.classList.add('toast--visible'));
+  const dismissAfter = TOAST_DURATION[kind] ?? TOAST_DURATION[''];
+  setTimeout(() => {
+    el.classList.add('toast--leaving');
+    el.classList.remove('toast--visible');
+    setTimeout(() => el.remove(), 220);
+  }, dismissAfter);
 }
 
 function downloadBlob(blob, filename) {
@@ -3899,9 +4507,9 @@ $('btnXML').addEventListener('click', () => {
     const xml = buildXML();
     const number = $('r_number').value.trim() || 'rechnung';
     downloadBlob(new Blob([xml], { type: 'application/xml' }), `${number}.xml`);
-    flash(t('msg_xml_done'), 'ok');
+    toast(t('msg_xml_done'), 'ok');
   } catch (e) {
-    flash(t('msg_error') + ' ' + e.message, 'err');
+    toast(t('msg_error') + ' ' + e.message, 'err');
   }
 });
 
@@ -3935,12 +4543,12 @@ $('btnValidate').addEventListener('click', () => {
       $('s_iban').value.trim() && !isValidIBAN($('s_iban').value) ? t('validate_invalid_iban') : null,
     ].filter(Boolean);
     if (checks.length === 0) {
-      flash(t('msg_xml_valid'), 'ok');
+      toast(t('msg_xml_valid'), 'ok');
     } else {
-      flash(t('msg_xml_warnings') + '\n• ' + checks.join('\n• '), 'err');
+      toast(t('msg_xml_warnings') + '\n• ' + checks.join('\n• '), 'err');
     }
   } catch (e) {
-    flash(t('msg_error') + ' ' + e.message, 'err');
+    toast(t('msg_error') + ' ' + e.message, 'err');
   }
 });
 
@@ -4317,10 +4925,10 @@ $('btnPDF').addEventListener('click', async () => {
     await recordInvoiceNumber($('r_number').value);
     // Save snapshot to history (no-op when disabled)
     await recordHistoryEntry();
-    flash(`${t('msg_pdf_done')} ${outName}\n${t('msg_pdf_done_2')}`, 'ok');
+    toast(`${t('msg_pdf_done')} ${outName}\n${t('msg_pdf_done_2')}`, 'ok');
   } catch (e) {
     console.error(e);
-    flash(t('msg_error') + ' ' + e.message, 'err');
+    toast(t('msg_error') + ' ' + e.message, 'err');
   } finally {
     btn.disabled = false;
     btn.textContent = t('btn_create_pdf');
@@ -4460,7 +5068,7 @@ async function exportData() {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const ts = new Date().toISOString().slice(0, 10);
   downloadBlob(blob, `erechnung-backup-${ts}.json`);
-  flash(`${t('msg_backup_export')} 1 ${t('msg_backup_seller')}, ${payload.buyers.length} ${t('msg_backup_buyers')}, ${payload.footnotes.length} ${t('msg_backup_footnotes')}.`, 'ok');
+  toast(`${t('msg_backup_export')} 1 ${t('msg_backup_seller')}, ${payload.buyers.length} ${t('msg_backup_buyers')}, ${payload.footnotes.length} ${t('msg_backup_footnotes')}.`, 'ok');
 }
 
 // Validate every section of a backup payload before it touches storage or
@@ -4581,6 +5189,8 @@ async function importData(file) {
       // Newer format: stammdaten only. Older format: merged seller+boilerplate.
       await store.set(STORAGE_KEY, JSON.stringify(payload.seller));
       applySellerStammdaten(payload.seller);
+      updateSetupCardVisibility();
+      updateNumberSetupCardVisibility();
     }
     // Per-language boilerplate (v2)
     if (payload.boilerplate && typeof payload.boilerplate === 'object') {
@@ -4640,6 +5250,9 @@ async function importData(file) {
     if (Array.isArray(payload.history)) {
       state.history = payload.history;
       await persistHistory();
+      renderBuyerNamesMemory();
+  updateDuplicateLastVisibility();
+  if (typeof updateItemsFreshHint === 'function') updateItemsFreshHint();
     }
     if (typeof payload.history_enabled === 'boolean') {
       state.historyEnabled = payload.history_enabled;
@@ -4674,12 +5287,12 @@ async function importData(file) {
         applyTheme(payload.theme);
       }
     }
-    flash(`${t('msg_backup_import_done')} ${sellerCount} ${t('msg_backup_seller')}, ${buyerCount} ${t('msg_backup_buyers')}, ${footnoteCount} ${t('msg_backup_footnotes')}.`, 'ok');
+    toast(`${t('msg_backup_import_done')} ${sellerCount} ${t('msg_backup_seller')}, ${buyerCount} ${t('msg_backup_buyers')}, ${footnoteCount} ${t('msg_backup_footnotes')}.`, 'ok');
     if (issues.length) {
       console.warn('[erechnung] Backup import: malformed sections were skipped or partially loaded:', issues);
     }
   } catch (e) {
-    flash(t('msg_backup_failed') + ' ' + e.message, 'err');
+    toast(t('msg_backup_failed') + ' ' + e.message, 'err');
   }
 }
 
@@ -4691,6 +5304,82 @@ async function importData(file) {
 function isSellerConfigured() {
   const s = collectSellerStammdaten();
   return Boolean(s.name && (s.line1 || s.city || s.country));
+}
+
+// Show the first-run setup card while the seller profile is still empty.
+// Hidden as soon as the user has minimal master data filled in.
+function updateSetupCardVisibility() {
+  const card = document.getElementById('setupCard');
+  if (!card) return;
+  card.hidden = isSellerConfigured();
+}
+
+// Show the number-scheme setup card only on a fresh slate: seller already
+// configured, but neither pattern nor counter has ever been touched. Once
+// either is set (here or later via the inline editor), the card is gone
+// for good.
+async function updateNumberSetupCardVisibility() {
+  const card = document.getElementById('numberSetupCard');
+  if (!card) return;
+  if (!isSellerConfigured()) { card.hidden = true; return; }
+  const hasPattern = await store.get(NUMBER_PATTERN_KEY);
+  const hasCounter = await store.get(COUNTER_KEY);
+  card.hidden = Boolean(hasPattern || hasCounter);
+}
+
+// Render the live "next number" preview inside the number-setup card.
+function updateNumberSetupPreview() {
+  const patternEl = document.getElementById('numberSetupPattern');
+  const startEl = document.getElementById('numberSetupStart');
+  const previewEl = document.getElementById('numberSetupPreview');
+  if (!patternEl || !startEl || !previewEl) return;
+  const pattern = (patternEl.value || '').trim() || DEFAULT_NUMBER_PATTERN;
+  const start = Math.max(1, parseInt(startEl.value, 10) || 1);
+  previewEl.textContent = resolveNumberPattern(pattern, start);
+}
+
+// Load a realistic demo dataset into the current form (DE → FR reverse charge).
+// Nothing is persisted: seller stays unsaved unless the user clicks Save,
+// no history snapshot is recorded. Used by the setup-card "demo" CTA.
+function loadDemoData() {
+  applySellerStammdaten({
+    name: 'Demo Beratung GmbH',
+    line1: 'Musterstraße 12',
+    zip: '10115',
+    city: 'Berlin',
+    country: 'DE',
+    vat: 'DE123456789',
+    siret: '',
+    email: 'kontakt@demo-beratung.example',
+    phone: '+49 30 1234567',
+    // Placeholder IBAN: all-zero body with mod-97 checksum (36) so it
+    // validates structurally but cannot map to any real account.
+    iban: 'DE36000000000000000000',
+    bic: 'EXMPDEFFXXX',
+    bank: 'Beispielbank',
+  });
+  applyBuyer({
+    name: 'Société Démo SARL',
+    line1: '10 rue de la Paix',
+    zip: '75001',
+    city: 'Paris',
+    country: 'FR',
+    vat: 'FR12345678901',
+    siret: '',
+    reference: '',
+  });
+  state.items = [
+    { id: crypto.randomUUID(), desc: 'Beratungsleistung Mai 2026', qty: 5, unit: 'C62', price: 800, vat: 0 },
+    { id: crypto.randomUUID(), desc: 'Reisekostenpauschale',        qty: 1, unit: 'C62', price: 120, vat: 0 },
+  ];
+  renderItems();
+  $('r_currency').value = 'EUR';
+  $('r_taxmode').value = 'AE';
+  calcTotals();
+  updateFilenamePreview();
+  updateBuyerHistoryHint();
+  updateSetupCardVisibility();
+  toast(t('msg_demo_loaded'), 'ok');
 }
 
 // Build a compact summary line for the collapsed seller header.
@@ -5016,7 +5705,7 @@ function closeEmbedModal() {
 // embeds the current invoice's XML into it.
 async function runEmbedXML() {
   if (!state.pdfFile) {
-    flash(t('msg_pdf_select_first'), 'err');
+    toast(t('msg_pdf_select_first'), 'err');
     return;
   }
   const btn = $('btnEmbedRun');
@@ -5037,10 +5726,10 @@ async function runEmbedXML() {
 
     await recordHistoryEntry();
     closeEmbedModal();
-    flash(t('msg_embed_done'), 'ok');
+    toast(t('msg_embed_done'), 'ok');
   } catch (e) {
     console.error(e);
-    flash(t('msg_embed_failed') + ' ' + e.message, 'err');
+    toast(t('msg_embed_failed') + ' ' + e.message, 'err');
   } finally {
     btn.disabled = false;
     btn.textContent = t('btn_embed_run');
@@ -5050,12 +5739,57 @@ async function runEmbedXML() {
 
 // -------- Init --------
 document.getElementById('addItem').addEventListener('click', () => addItem());
+document.getElementById('itemsFreshHintCta').addEventListener('click', duplicateLastInvoice);
 document.getElementById('saveSeller').addEventListener('click', saveSeller);
 $('clearSeller').addEventListener('click', clearSeller);
 $('sellerToggle').addEventListener('click', () => setSellerCollapsed(!sellerCollapsed));
 
+// Setup card CTA — jump to seller section, ensure expanded, focus name field.
+$('setupCardCta').addEventListener('click', async () => {
+  if (sellerCollapsed) await setSellerCollapsed(false);
+  const section = $('sellerSection');
+  if (section && section.scrollIntoView) {
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  $('s_name').focus({ preventScroll: true });
+});
+$('setupCardDemo').addEventListener('click', loadDemoData);
+
+// Number setup card: live preview + Apply/Default actions.
+$('numberSetupPattern').addEventListener('input', updateNumberSetupPreview);
+$('numberSetupStart').addEventListener('input', updateNumberSetupPreview);
+$('numberSetupCta').addEventListener('click', async () => {
+  const pattern = ($('numberSetupPattern').value || '').trim() || DEFAULT_NUMBER_PATTERN;
+  const start = parseInt($('numberSetupStart').value, 10);
+  if (!Number.isFinite(start) || start < 1) {
+    toast(t('msg_number_setup_start_invalid'), 'err');
+    return;
+  }
+  await store.set(NUMBER_PATTERN_KEY, pattern);
+  // Counter is stored as "last used". Next number = counter + 1, so to make
+  // the very next invoice equal `start`, persist start - 1.
+  await setCounterValue(start - 1);
+  // Keep the inline pattern editor in sync if it's already rendered.
+  const inlinePattern = document.getElementById('r_number_pattern');
+  if (inlinePattern) inlinePattern.value = pattern;
+  await applyNextInvoiceNumber();
+  updateSuggestNumberChipPreview && updateSuggestNumberChipPreview();
+  await updateNumberSetupCardVisibility();
+  toast(t('msg_number_setup_done'), 'ok');
+});
+$('numberSetupDefault').addEventListener('click', async () => {
+  await store.set(NUMBER_PATTERN_KEY, DEFAULT_NUMBER_PATTERN);
+  const inlinePattern = document.getElementById('r_number_pattern');
+  if (inlinePattern) inlinePattern.value = DEFAULT_NUMBER_PATTERN;
+  await applyNextInvoiceNumber();
+  updateSuggestNumberChipPreview && updateSuggestNumberChipPreview();
+  await updateNumberSetupCardVisibility();
+  toast(t('msg_number_setup_done'), 'ok');
+});
+
 // Top-bar modal openers
 $('openHistory').addEventListener('click', openHistoryModal);
+$('duplicateLast').addEventListener('click', duplicateLastInvoice);
 $('openHelp').addEventListener('click', openHelpModal);
 $('historyClose').addEventListener('click', closeHistoryModal);
 $('historyModal').addEventListener('click', (e) => {
@@ -5089,13 +5823,32 @@ $('buyerPicker').addEventListener('change', (e) => {
 });
 $('saveBuyer').addEventListener('click', saveBuyer);
 $('deleteBuyer').addEventListener('click', deleteBuyer);
-// Update history hint as the user types in the name field
-$('b_name').addEventListener('input', updateBuyerHistoryHint);
+// Update history hint as the user types in the name field. If the typed
+// (or datalist-picked) value matches a past buyer exactly and the rest of
+// the address block is still empty, autofill the remaining fields from the
+// most recent matching history snapshot. Never overwrites existing input.
+$('b_name').addEventListener('input', () => {
+  const name = $('b_name').value.trim();
+  if (name && buyerAddressEmpty()) {
+    const past = findHistoryBuyerByName(name);
+    if (past) {
+      applyBuyer({ ...past, name });
+      updateFilenamePreview();
+    }
+  }
+  updateBuyerHistoryHint();
+});
 
 // History picker events
-$('historyClone').addEventListener('click', cloneFromHistory);
-$('historyDelete').addEventListener('click', deleteHistoryEntry);
 $('historyClearAll').addEventListener('click', clearAllHistory);
+$('historySearch').addEventListener('input', (e) => {
+  historyFilter.search = e.target.value;
+  renderHistoryPicker();
+});
+$('historyPeriod').addEventListener('change', (e) => {
+  historyFilter.period = e.target.value;
+  renderHistoryPicker();
+});
 $('historyEnable').addEventListener('change', async (e) => {
   state.historyEnabled = e.target.checked;
   await persistHistoryEnabled();
@@ -5154,6 +5907,8 @@ $('statsModal').addEventListener('click', (e) => {
 });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
+  // Tooltips are the lightest layer — close first if open.
+  if (_tipOwner) { hideTooltip(); return; }
   // Order: deepest/topmost modals first
   const ym = $('yoyBackfillModal');
   const pm = $('pastInvoiceModal');
@@ -5169,7 +5924,10 @@ document.addEventListener('keydown', (e) => {
   if (sm && sm.classList.contains('open')) {
     if (statsBuyerDrillDown) { setStatsBuyerDrillDown(null); return; }
     closeStatsModal();
+    return;
   }
+  // No modal open — Esc clears any pending inline-delete confirmation.
+  if (_removeConfirmBtn) resetRemoveConfirm();
 });
 
 $('r_delivery_end').addEventListener('change', () => {
@@ -5229,7 +5987,7 @@ $('saveNumberPattern').addEventListener('click', async () => {
   // Chip-Vorschau und Dateinamen-Vorschau auch aktualisieren
   updateSuggestNumberChipPreview();
   updateFilenamePreview();
-  flash(`${t('msg_pattern_saved')} ${pattern}`, 'ok');
+  toast(`${t('msg_pattern_saved')} ${pattern}`, 'ok');
 });
 async function updateSuggestNumberChipPreview() {
   const pattern = ($('r_number_pattern').value || '').trim() || DEFAULT_NUMBER_PATTERN;
@@ -5246,11 +6004,22 @@ $('r_number_pattern').addEventListener('input', updateSuggestNumberChipPreview);
   $('r_number_pattern').value = await getNumberPattern();
 })();
 
-// Footnote preset events
+// Footnote preset events. When the picked preset reads like a Reverse-Charge
+// note, automatically prepend the precise legal sentence (in the active
+// invoice language) above it — unless the text already contains the
+// canonical "Art. 196" reference.
+const RC_HEURISTIC = /reverse\s*charge|autoliquidation|steuerschuldnerschaft/i;
+const RC_LEGAL_PRESENT = /art\.\s*196/i;
 $('footnotePicker').addEventListener('change', (e) => {
   const idx = e.target.value;
-  if (idx !== '' && state.footnotes[idx]) {
-    $('r_footnote').value = state.footnotes[idx].text;
+  if (idx === '' || !state.footnotes[idx]) return;
+  let text = state.footnotes[idx].text;
+  if (RC_HEURISTIC.test(text) && !RC_LEGAL_PRESENT.test(text)) {
+    text = tInvoice('rc_legal_text') + '\n\n' + text;
+    $('r_footnote').value = text;
+    toast(t('msg_rc_legal_added'), 'ok');
+  } else {
+    $('r_footnote').value = text;
   }
 });
 $('saveFootnote').addEventListener('click', saveFootnote);
@@ -5388,9 +6157,17 @@ async function init() {
 
   // 7. Apply seller-collapse UI based on whether stammdaten exist.
   applySellerCollapsedUI();
+
+  // 8. Wire up inline-validation listeners and run once over current state.
+  setupInlineValidation();
+  refreshInlineValidation();
+
+  // 9. First-run number-scheme card. Visibility depends on seller + storage.
+  updateNumberSetupPreview();
+  await updateNumberSetupCardVisibility();
 }
 
 init().catch(err => {
   console.error('Init failed:', err);
-  flash(t('msg_error') + ' ' + (err && err.message ? err.message : err), 'err');
+  toast(t('msg_error') + ' ' + (err && err.message ? err.message : err), 'err');
 });

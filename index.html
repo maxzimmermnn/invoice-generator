@@ -33,6 +33,12 @@
     <div class="sub" data-i18n="subtitle">ZUGFeRD 2.3 · Factur-X · EN 16931 (Comfort)</div>
   </div>
   <div class="top-controls">
+    <button id="duplicateLast" class="tiny-btn top-icon-btn" type="button" hidden data-i18n-title="btn_duplicate_last" aria-label="Duplicate last invoice">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="4" y="4" width="8" height="9" rx="1"/>
+        <path d="M2 10 L2 2 L9 2"/>
+      </svg>
+    </button>
     <button id="openHistory" class="tiny-btn top-icon-btn" type="button" data-i18n-title="btn_open_history" aria-label="History">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M2.5 4.5 A 5 5 0 1 1 1.8 8.3"/>
@@ -58,6 +64,42 @@
     </button>
   </div>
 </header>
+
+<!-- First-run setup card. Shown when the seller profile is empty;
+     hidden as soon as the user has saved their master data. -->
+<section class="setup-card" id="setupCard" hidden>
+  <h2 data-i18n="setup_card_title"></h2>
+  <p data-i18n="setup_card_intro"></p>
+  <div class="setup-card-actions">
+    <button type="button" class="primary" id="setupCardCta" data-i18n="setup_card_cta"></button>
+    <button type="button" class="link-btn" id="setupCardDemo" data-i18n="setup_card_demo_cta"></button>
+  </div>
+</section>
+
+<!-- Second first-run card: invoice-number scheme. Shown after the seller
+     is configured if no pattern has been set yet. -->
+<section class="setup-card" id="numberSetupCard" hidden>
+  <h2 data-i18n="number_setup_title"></h2>
+  <p data-i18n="number_setup_intro"></p>
+  <div class="number-setup-grid">
+    <label>
+      <span data-i18n="number_setup_pattern_label"></span>
+      <input type="text" id="numberSetupPattern" value="{yyyy}-{counter:5}" autocomplete="off">
+    </label>
+    <label>
+      <span data-i18n="number_setup_start_label"></span>
+      <input type="number" id="numberSetupStart" min="1" step="1" value="1">
+    </label>
+    <div class="number-setup-preview">
+      <span data-i18n="number_setup_preview_label"></span>:
+      <strong id="numberSetupPreview">2026-00001</strong>
+    </div>
+  </div>
+  <div class="setup-card-actions">
+    <button type="button" class="primary" id="numberSetupCta" data-i18n="number_setup_cta"></button>
+    <button type="button" class="link-btn" id="numberSetupDefault" data-i18n="number_setup_default"></button>
+  </div>
+</section>
 
 <!-- SELLER -->
 <section class="block sub" id="sellerSection">
@@ -102,7 +144,11 @@
     <label><span data-i18n="f_phone"></span>
       <input type="text" id="s_phone" autocomplete="off">
     </label>
-    <label class="half"><span data-i18n="f_iban"></span>
+    <label class="half">
+      <span class="label-with-tip">
+        <span data-i18n="f_iban"></span>
+        <button type="button" class="tooltip-btn" data-tip-key="tip_iban" data-i18n-aria-label="aria_tooltip_open">?</button>
+      </span>
       <input type="text" id="s_iban" autocomplete="off">
     </label>
     <label class="half"><span data-i18n="f_bic"></span>
@@ -129,7 +175,8 @@
   <div class="hint buyer-history-hint" id="buyerHistoryHint"></div>
   <div class="grid">
     <label class="full"><span data-i18n="f_company"></span>
-      <input type="text" id="b_name">
+      <input type="text" id="b_name" list="buyerNamesMemory" autocomplete="off">
+      <datalist id="buyerNamesMemory"></datalist>
     </label>
     <label class="full"><span data-i18n="f_address"></span>
       <input type="text" id="b_line1">
@@ -196,7 +243,11 @@
         <button type="button" data-days="60">+60 <span data-i18n="chip_days"></span></button>
       </span>
     </label>
-    <label><span data-i18n="f_delivery"></span>
+    <label>
+      <span class="label-with-tip">
+        <span data-i18n="f_delivery"></span>
+        <button type="button" class="tooltip-btn" data-tip-key="tip_delivery" data-i18n-aria-label="aria_tooltip_open">?</button>
+      </span>
       <input type="date" id="r_delivery">
     </label>
     <label><span data-i18n="f_delivery_end"></span>
@@ -213,7 +264,11 @@
         <option value="CHF">CHF</option>
       </select>
     </label>
-    <label><span data-i18n="f_taxmode"></span>
+    <label>
+      <span class="label-with-tip">
+        <span data-i18n="f_taxmode"></span>
+        <button type="button" class="tooltip-btn" data-tip-key="tip_taxmode" data-i18n-aria-label="aria_tooltip_open">?</button>
+      </span>
       <select id="r_taxmode">
         <option value="AE" selected data-i18n="tax_AE"></option>
         <option value="S" data-i18n="tax_S"></option>
@@ -290,6 +345,10 @@
 <section class="block">
   <h2 data-i18n="section_items"></h2>
   <div class="hint" data-i18n="section_items_hint"></div>
+  <div class="items-fresh-hint" id="itemsFreshHint" hidden>
+    <span data-i18n="fresh_form_hint"></span>
+    <button type="button" class="link-btn" id="itemsFreshHintCta" data-i18n="fresh_form_cta"></button>
+  </div>
   <div class="items" id="items">
     <div class="row head">
       <div data-i18n="th_desc"></div>
@@ -330,6 +389,14 @@
   <div class="note-small filename-preview" id="filenamePreview"></div>
 </section>
 
+<details class="format-info">
+  <summary data-i18n="format_info_title"></summary>
+  <p data-i18n="format_info_body"></p>
+  <p>
+    <a href="https://fnfe-mpe.org/factur-x/factur-x_en/" target="_blank" rel="noopener noreferrer" data-i18n="format_info_link_label"></a>
+  </p>
+</details>
+
 <footer>
   <p class="footer-disclaimer" data-i18n="footer_disclaimer"></p>
   <p class="footer-backup">
@@ -347,7 +414,6 @@
      full viewport. Body has padding-bottom matching the bar's height. -->
 <div class="action-bar">
   <div class="action-bar-inner">
-    <div class="status" id="status"></div>
     <div class="actions">
       <button type="button" class="primary" id="btnPDF" data-i18n="btn_create_pdf"></button>
       <button type="button" class="secondary" id="btnXML" data-i18n="btn_xml_only"></button>
@@ -409,12 +475,20 @@
 
     <p class="modal-intro" data-i18n="section_history_hint"></p>
 
-    <div class="input-with-action">
-      <select id="historyPicker" aria-label="Past invoice">
-        <!-- Filled by renderHistoryPicker() -->
+    <div class="history-filter-row">
+      <input type="search" id="historySearch" data-i18n-placeholder="history_search_placeholder" autocomplete="off">
+      <select id="historyPeriod" aria-label="Period">
+        <option value="all" selected data-i18n="stats_period_all"></option>
+        <option value="ytd" data-i18n="stats_period_ytd"></option>
+        <option value="last12" data-i18n="stats_period_last12"></option>
+        <option value="last6" data-i18n="stats_period_last6"></option>
+        <option value="last3" data-i18n="stats_period_last3"></option>
+        <option value="last_month" data-i18n="stats_period_last_month"></option>
+        <option value="last_year" data-i18n="stats_period_last_year"></option>
       </select>
-      <button class="tiny-btn" id="historyClone" type="button" data-i18n="btn_history_clone"></button>
     </div>
+
+    <ul id="historyList" class="history-list" role="list"></ul>
 
     <div class="history-bottom-row">
       <label class="inline">
@@ -423,7 +497,6 @@
       </label>
       <div class="history-bottom-actions">
         <button class="tiny-btn" id="historyAddPast" type="button" data-i18n="btn_history_add_past"></button>
-        <button class="tiny-btn" id="historyDelete" type="button" data-i18n="btn_history_delete"></button>
         <button class="tiny-btn" id="historyClearAll" type="button" data-i18n="btn_history_clear_all"></button>
       </div>
     </div>
@@ -554,6 +627,13 @@
     </div>
   </div>
 </div>
+
+<!-- Toast host — transient feedback messages stack here, top-right. -->
+<div id="toastHost" class="toast-host" aria-live="polite" aria-atomic="false"></div>
+
+<!-- Shared tooltip popover — positioned dynamically next to the
+     triggering .tooltip-btn. Closes on Esc, outside click, or re-click. -->
+<div id="tooltipPopover" class="tooltip-popover" role="tooltip" hidden></div>
 
 <script type="module" src="/src/main.js"></script>
 </body>

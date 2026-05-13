@@ -31,24 +31,30 @@
   --paper-soft:   #f0f0f0;
   --ink:          #111;
   --ink-soft:     #4a4642;
-  --ink-faint:    #8a857e;
+  --ink-faint:    #6f6a64;
   --rule:         #d4d4d4;
   --accent:       #9b2a22;
   --ok:           #2f6b3c;
   --warn:         #b36b00;
+  --info:         #2c5aa0;
   --focus:        #9b2a22;
 
   /* Year-over-year arrow colors */
   --yoy-up:       #2e8540;
   --yoy-down:     #c0392b;
 
-  /* Spacing scale (4 / 8 / 16 / 24 / 40 / 64) */
-  --gap-1: 4px;
-  --gap-2: 8px;
-  --gap-3: 16px;
-  --gap-4: 24px;
-  --gap-5: 40px;
-  --gap-6: 64px;
+  /* Spacing scale (4 / 8 / 12 / 16 / 24 / 32) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* Type scale — three steps. h1 uses its own clamp, grand total stays 22px. */
+  --text-sm:   12px;
+  --text-base: 14px;
+  --text-lg:   18px;
 }
 
 [data-theme="dark"] {
@@ -56,11 +62,12 @@
   --paper-soft:   #242424;
   --ink:          #e8e4df;
   --ink-soft:     #b0aaa2;
-  --ink-faint:    #7a756e;
+  --ink-faint:    #9a948c;
   --rule:         #3a3a3a;
   --accent:       #d4574e;
   --ok:           #5cb870;
   --warn:         #d4a04a;
+  --info:         #7eaae8;
   --focus:        #d4574e;
 
   --yoy-up:       #4ec870;
@@ -76,7 +83,7 @@ body {
   background: var(--paper);
   color: var(--ink);
   font-family: "Inconsolata", ui-monospace, monospace;
-  font-size: 14px;
+  font-size: var(--text-base);
   line-height: 1.5;
   /* Bottom padding reserves space for the fixed action bar so footer
      and page content scroll cleanly above it. */
@@ -94,9 +101,9 @@ header.top {
   justify-content: space-between;
   align-items: flex-start;       /* lets buttons sit at title height */
   border-bottom: 1px solid var(--ink);
-  padding-bottom: var(--gap-3);
-  margin-bottom: var(--gap-5);
-  gap: var(--gap-4);
+  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-6);
+  gap: var(--space-5);
   flex-wrap: wrap;
 }
 
@@ -110,7 +117,7 @@ header.top h1 {
 }
 
 header.top .sub {
-  font-size: 12px;
+  font-size: var(--text-sm);
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: var(--ink-soft);
@@ -124,7 +131,7 @@ header.top .sub {
 .top-controls {
   display: flex;
   align-items: center;
-  gap: var(--gap-2);
+  gap: var(--space-2);
   /* Lift the controls slightly so they optically center on the H1. */
   margin-top: clamp(0px, 0.6vw, 8px);
 }
@@ -141,24 +148,24 @@ header.top .sub {
 /* Primary sections (Buyer, Invoice, Items): strong border, large heading. */
 section.block {
   border-top: 1px solid var(--ink);
-  padding-top: var(--gap-4);
-  margin-bottom: var(--gap-5);
+  padding-top: var(--space-5);
+  margin-bottom: var(--space-6);
 }
 
 section.block h2 {
   font-family: "Inconsolata", ui-monospace, monospace;
   font-weight: 500;
-  font-size: 22px;
-  margin: 0 0 var(--gap-1);
+  font-size: var(--text-lg);
+  margin: 0 0 var(--space-1);
   letter-spacing: -0.005em;
 }
 
 section.block .hint {
-  font-size: 11px;
+  font-size: var(--text-sm);
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--ink-faint);
-  margin-bottom: var(--gap-3);
+  margin-bottom: var(--space-4);
 }
 
 /* Avoid a double rule between header.top and the first section.
@@ -168,27 +175,34 @@ header.top + section.block {
   padding-top: 0;
 }
 
+/* When both first-run setup cards are hidden, the seller section becomes the
+   first visible section under the header — drop only the divider line; keep
+   the padding-top so the h2 retains breathing room above. */
+.setup-card[hidden] + .setup-card[hidden] + section.block.sub {
+  border-top: none;
+}
+
 /* Secondary sections (Seller, Filename — marked with .sub): leaner
    visual weight, signals "settings" rather than workflow steps. */
 section.block.sub {
   border-top: 1px solid var(--ink-soft);
-  padding-top: var(--gap-3);
-  margin-bottom: var(--gap-4);
+  padding-top: var(--space-4);
+  margin-bottom: var(--space-5);
 }
 section.block.sub h2 {
   font-family: "Inconsolata", ui-monospace, monospace;
-  font-size: 14px;
+  font-size: var(--text-base);
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: var(--ink-soft);
-  margin: 0 0 var(--gap-2);
+  margin: 0 0 var(--space-2);
 }
 /* Center the seller toggle vertically with the smaller secondary h2,
    plus breathing room between the header row and the body below. */
 section.block.sub .seller-head {
   align-items: center;
-  margin-bottom: var(--gap-3);
+  margin-bottom: var(--space-4);
 }
 
 
@@ -197,7 +211,7 @@ section.block.sub .seller-head {
 .seller-head {
   display: flex;
   align-items: center;
-  gap: var(--gap-3);
+  gap: var(--space-4);
   flex-wrap: wrap;
 }
 .seller-head h2 {
@@ -208,7 +222,7 @@ section.block.sub .seller-head {
    them past the toggle's summary regardless of how long it is. */
 .seller-head-actions {
   display: flex;
-  gap: var(--gap-2);
+  gap: var(--space-2);
   margin-left: auto;
 }
 /* Tighter line-height inside these specific buttons so their text sits
@@ -231,7 +245,7 @@ section.block.collapsed .seller-head-actions {
   cursor: pointer;
   display: inline-flex;
   align-items: center;        /* center arrow + summary vertically */
-  gap: var(--gap-2);
+  gap: var(--space-2);
   color: var(--ink-soft);
   font-family: "Inconsolata", monospace;
   font-size: inherit;         /* match the .sub h2 size (14px) */
@@ -272,7 +286,7 @@ section.block.collapsed > #sellerBody {
   display: none;
 }
 section.block.collapsed {
-  padding-bottom: 8px;
+  padding-bottom: var(--space-2);
 }
 
 
@@ -281,7 +295,7 @@ section.block.collapsed {
 .grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px var(--gap-3);
+  gap: var(--space-3) var(--space-4);
 }
 
 .grid .full { grid-column: 1 / -1; }
@@ -290,8 +304,8 @@ section.block.collapsed {
 label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 11px;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: var(--ink-soft);
@@ -300,17 +314,17 @@ label {
 label.inline {
   flex-direction: row;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   text-transform: none;
   letter-spacing: 0;
-  font-size: 13px;
+  font-size: var(--text-base);
   color: var(--ink);
 }
 
 input[type="text"], input[type="email"], input[type="date"],
 input[type="number"], select, textarea {
   font-family: "Inconsolata", monospace;
-  font-size: 14px;
+  font-size: var(--text-base);
   background: transparent;
   color: var(--ink);
   border: none;
@@ -324,6 +338,16 @@ input[type="number"], select, textarea {
 
 input:focus, select:focus, textarea:focus { border-color: var(--focus); }
 textarea { resize: vertical; min-height: 56px; }
+
+/* Inline validation — non-blocking, applied on input/blur. */
+input.invalid, select.invalid, textarea.invalid { border-color: var(--accent); }
+input.invalid:focus, select.invalid:focus, textarea.invalid:focus { border-color: var(--accent); }
+.field-error {
+  display: block;
+  color: var(--accent);
+  font-size: var(--text-sm);
+  margin-top: var(--space-1);
+}
 
 select {
   appearance: none;
@@ -347,13 +371,13 @@ input[type="number"] { -moz-appearance: textfield; }
   display: grid;
   grid-template-columns: minmax(180px, 1fr) 90px 110px 100px 28px;
   gap: 0;
-  font-size: 13px;
+  font-size: var(--text-base);
 }
 
 .items .row { display: contents; }
 
 .items .head > div {
-  font-size: 10px;
+  font-size: var(--text-sm);
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--ink-faint);
@@ -373,7 +397,7 @@ input[type="number"] { -moz-appearance: textfield; }
   border: none;
   border-bottom: 1px solid transparent;
   padding: 2px 0;
-  font-size: 13px;
+  font-size: var(--text-base);
 }
 .items input:focus, .items select:focus { border-bottom-color: var(--focus); }
 
@@ -384,17 +408,24 @@ input[type="number"] { -moz-appearance: textfield; }
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
   color: var(--ink-faint);
-  font-size: 16px;
+  font-size: var(--text-lg);
   border: none;
   background: transparent;
   padding: 0;
 }
 .items .remove:hover { color: var(--accent); }
+.items .remove.confirming {
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  background: var(--paper-soft);
+  font-size: var(--text-sm);
+  padding: 2px var(--space-2);
+}
 
 .add-row {
-  margin-top: 12px;
+  margin-top: var(--space-3);
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--text-sm);
   background: transparent;
   border: 1px dashed var(--ink);
   color: var(--ink);
@@ -408,21 +439,21 @@ input[type="number"] { -moz-appearance: textfield; }
 /* === 7. Totals ============================================================ */
 
 .totals {
-  margin-top: 16px;
+  margin-top: var(--space-4);
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 4px 24px;
+  gap: var(--space-1) var(--space-5);
   font-variant-numeric: tabular-nums;
-  font-size: 14px;
+  font-size: var(--text-base);
 }
 .totals .label { color: var(--ink-soft); }
 .totals .val { text-align: right; }
 .totals .grand {
   font-weight: 500;
   border-top: 1px solid var(--ink);
-  padding-top: 8px;
-  margin-top: 4px;
-  font-size: 16px;
+  padding-top: var(--space-2);
+  margin-top: var(--space-1);
+  font-size: var(--text-lg);
 }
 .totals .grand.val { font-family: "Inconsolata", ui-monospace, monospace; font-size: 22px; font-weight: 600; }
 
@@ -431,7 +462,7 @@ input[type="number"] { -moz-appearance: textfield; }
 
 .drop {
   border: 1.5px dashed var(--rule);
-  padding: 24px;
+  padding: var(--space-5);
   text-align: center;
   cursor: pointer;
   transition: all 0.15s;
@@ -448,7 +479,7 @@ input[type="number"] { -moz-appearance: textfield; }
   color: var(--ok);
   background: rgba(47, 107, 60, 0.05);
 }
-.drop .fname { font-weight: 500; margin-top: 4px; word-break: break-all; }
+.drop .fname { font-weight: 500; margin-top: var(--space-1); word-break: break-all; }
 
 
 /* === 9. Action bar (sticky bottom) ======================================== */
@@ -474,18 +505,7 @@ input[type="number"] { -moz-appearance: textfield; }
   padding: 12px 24px;
   display: flex;
   flex-direction: column;
-  gap: var(--gap-2);
-}
-
-/* Status sits above the buttons. Collapses when empty so the bar
-   stays compact in idle state. */
-.action-bar .status {
-  margin: 0;
-  min-height: 0;
-  text-align: center;
-}
-.action-bar .status:empty {
-  display: none;
+  gap: var(--space-2);
 }
 
 .action-bar .actions {
@@ -498,7 +518,7 @@ input[type="number"] { -moz-appearance: textfield; }
 .action-bar button.primary,
 .action-bar button.secondary {
   padding: 10px 18px;
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 
@@ -506,14 +526,14 @@ input[type="number"] { -moz-appearance: textfield; }
 
 .actions {
   display: flex;
-  gap: var(--gap-3);
-  margin-top: var(--gap-5);
+  gap: var(--space-4);
+  margin-top: var(--space-6);
   flex-wrap: wrap;
 }
 
 button.primary, button.secondary {
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--text-base);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 14px 22px;
@@ -541,18 +561,18 @@ button.secondary:hover { background: var(--ink); color: var(--paper); }
   border: 1px solid var(--rule);
   color: var(--ink-soft);
   padding: 4px 10px;
-  font-size: 11px;
+  font-size: var(--text-sm);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   cursor: pointer;
-  margin-left: 8px;
+  margin-left: var(--space-2);
 }
 .tiny-btn:hover { border-color: var(--ink); color: var(--ink); }
 
 .due-chips {
   display: flex;
-  gap: 4px;
-  margin-top: 4px;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
   flex-wrap: wrap;
 }
 .due-chips button {
@@ -561,7 +581,7 @@ button.secondary:hover { background: var(--ink); color: var(--paper); }
   border: 1px solid var(--rule);
   color: var(--ink-soft);
   padding: 2px 8px;
-  font-size: 10px;
+  font-size: var(--text-sm);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   cursor: pointer;
@@ -574,20 +594,132 @@ button.secondary:hover { background: var(--ink); color: var(--paper); }
   background: var(--paper-soft);
 }
 
-.status {
-  margin-top: 20px;
-  padding: 12px 16px;
-  font-size: 13px;
-  border-left: 3px solid var(--ink-soft);
-  background: var(--paper-soft);
-  white-space: pre-wrap;
-  display: none;
-}
-.status.show { display: block; }
-.status.ok { border-color: var(--ok); }
-.status.err { border-color: var(--accent); color: var(--accent); }
+.note-small { font-size: var(--text-sm); color: var(--ink-faint); margin-top: 6px; }
 
-.note-small { font-size: 11px; color: var(--ink-faint); margin-top: 6px; }
+/* Field tooltip — small "?" button next to a label, opens a shared popover. */
+.label-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.tooltip-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: var(--space-1);
+  padding: 0;
+  border: 1px solid var(--ink-faint);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-faint);
+  font-family: inherit;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.tooltip-btn:hover,
+.tooltip-btn[aria-expanded="true"] {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+.tooltip-popover {
+  position: fixed;
+  max-width: 280px;
+  padding: var(--space-3);
+  background: var(--paper-soft);
+  color: var(--ink);
+  border: 1px solid var(--ink-soft);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  z-index: 1100;
+}
+[data-theme="dark"] .tooltip-popover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); }
+
+/* First-run setup card — visible while the seller profile is empty,
+   nudges the user to fill master data before generating an invoice. */
+.setup-card {
+  padding: var(--space-5);
+  margin-bottom: var(--space-6);
+  border-left: 3px solid var(--accent);
+  background: var(--paper-soft);
+}
+.setup-card h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: var(--accent);
+}
+.setup-card p {
+  margin: var(--space-2) 0 var(--space-4);
+  color: var(--ink-soft);
+}
+.setup-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.number-setup-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.number-setup-grid .number-setup-preview {
+  grid-column: 1 / -1;
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+.number-setup-grid .number-setup-preview strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+@media (max-width: 480px) {
+  .number-setup-grid { grid-template-columns: 1fr; }
+}
+
+/* Toasts — fixed top-right stack, transient feedback for save/export/copy/import.
+   Errors keep the same border-left + tinted color convention as the legacy
+   .status bar so users recognise the signal. */
+.toast-host {
+  position: fixed;
+  top: var(--space-5);
+  right: var(--space-5);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  pointer-events: none;
+  max-width: min(360px, calc(100vw - 2 * var(--space-5)));
+}
+.toast {
+  pointer-events: auto;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-base);
+  font-family: inherit;
+  background: var(--paper-soft);
+  color: var(--ink);
+  border-left: 3px solid var(--ink-soft);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  white-space: pre-wrap;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 180ms ease-out, transform 180ms ease-out;
+}
+.toast.toast--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.toast.toast--leaving {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+.toast.ok  { border-color: var(--ok); }
+.toast.err { border-color: var(--accent); color: var(--accent); }
+[data-theme="dark"] .toast { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4); }
 
 
 /* === 10b. Invoice number pattern editor =================================== */
@@ -595,7 +727,7 @@ button.secondary:hover { background: var(--ink); color: var(--paper); }
 .number-pattern-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   margin-top: 6px;
   flex-wrap: wrap;
 }
@@ -605,7 +737,7 @@ button.secondary:hover { background: var(--ink); color: var(--paper); }
   border: 1px solid var(--rule);
   color: var(--ink-soft);
   padding: 3px 8px;
-  font-size: 10px;
+  font-size: var(--text-sm);
   line-height: 1.2;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -623,7 +755,7 @@ button.secondary:hover { background: var(--ink); color: var(--paper); }
   min-width: 200px;
 }
 .number-pattern-details summary {
-  font-size: 10px;
+  font-size: var(--text-sm);
   line-height: 1.2;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -636,13 +768,13 @@ button.secondary:hover { background: var(--ink); color: var(--paper); }
 .number-pattern-details summary:hover { color: var(--ink); }
 
 .number-pattern-body {
-  margin-top: 8px;
-  padding: 12px;
+  margin-top: var(--space-2);
+  padding: var(--space-3);
   background: var(--paper-soft);
   border: 1px solid var(--rule);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .number-pattern-body input[type="text"] {
   border: 1px solid var(--rule);
@@ -661,7 +793,7 @@ button.secondary:hover { background: var(--ink); color: var(--paper); }
   min-width: 32px;
   height: 32px;
   padding: 0 8px;
-  font-size: 13px;
+  font-size: var(--text-base);
   line-height: 1;
 }
 .top-icon-btn svg { display: block; }
@@ -675,7 +807,7 @@ button.secondary:hover { background: var(--ink); color: var(--paper); }
   background: transparent;
   color: var(--ink-soft);
   font-family: inherit;
-  font-size: 11px;
+  font-size: var(--text-sm);
   letter-spacing: 0.1em;
   padding: 0 22px 0 10px;
   cursor: pointer;
@@ -706,7 +838,7 @@ button.secondary:hover { background: var(--ink); color: var(--paper); }
   border: 1px solid var(--rule);
   background: transparent;
   color: var(--ink-soft);
-  font-size: 14px;
+  font-size: var(--text-base);
   font-family: inherit;
   cursor: pointer;
   display: flex;
@@ -729,9 +861,9 @@ button.secondary:hover { background: var(--ink); color: var(--paper); }
 .picker-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 .picker-row select {
   flex: 1;
@@ -739,12 +871,12 @@ button.secondary:hover { background: var(--ink); color: var(--paper); }
   padding: 6px 22px 6px 8px;
   border: 1px solid var(--rule);
   background-color: var(--paper-soft);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .input-with-action {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   align-items: center;
 }
 
@@ -756,34 +888,56 @@ button.secondary:hover { background: var(--ink); color: var(--paper); }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .label-row .tiny-btn { margin-left: 0; }
 .input-with-action input { flex: 1; }
 
 .buyer-history-hint {
   min-height: 1em;          /* reserve space so layout doesn't jump */
-  margin-top: 4px;
+  margin-top: var(--space-1);
 }
 .buyer-history-hint:empty { display: none; }
 
 
 /* === 13. Filename preview + chips ========================================= */
 
-.filename-chips { margin-bottom: 8px; }
+.filename-chips { margin-bottom: var(--space-2); }
 .filename-preview {
-  margin-top: 4px;
+  margin-top: var(--space-1);
   font-family: 'Inconsolata', monospace;
 }
 
 
 /* === 14. Footer (slim, single-line) ====================================== */
 
+.format-info {
+  margin-top: var(--space-6);
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+.format-info summary {
+  cursor: pointer;
+  color: var(--ink);
+  padding: var(--space-2) 0;
+  user-select: none;
+}
+.format-info summary:hover { color: var(--accent); }
+.format-info p {
+  margin: var(--space-2) 0 0;
+  line-height: 1.5;
+}
+.format-info a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 footer {
-  margin-top: var(--gap-5);
-  padding-top: var(--gap-3);
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
   border-top: 1px solid var(--ink-soft);
-  font-size: 11px;
+  font-size: var(--text-sm);
   color: var(--ink-faint);
   letter-spacing: 0.05em;
 
@@ -791,7 +945,7 @@ footer {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: var(--gap-3);
+  gap: var(--space-4);
   flex-wrap: wrap;
 }
 footer p { margin: 0; }
@@ -800,7 +954,7 @@ footer a { color: var(--ink-soft); }
 .footer-disclaimer {
   font-style: italic;
   opacity: 0.75;
-  font-size: 11px;
+  font-size: var(--text-sm);
   line-height: 1.5;
   flex: 1 1 auto;
   min-width: 0;
@@ -808,11 +962,12 @@ footer a { color: var(--ink-soft); }
 .footer-backup {
   display: flex;
   align-items: center;
-  gap: var(--gap-1);
+  gap: var(--space-1);
   flex-wrap: wrap;
   flex: 0 0 auto;
 }
-.footer-link-btn {
+.footer-link-btn,
+.link-btn {
   background: none;
   border: none;
   padding: 0;
@@ -823,7 +978,18 @@ footer a { color: var(--ink-soft); }
   cursor: pointer;
   letter-spacing: inherit;
 }
-.footer-link-btn:hover { color: var(--ink); }
+.footer-link-btn:hover,
+.link-btn:hover { color: var(--ink); }
+
+.items-fresh-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--ink-faint);
+  margin-bottom: var(--space-3);
+}
 
 
 /* === 15. Helpers + focus visibility ====================================== */
@@ -848,6 +1014,7 @@ button:focus-visible,
 .theme-toggle:focus-visible,
 .lang-select:focus-visible,
 .footer-link-btn:focus-visible,
+.link-btn:focus-visible,
 .number-pattern-details summary:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
@@ -896,22 +1063,22 @@ textarea:focus-visible {
   width: 100%;
   max-width: 720px;
   border: 1px solid var(--ink);
-  padding: 24px;
+  padding: var(--space-5);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .modal-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .modal-head h2 { margin: 0; }
 .modal-head-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   align-items: center;
   flex-wrap: wrap;
 }
@@ -925,7 +1092,7 @@ textarea:focus-visible {
 .modal-intro {
   margin: 0 0 20px 0;
   color: var(--ink-soft);
-  font-size: 13px;
+  font-size: var(--text-base);
   line-height: 1.5;
 }
 
@@ -933,21 +1100,123 @@ textarea:focus-visible {
 /* === History modal ======================================================== */
 
 .history-modal-content {
-  max-width: 720px;
+  max-width: 1000px;
+}
+.history-filter-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.history-filter-row input[type="search"] { flex: 1 1 auto; }
+.history-filter-row select { flex: 0 0 auto; width: auto; }
+@media (max-width: 480px) {
+  .history-filter-row { flex-direction: column; align-items: stretch; }
+  .history-filter-row select { width: 100%; }
+}
+
+/* Dynamic history list — replaces the old <select>. Scrollable, per-row
+   clone + delete actions. Delete reuses the inline-confirm pattern from
+   line items (.confirming class on the × button). */
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 50vh;
+  overflow-y: auto;
+  border: 1px solid var(--rule);
+}
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--rule);
+}
+.history-row:last-child { border-bottom: none; }
+.history-row:hover { background: var(--paper-soft); }
+.history-row-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  align-items: baseline;
+  font-size: var(--text-base);
+}
+.history-row-info .num    { font-weight: 500; }
+.history-row-info .date   { color: var(--ink-soft); }
+.history-row-info .buyer  { color: var(--ink); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-row-info .total  { color: var(--ink); font-variant-numeric: tabular-nums; }
+.history-row-info .marker { color: var(--ink-faint); font-size: var(--text-sm); }
+.status-pill {
+  display: inline-block;
+  padding: 0 var(--space-2);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.status-pill.draft    { color: var(--ink-soft); }
+.status-pill.exported { color: var(--info); }
+.history-row-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--space-1);
+}
+.history-row-empty {
+  list-style: none;
+  padding: var(--space-6) var(--space-5);
+}
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: center;
+  color: var(--ink-soft);
+}
+.empty-state h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 500;
+  color: var(--ink);
+}
+.empty-state p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+  max-width: 40ch;
+}
+.empty-state .primary,
+.empty-state .tiny-btn {
+  margin-top: var(--space-1);
+}
+.history-delete-btn {
+  width: 28px;
+  text-align: center;
+  font-size: var(--text-base);
+  line-height: 1;
+}
+@media (max-width: 480px) {
+  .history-row { flex-direction: column; align-items: stretch; }
+  .history-row-actions { justify-content: flex-end; }
 }
 .history-bottom-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--gap-3);
+  gap: var(--space-4);
   flex-wrap: wrap;
-  padding-top: 12px;
+  padding-top: var(--space-3);
   border-top: 1px solid var(--ink-soft);
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 .history-bottom-actions {
   display: flex;
-  gap: var(--gap-2);
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 /* Toggle: uses label.inline for row-layout. Override below opts the
@@ -975,8 +1244,8 @@ textarea:focus-visible {
 }
 .help-body {
   overflow-y: auto;
-  padding-right: 8px;
-  font-size: 14px;
+  padding-right: var(--space-2);
+  font-size: var(--text-base);
   line-height: 1.6;
   color: var(--ink);
 }
@@ -987,7 +1256,7 @@ textarea:focus-visible {
 .help-body h3 {
   font-family: "Inconsolata", ui-monospace, monospace;
   font-weight: 500;
-  font-size: 19px;
+  font-size: var(--text-lg);
   margin: 32px 0 12px;
   letter-spacing: -0.005em;
 }
@@ -998,7 +1267,7 @@ textarea:focus-visible {
   font-family: "Inconsolata", monospace;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 500;
   margin: 24px 0 8px;
   color: var(--ink-soft);
@@ -1032,8 +1301,8 @@ textarea:focus-visible {
 .embed-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
 }
 
 
@@ -1045,8 +1314,8 @@ textarea:focus-visible {
 .past-modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
 }
 
 
@@ -1059,11 +1328,11 @@ textarea:focus-visible {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--gap-3);
+  gap: var(--space-4);
 }
 .stats-tabs {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
 }
 .stats-tabs .tiny-btn.active {
   background: var(--ink);
@@ -1074,46 +1343,46 @@ textarea:focus-visible {
 .stats-body {
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: var(--space-6);
 }
 .stats-empty {
   color: var(--ink-soft);
   padding: 32px 0;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--text-base);
 }
 .stats-block {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
 }
 .stats-block-head {
   font-family: "Inconsolata", ui-monospace, monospace;
-  font-size: 18px;
+  font-size: var(--text-lg);
   font-weight: 500;
 }
 .stats-block-count {
   color: var(--ink-soft);
   font-family: "Inconsolata", monospace;
-  font-size: 12px;
+  font-size: var(--text-sm);
   letter-spacing: 0.05em;
 }
 
 .stats-kpis {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  gap: var(--space-3);
 }
 .stats-kpi {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px;
+  gap: var(--space-1);
+  padding: var(--space-3);
   border: 1px solid var(--ink-soft);
 }
 .stats-kpi-label {
   color: var(--ink-soft);
-  font-size: 10px;
+  font-size: var(--text-sm);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -1123,21 +1392,21 @@ textarea:focus-visible {
 .stats-kpi-value {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: nowrap;
   white-space: nowrap;
   font-family: "Inconsolata", monospace;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: var(--text-lg);
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
 .stats-subhead {
   color: var(--ink-soft);
-  font-size: 10px;
+  font-size: var(--text-sm);
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 
@@ -1152,6 +1421,9 @@ textarea:focus-visible {
   height: auto;
   color: var(--ink);
 }
+/* Override the inline opacity="0.55" on month labels so they keep enough
+   contrast in dark mode where currentColor is light cream on near-black. */
+.stats-chart text { opacity: 0.8; }
 .stats-bar-hit {
   cursor: default;
 }
@@ -1162,7 +1434,7 @@ textarea:focus-visible {
   color: var(--paper);
   padding: 4px 8px;
   font-family: "Inconsolata", monospace;
-  font-size: 11px;
+  font-size: var(--text-sm);
   white-space: nowrap;
   border-radius: 2px;
   z-index: 10;
@@ -1184,8 +1456,8 @@ textarea:focus-visible {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 12px;
-  font-size: 13px;
+  gap: var(--space-3);
+  font-size: var(--text-base);
   color: var(--ink);
   font-family: inherit;
   border-radius: 2px;
@@ -1198,7 +1470,7 @@ textarea:focus-visible {
 .stats-buyer-name { font-weight: 500; }
 .stats-buyer-meta {
   font-family: "Inconsolata", monospace;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--ink-soft);
 }
 
@@ -1220,17 +1492,17 @@ textarea:focus-visible {
 .stats-buyer-detail {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--space-5);
 }
 .stats-buyer-head {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-4);
 }
 .stats-buyer-title {
   margin: 0;
   font-family: "Inconsolata", ui-monospace, monospace;
-  font-size: 20px;
+  font-size: var(--text-lg);
   font-weight: 500;
 }
 .stats-back-btn::before {
@@ -1250,17 +1522,17 @@ textarea:focus-visible {
   width: 100%;
   border-collapse: collapse;
   font-family: "Inconsolata", monospace;
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 .qb-table th,
 .qb-table td {
   padding: 8px 10px;
-  border-bottom: 1px solid var(--ink-soft);
+  border-bottom: 1px solid var(--rule);
   text-align: left;
   white-space: nowrap;
 }
 .qb-table th {
-  font-size: 10px;
+  font-size: var(--text-sm);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-soft);
@@ -1278,14 +1550,14 @@ textarea:focus-visible {
 .qb-table tfoot tr.qb-total td {
   border-top: 1px solid var(--ink);
   border-bottom: none;
-  padding-top: 12px;
+  padding-top: var(--space-3);
 }
 
 
 /* === Stats: year-over-year arrows ========================================= */
 
 .yoy-arrow {
-  font-size: 10px;
+  font-size: var(--text-sm);
   font-weight: 500;
   letter-spacing: 0.02em;
   display: inline-flex;
@@ -1313,13 +1585,13 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 10px 14px;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
   background: var(--paper-soft);
   border: 1px solid var(--ink-soft);
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--text-base);
   color: var(--ink-soft);
 }
 .yoy-banner-info {
@@ -1335,7 +1607,7 @@ textarea:focus-visible {
 }
 .yoy-modal-fields {
   display: flex;
-  gap: 16px;
+  gap: var(--space-4);
   margin-bottom: 20px;
   flex-wrap: wrap;
 }
@@ -1351,21 +1623,21 @@ textarea:focus-visible {
 .yoy-month-grid label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 11px;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--ink-soft);
 }
 .yoy-month-grid input {
-  font-size: 13px;
+  font-size: var(--text-base);
   padding: 6px 8px;
   font-variant-numeric: tabular-nums;
 }
 .yoy-modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 
@@ -1383,7 +1655,7 @@ textarea:focus-visible {
   .items .row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 4px 12px;
+    gap: var(--space-1) var(--space-3);
     padding: 12px 0;
     border-bottom: 1px dashed var(--rule);
   }
@@ -1392,7 +1664,7 @@ textarea:focus-visible {
   .items .cell::before {
     content: attr(data-label);
     display: block;
-    font-size: 10px;
+    font-size: var(--text-sm);
     text-transform: uppercase;
     letter-spacing: 0.12em;
     color: var(--ink-faint);
@@ -1405,11 +1677,11 @@ textarea:focus-visible {
     padding: 24px 16px 80px;
   }
   section.block {
-    margin-bottom: var(--gap-4);
+    margin-bottom: var(--space-5);
   }
   footer {
     flex-direction: column;
-    gap: var(--gap-2);
+    gap: var(--space-2);
   }
   .stats-kpis {
     grid-template-columns: repeat(2, 1fr);
@@ -1421,14 +1693,14 @@ textarea:focus-visible {
   .action-bar button.primary,
   .action-bar button.secondary {
     padding: 8px 14px;
-    font-size: 11px;
+    font-size: var(--text-sm);
   }
 }
 
 @media (max-width: 480px) {
   .top-controls {
     flex-wrap: wrap;
-    gap: var(--gap-2);
+    gap: var(--space-2);
   }
   .top-icon-btn {
     min-width: 28px;
@@ -1444,6 +1716,12 @@ textarea:focus-visible {
   .yoy-month-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+  .toast-host {
+    top: var(--space-3);
+    right: var(--space-3);
+    left: var(--space-3);
+    max-width: none;
+  }
 }
 
 
@@ -1458,7 +1736,7 @@ textarea:focus-visible {
   body {
     background: #fff;
     color: #000;
-    padding: 16px;
+    padding: var(--space-4);
     padding-bottom: 0;
   }
   .actions,
@@ -1470,7 +1748,11 @@ textarea:focus-visible {
   .tiny-btn,
   .items .remove,
   .number-pattern-row,
-  .status,
+  .toast-host,
+  .setup-card,
+  .tooltip-btn,
+  .tooltip-popover,
+  .format-info,
   .action-bar,
   .modal,
   footer {
