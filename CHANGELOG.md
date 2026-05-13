@@ -1,4 +1,98 @@
-## [1.6.0] - 2026-05-12
+## [1.7.0] - 2026-05-13
+
+UX sweep across the whole app. Sharpens the first-run experience, makes
+the history modal a real working surface, and pulls visual decisions onto
+a small set of design tokens (spacing, type, status colour). Functional
+behaviour is unchanged: the XML/PDF pipeline, storage schema, and EN 16931
+conformance carry over from 1.6.0.
+
+### Added
+
+- **Buyer-name memory.** The customer-name input is backed by a datalist
+  that pulls unique names from history (most recent first, capped at 20).
+  Picking a name autofills the rest of the address block when those
+  fields are empty; never overwrites manual entry.
+- **One-click "Duplicate last invoice"** icon in the top bar. Clones the
+  newest history entry, refreshes the date, auto-assigns the next number.
+  Hidden when history is empty.
+- **Reusable toast system** (top-right, stacked, capped at four) replaces
+  the bottom status bar. Durations follow kind: ok 2s, default 2.5s,
+  err 5s. ARIA role tracks severity.
+- **First-run setup card** prompts the seller stammdaten the very first
+  time the app is opened with empty storage. Includes a "Start with demo
+  data" secondary action that loads a realistic DE → FR reverse-charge
+  example without persisting anything.
+- **Second first-run card for the invoice-number scheme.** Appears once
+  the seller is configured if neither pattern nor counter has been
+  written. Live preview, start-value input, "use default" escape hatch.
+- **Inline-confirm delete on line items.** First click on × turns the
+  button into "delete?"; Esc, click-away, or 3 s timeout reverts. Same
+  pattern applied to the history list.
+- **Enter on the VAT field** of a line item inserts a new row right
+  after the current one and focuses its description.
+- **Inline, non-blocking field validation.** IBAN (mod-97 checksum),
+  VAT ID (strict DE/FR patterns, generic fallback for other countries),
+  and soft date checks (invoice date far in future, due before invoice
+  date, delivery end before delivery start). Red underline plus a hint
+  span; XML / PDF generation never blocked.
+- **History search + period filter.** Full-text across number, buyer,
+  formatted total, project, and category, combined with the same period
+  filter the stats modal uses (YTD, last 12, last 6, last 3, last 30 d,
+  last year, all).
+- **History list redesign.** The old `<select>` is gone. The modal now
+  shows a scrollable list (max 50 vh) with per-row Clone and inline-
+  confirm Delete. Modal widened to 1000 px to match the form so long
+  buyer names and invoice numbers no longer wrap.
+- **Status pills** in each history row: Entwurf (neutral) for manually
+  entered past invoices, Exportiert (blue) for everything generated
+  through the tool. Schema keeps `snap.status` free-form for a future
+  "paid" stage.
+- **Structured empty states** with a title, body, and CTA: empty
+  history (close modal + start filling the form), no filter match
+  (reset filters), fresh form on the main page (offers "duplicate last
+  invoice" when history exists). The fresh-form hint hides as soon as
+  the user types in the only line item.
+- **Three field tooltips** on Leistungsdatum, Steuerart, and IBAN.
+  Shared popover, Esc-first in the global key handler, click-outside
+  dismiss, keyboard accessible.
+- **Reverse-charge auto-text.** Picking a footnote preset whose text
+  looks like a reverse-charge note (heuristic on "reverse charge" /
+  "autoliquidation" / "steuerschuldnerschaft") prepends the Art. 196
+  legal sentence in the active invoice language, unless the citation
+  is already present, in which case nothing changes.
+- **Collapsible "Was ist ZUGFeRD / Factur-X?" info block** above the
+  footer with a short explanation and a link to the FNFE-MPE spec.
+
+### Changed
+
+- **Spacing tokens** consolidated to `--space-1`..`--space-6` (4 / 8 /
+  12 / 16 / 24 / 32). The legacy `--gap-*` tokens were removed and all
+  29 usages remapped; on-scale hardcoded paddings, margins, and gaps
+  also migrated. The deliberate 40 px section margin was pulled to 32
+  to stay on the 8 px grid.
+- **Type scale** normalized to `--text-sm` (12), `--text-base` (14),
+  `--text-lg` (18). H1 keeps its `clamp(28, 4vw, 42)`; the grand-total
+  amount keeps 22 px / 600 by request. All other font sizes and 600
+  weights are unified.
+- **Dark mode contrast.** `--ink-faint` bumped so 12 px helper text
+  clears AA in both modes. Quartals-table body dividers switched to
+  the subtler `--rule`. Stats-chart month labels lifted from opacity
+  0.55 to 0.8 so they stay readable on dark.
+- **Invoice-number suggestion chip** keeps working as before; the
+  number-scheme card never overrides an existing pattern or counter,
+  so users with an established workflow see no change.
+
+### Internal
+
+- `flash()` renamed to `toast()`; 62 call sites updated. Errors keep
+  longer dwell time so they're actually readable.
+- `cloneFromHistory()` and `deleteHistoryEntry()` now take an explicit
+  index argument; the old picker-based callers are gone.
+- `recordHistoryEntry(mode)` accepts a snapshot status, with `'draft'`
+  reserved for past-invoice manual entries.
+- `applyTranslations` also processes `data-i18n-aria-label`.
+
+
 
 Code-review sweep across the whole codebase. Tightens EN 16931 / PDF/A-3
 compliance in places where strict validators disagreed with the previous
