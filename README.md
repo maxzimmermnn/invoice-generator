@@ -31,12 +31,13 @@ carries machine-readable XML data per EN 16931 (ZUGFeRD 2.3 / Factur-X 1.0,
 Comfort profile) embedded inside it, making it compliant with German
 e-invoicing law (§14 UStG, in force since 2025) and valid as a Factur-X
 invoice for French customers. Three UI languages (German, English, French),
-five fonts, three layouts, per-language storage of default texts, a
-searchable invoice history with cloning and status pills (and the option
-to backfill older invoices manually), non-blocking inline validation for
-IBAN/VAT/date fields, a first-run setup wizard with demo data, and a full
-statistics view with quarterly tax breakdowns, year-over-year comparison,
-buyer drill-down, and CSV export.
+five fonts, three layouts, per-language storage of default texts, a live
+side-by-side PDF preview on desktop, a searchable invoice history with
+cloning and status pills (and the option to backfill older invoices
+manually), non-blocking inline validation for IBAN/VAT/date fields, a
+first-run setup wizard with demo data, and a full statistics view with
+quarterly tax breakdowns, year-over-year comparison, buyer drill-down,
+and CSV export.
 
 ## Layouts
 
@@ -81,6 +82,26 @@ so existing users see no change.
 A `?` next to a few key fields (service date, VAT mode, IBAN) opens a
 short tooltip explaining when to pick what. Tooltips close on Esc,
 outside-click, or a second click on the same `?`.
+
+### Live preview
+On viewports of 1024 px or wider, a sticky preview pane on the right
+shows the rendered PDF and refreshes 300 ms after the last form change.
+Re-renders pause while the cursor is over the pane so you can scroll
+the embedded PDF without it reloading underneath; pending updates
+flush as soon as you move the cursor back to the form. The pane has
+two width tiers (compact below 1400 px, roomy above) so a single-page
+A4 invoice fits without inner scrolling at either size.
+
+The preview path skips the expensive Factur-X post-processing (XML
+embedding, PDF/A-3 output intent, XMP metadata, trailer ID) and
+reuses the cached fonts, so updates cost milliseconds. The full
+export pipeline still runs when you actually click Create PDF.
+
+A toggle in the top bar turns the pane on or off and the choice is
+remembered. Default is on for first-time visitors on wide screens;
+the toggle is hidden on smaller viewports where the pane would
+crowd the form. The pane stays light-themed regardless of dark mode
+so the PDF rendition is always readable.
 
 ### Seller profile
 Master data (address, VAT ID, IBAN, BIC, bank, optional SIRET) is stored
