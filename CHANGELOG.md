@@ -1,3 +1,57 @@
+## [1.8.0] - 2026-05-14
+
+Adds a live side-by-side preview of the rendered invoice on desktop
+viewports. No changes to the XML/PDF export pipeline; the preview reuses
+the existing layout renderers and only skips the expensive Factur-X
+post-processing that the real export still runs.
+
+### Added
+
+- **Live PDF preview pane.** On viewports >= 1024 px the form sits next
+  to a sticky preview pane that re-renders 300 ms after the last form
+  change. Reuses `generateInvoicePDF()` and produces a raw blob (no
+  XML embedding, no PDF/A-3 output intent, no XMP, no deterministic
+  trailer ID) so re-renders cost milliseconds rather than the full
+  export tail. The browser's PDF viewer is forced into fit-to-page
+  via the `#view=Fit` URL fragment.
+- **Top-bar toggle** with eye-on/eye-off SVG, persisted under
+  `erechnung:preview_enabled:v1`. Default on for first-time users on
+  wide screens; hidden entirely on viewports < 1024 px so it doesn't
+  clutter mobile.
+- **Hover-pause** on the preview pane: re-renders are deferred while
+  the cursor is over the pane so the user can scroll the embedded PDF
+  without it reloading underneath. Pending changes flush on
+  mouseleave, with debounce, in-flight, and pending-render guards
+  preventing overlap and the toggle-during-render race.
+- **Two width tiers** for the preview column so a single-page A4
+  renders without inner scrolling: 1024-1399 px gets a compact
+  `minmax(280, 380)` column, >= 1400 px a roomy `minmax(380, 560)`
+  column. iframe aspect ratio is 1 / 1.5 to leave room for the
+  embedded viewer's toolbar. The sticky action bar's inner grid
+  mirrors the same tiers so its buttons stay aligned to the form
+  column.
+
+### Internal
+
+- New `generatePreviewPDFBytes()` wraps `generateInvoicePDF().save()`.
+  No new dependencies; the existing `_fontDataCache` means the
+  WOFF -> SFNT decode runs once per font and subsequent renders are
+  pure layout work.
+- Programmatic value setters (`applyBuyer`, `applySellerStammdaten`,
+  `renderItems`) trigger `schedulePreviewRender()` explicitly since
+  setting `input.value` from script does not fire input/change.
+- `applyTranslations` already gained `data-i18n-aria-label` in 1.7.0;
+  the new preview toggle reuses that hook.
+
+### Notes
+
+- Scroll position inside the embedded PDF viewer is not preserved
+  across re-renders. The hover-pause keeps this from being annoying
+  in practice. A pixel-perfect scroll-preserved preview would
+  require pdf.js (~2 MB) which conflicts with the single-file build
+  target.
+
+
 ## [1.7.0] - 2026-05-13
 
 UX sweep across the whole app. Sharpens the first-run experience, makes
