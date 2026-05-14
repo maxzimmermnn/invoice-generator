@@ -1,5 +1,7 @@
 # E-Invoice Generator
 
+[![GitHub release](https://img.shields.io/github/v/release/maxzimmermnn/invoice-generator?sort=semver&display_name=tag)](https://github.com/maxzimmermnn/invoice-generator/releases/latest)
+
 A self-contained, offline-first tool for creating ZUGFeRD- / Factur-X-compliant
 invoices. Runs fully offline in any modern browser, doesn't store anything on
 a server.
