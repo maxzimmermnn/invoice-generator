@@ -25,6 +25,8 @@
   This tool requires JavaScript. Please enable it.
 </noscript>
 
+<div class="page-layout">
+
 <div class="wrap">
 
 <header class="top">
@@ -51,6 +53,17 @@
         <rect x="1" y="8" width="2.5" height="5" fill="currentColor"/>
         <rect x="5.75" y="4" width="2.5" height="9" fill="currentColor"/>
         <rect x="10.5" y="6" width="2.5" height="7" fill="currentColor"/>
+      </svg>
+    </button>
+    <button id="previewToggle" class="tiny-btn top-icon-btn preview-toggle" type="button"
+            aria-pressed="true" data-i18n-title="aria_preview_toggle" data-i18n-aria-label="aria_preview_toggle">
+      <svg class="eye-on" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M1 7 Q 7 1 13 7 Q 7 13 1 7 Z"/>
+        <circle cx="7" cy="7" r="2"/>
+      </svg>
+      <svg class="eye-off" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M1 7 Q 7 1 13 7 Q 7 13 1 7 Z"/>
+        <line x1="2" y1="12" x2="12" y2="2"/>
       </svg>
     </button>
     <select id="langSelect" class="lang-select" aria-label="Language">
@@ -410,7 +423,20 @@
 
 </div><!-- /.wrap -->
 
-<!-- Sticky bottom action bar — sits outside .wrap so it can span the
+<!-- Live preview pane (≥ 1024px). Theme-agnostic light background so the
+     PDF rendition doesn't dissolve into a dark page. -->
+<aside class="preview-pane" id="previewPane">
+  <div class="preview-pane-head">
+    <span data-i18n="preview_title"></span>
+    <span class="preview-pane-status" id="previewStatus" hidden data-i18n="preview_updating"></span>
+  </div>
+  <div class="preview-empty" id="previewEmpty" data-i18n="preview_empty"></div>
+  <iframe class="preview-frame" id="previewFrame" title="Invoice preview" hidden></iframe>
+</aside>
+
+</div><!-- /.page-layout -->
+
+<!-- Sticky bottom action bar — sits outside .page-layout so it can span the
      full viewport. Body has padding-bottom matching the bar's height. -->
 <div class="action-bar">
   <div class="action-bar-inner">

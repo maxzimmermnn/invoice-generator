@@ -272,6 +272,11 @@ const I18N = {
     msg_number_setup_done: 'Nummern-Schema gespeichert',
     msg_number_setup_start_invalid: 'Startwert muss eine positive Ganzzahl sein.',
     format_info_title: 'Was ist ZUGFeRD / Factur-X?',
+    preview_title: 'Vorschau',
+    preview_empty: 'Vorschau erscheint nach Eingabe.',
+    preview_updating: 'Aktualisiere…',
+    preview_toggle_label: 'Vorschau',
+    aria_preview_toggle: 'Live-Vorschau umschalten',
     format_info_body: 'ZUGFeRD und Factur-X bezeichnen dasselbe hybride Format: eine PDF/A-3-Datei mit zusätzlich eingebettetem strukturierten XML nach EN 16931. Das PDF bleibt lesbar wie gewohnt, das XML erlaubt automatische Buchungsläufe beim Empfänger. Für B2B-Rechnungen in Deutschland ab 2025 (Empfang) bzw. 2027 (Versand) Pflicht.',
     format_info_link_label: 'Factur-X-Spezifikation (FNFE-MPE)',
     // Buttons
@@ -682,6 +687,11 @@ const I18N = {
     msg_number_setup_done: 'Number scheme saved',
     msg_number_setup_start_invalid: 'Start value must be a positive integer.',
     format_info_title: 'What is ZUGFeRD / Factur-X?',
+    preview_title: 'Preview',
+    preview_empty: 'Preview shows up once you start filling the form.',
+    preview_updating: 'Updating…',
+    preview_toggle_label: 'Preview',
+    aria_preview_toggle: 'Toggle live preview',
     format_info_body: 'ZUGFeRD and Factur-X are the same hybrid format: a PDF/A-3 file with structured XML (EN 16931) embedded inside. The PDF stays readable for humans; the XML lets the recipient post the invoice automatically. Mandatory for German B2B from 2025 (receiving) and 2027 (sending).',
     format_info_link_label: 'Factur-X specification (FNFE-MPE)',
     btn_save_template: 'save as template',
@@ -1080,6 +1090,11 @@ const I18N = {
     msg_number_setup_done: 'Schéma de numérotation enregistré',
     msg_number_setup_start_invalid: 'Le numéro de départ doit être un entier positif.',
     format_info_title: 'Qu\'est-ce que ZUGFeRD / Factur-X ?',
+    preview_title: 'Aperçu',
+    preview_empty: 'L\'aperçu apparaîtra dès que vous remplirez le formulaire.',
+    preview_updating: 'Mise à jour…',
+    preview_toggle_label: 'Aperçu',
+    aria_preview_toggle: 'Basculer l\'aperçu en direct',
     format_info_body: 'ZUGFeRD et Factur-X désignent le même format hybride : un PDF/A-3 avec un XML structuré (EN 16931) intégré. Le PDF reste lisible normalement ; le XML permet le traitement automatique chez le destinataire. Obligatoire pour le B2B allemand à partir de 2025 (réception) et 2027 (émission).',
     format_info_link_label: 'Spécification Factur-X (FNFE-MPE)',
     btn_save_template: 'enregistrer comme modèle',
@@ -1712,6 +1727,7 @@ function applySellerStammdaten(s) {
   $('s_bic').value = nz(s.bic);
   $('s_bank').value = nz(s.bank);
   if (typeof refreshInlineValidation === 'function') refreshInlineValidation();
+  if (typeof schedulePreviewRender === 'function') schedulePreviewRender();
 }
 function applyBoilerplate(b) {
   $('r_intro').value = nz(b.intro);
@@ -1769,6 +1785,7 @@ function applyBuyer(b) {
   $('b_siret').value = nz(b.siret);
   $('b_reference').value = nz(b.reference);
   if (typeof refreshInlineValidation === 'function') refreshInlineValidation();
+  if (typeof schedulePreviewRender === 'function') schedulePreviewRender();
 }
 function clearBuyer() {
   $('b_name').value = '';
@@ -4038,6 +4055,7 @@ function renderItems() {
   }
   calcTotals();
   updateItemsFreshHint();
+  if (typeof schedulePreviewRender === 'function') schedulePreviewRender();
 }
 
 // Show the fresh-form hint only when the items area is in its pristine
@@ -4494,6 +4512,127 @@ function toast(msg, kind = '') {
   }, dismissAfter);
 }
 
+// -------- Live preview --------
+const PREVIEW_ENABLED_KEY = 'erechnung:preview_enabled:v1';
+
+// Side-by-side iframe preview of the rendered PDF, refreshed on a 300 ms
+// debounce after any form change. Re-renders are paused while the cursor
+// is over the preview pane so the user can scroll inside the PDF viewer
+// without the iframe reloading underneath them.
+const PREVIEW_DEBOUNCE_MS = 300;
+const PREVIEW_MEDIA_QUERY = window.matchMedia('(min-width: 1024px)');
+let previewBlobUrl = null;
+let previewRenderTimer = null;
+let previewInFlight = false;
+let previewPending = false;
+let previewHovering = false;
+let previewEnabled = true; // wired to a toolbar toggle in the next step
+
+function isPreviewActive() {
+  return previewEnabled && PREVIEW_MEDIA_QUERY.matches;
+}
+
+function schedulePreviewRender() {
+  if (!isPreviewActive()) return;
+  if (previewHovering) { previewPending = true; return; }
+  if (previewRenderTimer) clearTimeout(previewRenderTimer);
+  previewRenderTimer = setTimeout(() => {
+    previewRenderTimer = null;
+    renderPreviewNow();
+  }, PREVIEW_DEBOUNCE_MS);
+}
+
+async function renderPreviewNow() {
+  if (!isPreviewActive()) return;
+  if (previewInFlight) { previewPending = true; return; }
+  previewInFlight = true;
+  previewPending = false;
+  const statusEl = document.getElementById('previewStatus');
+  if (statusEl) statusEl.hidden = false;
+  try {
+    const bytes = await generatePreviewPDFBytes();
+    // If the user toggled the preview off while the render was in flight,
+    // skip applying the result and free the bytes immediately.
+    if (!previewEnabled) return;
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
+    previewBlobUrl = URL.createObjectURL(blob);
+    const iframe = document.getElementById('previewFrame');
+    const empty = document.getElementById('previewEmpty');
+    if (iframe) {
+      // #view=Fit forces the embedded PDF viewer (Chrome, Safari, Firefox)
+      // to scale the page to fit the iframe instead of opening at 100 %.
+      iframe.src = previewBlobUrl + '#view=Fit';
+      iframe.hidden = false;
+    }
+    if (empty) empty.hidden = true;
+  } catch (e) {
+    console.warn('[preview] render failed:', e?.message || e);
+  } finally {
+    previewInFlight = false;
+    if (statusEl) statusEl.hidden = true;
+    // If a change came in during the in-flight render, run again.
+    if (previewPending && !previewHovering) schedulePreviewRender();
+  }
+}
+
+function setupPreviewListeners() {
+  const formScope = document.querySelector('.wrap');
+  if (formScope) {
+    formScope.addEventListener('input', schedulePreviewRender);
+    formScope.addEventListener('change', schedulePreviewRender);
+  }
+  const pane = document.getElementById('previewPane');
+  if (pane) {
+    pane.addEventListener('mouseenter', () => { previewHovering = true; });
+    pane.addEventListener('mouseleave', () => {
+      previewHovering = false;
+      if (previewPending) schedulePreviewRender();
+    });
+  }
+  // Re-evaluate when the viewport crosses the 1024 px threshold.
+  PREVIEW_MEDIA_QUERY.addEventListener('change', () => {
+    if (isPreviewActive()) schedulePreviewRender();
+  });
+  const toggle = document.getElementById('previewToggle');
+  if (toggle) toggle.addEventListener('click', () => setPreviewEnabled(!previewEnabled));
+}
+
+async function loadPreviewEnabled() {
+  try {
+    const v = await store.get(PREVIEW_ENABLED_KEY);
+    previewEnabled = v === null || v === undefined ? true : v !== 'false';
+  } catch (e) {
+    console.warn('[erechnung] Failed to load preview-enabled flag:', e?.message || e);
+    previewEnabled = true;
+  }
+  applyPreviewEnabledUI();
+}
+
+async function setPreviewEnabled(v) {
+  previewEnabled = !!v;
+  try { await store.set(PREVIEW_ENABLED_KEY, String(previewEnabled)); } catch (_) {}
+  applyPreviewEnabledUI();
+  if (previewEnabled) {
+    schedulePreviewRender();
+  } else {
+    // Tear down current iframe content and free the blob.
+    if (previewRenderTimer) { clearTimeout(previewRenderTimer); previewRenderTimer = null; }
+    const iframe = document.getElementById('previewFrame');
+    if (iframe) { iframe.src = 'about:blank'; iframe.hidden = true; }
+    const empty = document.getElementById('previewEmpty');
+    if (empty) empty.hidden = false;
+    if (previewBlobUrl) { URL.revokeObjectURL(previewBlobUrl); previewBlobUrl = null; }
+  }
+}
+
+function applyPreviewEnabledUI() {
+  const layout = document.querySelector('.page-layout');
+  const btn = document.getElementById('previewToggle');
+  if (layout) layout.classList.toggle('preview-off', !previewEnabled);
+  if (btn) btn.setAttribute('aria-pressed', String(previewEnabled));
+}
+
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -4712,6 +4851,15 @@ async function generateInvoicePDF() {
   const renderer = (LAYOUTS[layoutKey] || LAYOUTS[DEFAULT_LAYOUT]).render;
   await renderer(pdfDoc, ctx);
   return pdfDoc;
+}
+
+// Lightweight preview-only render. Skips XML embedding, PDF/A-3 output
+// intent, XMP injection, and the deterministic trailer ID — purely the
+// layout output, ready to be displayed in the side-by-side iframe.
+// Returns raw PDF bytes.
+async function generatePreviewPDFBytes() {
+  const pdfDoc = await generateInvoicePDF();
+  return pdfDoc.save({ useObjectStreams: false });
 }
 
 // Collect every piece of data the layout renderers need: form values,
@@ -6165,6 +6313,11 @@ async function init() {
   // 9. First-run number-scheme card. Visibility depends on seller + storage.
   updateNumberSetupPreview();
   await updateNumberSetupCardVisibility();
+
+  // 10. Live preview pane: load persisted toggle, attach listeners, render.
+  await loadPreviewEnabled();
+  setupPreviewListeners();
+  schedulePreviewRender();
 }
 
 init().catch(err => {

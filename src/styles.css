@@ -93,6 +93,128 @@ body {
 
 .wrap { max-width: 1000px; margin: 0 auto; }
 
+/* === Page layout: form + live preview pane =============================== */
+
+/* Default (mobile / narrow): page-layout is layout-neutral so .wrap and the
+   sticky action bar behave exactly as before. The preview pane is hidden. */
+.page-layout { display: contents; }
+.preview-pane { display: none; }
+
+@media (min-width: 1024px) {
+  /* Side-by-side grid: form column (capped to .wrap's natural max) plus
+     a preview column on the right. Two width tiers — compact for
+     narrow desktop windows (1024–1399 px) and roomy for ≥ 1400 px. */
+  .page-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+    gap: var(--space-5);
+    align-items: start;
+    max-width: 1700px;
+    margin: 0 auto;
+  }
+  .page-layout > .wrap {
+    margin: 0;
+    width: 100%;
+  }
+  .preview-pane {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    position: sticky;
+    top: var(--space-2);
+    align-self: start;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    padding: var(--space-3);
+    /* Theme-agnostic light surface so the PDF rendition stays readable
+       regardless of dark mode. */
+    background: #fafafa;
+    color: #111;
+    border: 1px solid #d4d4d4;
+  }
+  [data-theme="dark"] .preview-pane {
+    border-color: #6f6a64;
+  }
+  /* Align the sticky action bar with the form column so its buttons don't
+     drift over the preview column on wide viewports. */
+  .action-bar-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+    gap: var(--space-5);
+    max-width: 1700px;
+  }
+  .action-bar .actions {
+    grid-column: 1;
+  }
+}
+
+/* Wider desktops: give the preview column more breathing room. */
+@media (min-width: 1400px) {
+  .page-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(380px, 560px);
+  }
+  .action-bar-inner {
+    grid-template-columns: minmax(0, 1fr) minmax(380px, 560px);
+  }
+}
+.preview-pane-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #4a4642;
+}
+.preview-pane-status {
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: #6f6a64;
+}
+.preview-empty {
+  font-size: var(--text-sm);
+  color: #6f6a64;
+  text-align: center;
+  padding: var(--space-5) 0;
+}
+.preview-frame {
+  width: 100%;
+  /* A4 portrait plus a sliver of headroom for the browser PDF viewer
+     toolbar so the whole page stays visible without inner scrolling. */
+  aspect-ratio: 1 / 1.5;
+  flex: 0 0 auto;
+  border: 1px solid #d4d4d4;
+  background: #fff;
+}
+
+/* Preview toggle button — eye-on/eye-off swap via aria-pressed. Only shown
+   on viewports where the preview pane itself is available. */
+.preview-toggle { display: none; }
+@media (min-width: 1024px) {
+  .preview-toggle { display: inline-flex; }
+}
+.preview-toggle .eye-on,
+.preview-toggle .eye-off { display: none; }
+.preview-toggle[aria-pressed="true"]  .eye-on  { display: inline; }
+.preview-toggle[aria-pressed="false"] .eye-off { display: inline; }
+
+/* When the toggle is off, suppress the pane regardless of viewport size. */
+.page-layout.preview-off .preview-pane { display: none; }
+@media (min-width: 1024px) {
+  .page-layout.preview-off {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .page-layout.preview-off > .wrap {
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+  .page-layout.preview-off ~ .action-bar .action-bar-inner {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 
 /* === 3. Header ============================================================ */
 
@@ -1753,6 +1875,7 @@ textarea:focus-visible {
   .tooltip-btn,
   .tooltip-popover,
   .format-info,
+  .preview-pane,
   .action-bar,
   .modal,
   footer {
