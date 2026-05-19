@@ -170,6 +170,12 @@ function setupInlineValidation() {
   $('s_country')?.addEventListener('input', () => setFieldError($('s_vat'), validateVatInline($('s_vat').value, $('s_country').value)));
   $('b_country')?.addEventListener('input', () => setFieldError($('b_vat'), validateVatInline($('b_vat').value, $('b_country').value)));
 
+  // Switching the seller country also retunes item VAT rates to that
+  // country's standard rate (e.g. DE → 19, FR → 20). Triggered only on
+  // explicit user input — programmatic value changes from loadSeller
+  // don't fire 'input', so persisted state isn't clobbered.
+  $('s_country')?.addEventListener('input', applyCountryDefaultVat);
+
   // Soft date checks — chained re-evaluations because they share state.
   function checkDates() {
     const date = $('r_date').value;
@@ -2610,7 +2616,7 @@ function openPastInvoiceModal() {
   $('past_total').value = '';
   $('past_currency').value = $('r_currency').value || 'EUR';
   $('past_taxmode').value = $('r_taxmode').value || 'S';
-  $('past_vat_rate').value = '20';
+  $('past_vat_rate').value = String(defaultVatForCountry($('s_country').value));
   $('past_number').value = '';
   $('past_project').value = '';
   $('past_category').value = '';
@@ -3923,7 +3929,7 @@ function addItem(data = {}) {
     qty: data.qty ?? 1,
     unit: data.unit || 'C62',
     price: data.price ?? 0,
-    vat: data.vat ?? 20,
+    vat: data.vat ?? defaultVatForCountry($('s_country')?.value),
   };
   state.items.push(item);
   renderItems();
@@ -3938,11 +3944,25 @@ function addItemAfter(idx, data = {}) {
     qty: data.qty ?? 1,
     unit: data.unit || 'C62',
     price: data.price ?? 0,
-    vat: data.vat ?? 20,
+    vat: data.vat ?? defaultVatForCountry($('s_country')?.value),
   };
   state.items.splice(idx + 1, 0, item);
   renderItems();
   return item.id;
+}
+
+// Rewrite every item's VAT rate to the standard rate of the current seller
+// country. Called from the s_country input listener. Items are overwritten
+// unconditionally — switching country is an explicit signal and the per-item
+// rate is cheap to re-edit if a line really needs a custom percentage.
+function applyCountryDefaultVat() {
+  const rate = defaultVatForCountry($('s_country').value);
+  if (!state.items.length) return;
+  let changed = false;
+  for (const it of state.items) {
+    if (Number(it.vat) !== rate) { it.vat = rate; changed = true; }
+  }
+  if (changed) renderItems();
 }
 
 // Inline-delete-confirmation state. At most one row is ever in the
@@ -4211,6 +4231,20 @@ const COUNTRY_NAMES = Object.freeze({
 
 export function countryName(code) {
   return COUNTRY_NAMES[code?.toUpperCase()] || code;
+}
+
+// Default standard VAT rate per seller country, used to pre-fill item VAT
+// fields when the user switches the seller's country. Anything not listed
+// falls back to 20 (the most common EU rate).
+const DEFAULT_VAT_BY_COUNTRY = Object.freeze({
+  DE: 19, AT: 20, FR: 20, BE: 21, NL: 21, ES: 21, IT: 22, LU: 17,
+  PT: 23, IE: 23, DK: 25, SE: 25, FI: 25.5, PL: 23, CZ: 21, HU: 27,
+  GR: 24, RO: 19, BG: 20, HR: 25, SK: 23, SI: 22, EE: 22, LV: 21,
+  LT: 21, MT: 18, CY: 19, GB: 20, NO: 25, CH: 8.1, IS: 24, LI: 8.1,
+});
+function defaultVatForCountry(cc) {
+  const k = String(cc || '').trim().toUpperCase();
+  return DEFAULT_VAT_BY_COUNTRY[k] ?? 20;
 }
 
 // Validates business rules that depend on tax categories
@@ -6272,7 +6306,7 @@ async function init() {
 
   // 2. Defaults the user can immediately edit.
   $('r_date').value = new Date().toISOString().slice(0, 10);
-  addItem({ desc: '', qty: 1, price: 0, vat: 20 });
+  addItem({ desc: '', qty: 1, price: 0 });
 
   // 3. Populate the layout dropdown (its options come from LAYOUTS at runtime).
   const layoutSel = $('invoiceLayoutSelect');
@@ -6294,27 +6328,32 @@ async function init() {
     (async () => { layoutSel.value = await getCurrentLayout(); })(),
   ]);
 
-  // 5. Auto-fill the invoice number if the field is still empty, then refresh
+  // 5. Sync the default item's VAT rate to the (now-loaded) seller country.
+  //    The initial addItem ran before loadSeller, so a persisted non-DE
+  //    seller would otherwise show 19% by accident.
+  applyCountryDefaultVat();
+
+  // 6. Auto-fill the invoice number if the field is still empty, then refresh
   //    the filename preview (which depends on the number).
   await applyNextInvoiceNumber();
   updateFilenamePreview();
 
-  // 6. History UI — populate after translations + load are done so labels are correct.
+  // 7. History UI — populate after translations + load are done so labels are correct.
   $('historyEnable').checked = state.historyEnabled;
   renderHistoryPicker();
 
-  // 7. Apply seller-collapse UI based on whether stammdaten exist.
+  // 8. Apply seller-collapse UI based on whether stammdaten exist.
   applySellerCollapsedUI();
 
-  // 8. Wire up inline-validation listeners and run once over current state.
+  // 9. Wire up inline-validation listeners and run once over current state.
   setupInlineValidation();
   refreshInlineValidation();
 
-  // 9. First-run number-scheme card. Visibility depends on seller + storage.
+  // 10. First-run number-scheme card. Visibility depends on seller + storage.
   updateNumberSetupPreview();
   await updateNumberSetupCardVisibility();
 
-  // 10. Live preview pane: load persisted toggle, attach listeners, render.
+  // 11. Live preview pane: load persisted toggle, attach listeners, render.
   await loadPreviewEnabled();
   setupPreviewListeners();
   schedulePreviewRender();

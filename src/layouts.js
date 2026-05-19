@@ -297,6 +297,10 @@ async function renderInvoiceDIN5008(pdfDoc, ctx) {
 
   // Last-page reserve: totals + VAT note + footnote + payment + greeting/signature
   let lastPageReserve = LINE * 5;  // base totals block (sum/vat/grand)
+  const extraVatGroupsDin = mode === 'S'
+    ? Math.max(0, Object.values(totals.groups || {}).filter(g => g.basis > 0).length - 1)
+    : 0;
+  lastPageReserve += extraVatGroupsDin * LINE;
   if (mode !== 'S') lastPageReserve += LINE * 1.4;
   if (footnote)    lastPageReserve += LINE_TIGHT * Math.max(1, wrapText(footnote, mono, SIZE - 1, contentW).length) + LINE * 0.6;
   if (paymentNote) lastPageReserve += LINE * wrapText(paymentNote, mono, SIZE, contentW).length + LINE * 0.8;
@@ -393,10 +397,14 @@ async function renderInvoiceDIN5008(pdfDoc, ctx) {
     drawTextRight(tI('pdf_sum') + ':', totalLabelX, yy, mono, SIZE);
     drawTextRight(fmtMoney(totals.net), cTotalRight, yy, mono, SIZE);
     yy -= LINE;
-    if (mode === 'S' && totals.tax) {
-      drawTextRight(tI('total_tax_S') + ':', totalLabelX, yy, mono, SIZE);
-      drawTextRight(fmtMoney(totals.tax), cTotalRight, yy, mono, SIZE);
-      yy -= LINE;
+    if (mode === 'S') {
+      const vatGroups = Object.values(totals.groups || {}).filter(g => g.basis > 0);
+      for (const g of vatGroups) {
+        const rateStr = g.rate % 1 === 0 ? String(g.rate) : fmt(g.rate);
+        drawTextRight(`${tI('total_tax_S')} ${rateStr}%:`, totalLabelX, yy, mono, SIZE);
+        drawTextRight(fmtMoney(g.amount), cTotalRight, yy, mono, SIZE);
+        yy -= LINE;
+      }
     }
     drawRule(yy, 0.4, M_L + mm(80), colRight);
     yy -= LINE;
@@ -579,6 +587,10 @@ async function renderInvoiceModern(pdfDoc, ctx) {
   // Last-page reserve for totals + footnote + payment + greeting + signature.
   // This is conservative; better an extra blank-ish tail page than collision.
   let lastPageReserve = LINE * 7;  // base: totals block
+  const extraVatGroups = mode === 'S'
+    ? Math.max(0, Object.values(totals.groups || {}).filter(g => g.basis > 0).length - 1)
+    : 0;
+  lastPageReserve += extraVatGroups * LINE * 1.1;
   if (footnote) lastPageReserve += LINE_TIGHT * Math.max(1, wrapText(footnote, mono, SIZE_BODY - 1.5, contentW).length) + LINE * 0.6;
   if (paymentNote) lastPageReserve += LINE + LINE * wrapText(paymentNote, mono, SIZE_BODY, contentW).length + LINE * 0.4;
   if (greeting)  lastPageReserve += LINE;
@@ -699,19 +711,28 @@ async function renderInvoiceModern(pdfDoc, ctx) {
     drawText(tI('pdf_sum').toUpperCase(), labelX, yy, monoBold, SIZE_LABEL, SOFT);
     drawTextRight(fmtMoney(totals.net), valueXRight, yy, mono, SIZE_BODY);
     yy -= LINE * 1.1;
-    drawText(tI('total_tax_S'), labelX, yy, monoBold, SIZE_LABEL, SOFT);
-    if (mode === 'S' && totals.tax) {
-      drawTextRight(fmtMoney(totals.tax), valueXRight, yy, mono, SIZE_BODY);
+    const vatGroups = mode === 'S'
+      ? Object.values(totals.groups || {}).filter(g => g.basis > 0)
+      : [];
+    if (vatGroups.length > 0) {
+      for (const g of vatGroups) {
+        const rateStr = g.rate % 1 === 0 ? String(g.rate) : fmt(g.rate);
+        drawText(`${tI('total_tax_S')} ${rateStr}%`, labelX, yy, monoBold, SIZE_LABEL, SOFT);
+        drawTextRight(fmtMoney(g.amount), valueXRight, yy, mono, SIZE_BODY);
+        yy -= LINE * 1.1;
+      }
+      yy -= LINE * 0.7;
     } else {
+      drawText(tI('total_tax_S'), labelX, yy, monoBold, SIZE_LABEL, SOFT);
       const vatNote = (tI('pdf_vat_' + mode) || '').replace(/^[^:]+:\s*/, '');
       drawTextRight(vatNote, valueXRight, yy, mono, SIZE_BODY - 1, SOFT);
+      yy -= LINE * 1.8;
     }
-    yy -= LINE * 1.8;
     drawRule(yy + LINE * 0.7, 0.5, labelX, valueXRight);
     yy -= LINE * 0.9;
     drawText(tI('pdf_grand_total').toUpperCase(), labelX, yy, monoBold, SIZE_LABEL, SOFT);
-    drawTextRight(fmtMoney(totals.grand), valueXRight, yy - LINE * 0.4, monoBold, SIZE_TITLE);
-    yy -= LINE * 2.6;
+    drawTextRight(fmtMoney(totals.grand), valueXRight, yy - LINE * 0.25, monoBold, SIZE_BODY + 2);
+    yy -= LINE * 2.4;
 
     if (footnote) {
       for (const ln of wrapText(footnote, mono, SIZE_BODY - 1.5, contentW)) {
@@ -852,7 +873,12 @@ async function renderInvoiceTypewriter(pdfDoc, ctx) {
 
   // Last-page reserve: totals + VAT + footnote + payment + greeting/signature
   let lastPageReserve = LINE_H * 5;  // sum + grand total + spacing
-  lastPageReserve += LINE_H * 1.8;    // VAT line
+  if (mode === 'S') {
+    const vatGroupCount = Object.values(totals.groups || {}).filter(g => g.basis > 0).length;
+    lastPageReserve += vatGroupCount * LINE_H * 1.4;
+  } else {
+    lastPageReserve += LINE_H * 1.8;    // legal VAT note below grand total
+  }
   if (footnote)    lastPageReserve += LINE_TIGHT * Math.max(1, wrapText(footnote, mono, SIZE_BODY - 1, contentW).length) + LINE_H * 0.8;
   if (paymentNote) lastPageReserve += LINE_H * wrapText(paymentNote, mono, SIZE_BODY, contentW).length + LINE_H * 0.8;
   if (greeting)    lastPageReserve += LINE_H;
@@ -931,16 +957,26 @@ async function renderInvoiceTypewriter(pdfDoc, ctx) {
     drawText(sumLabel, cAmountRight - widthAt(sumLabel, mono, SIZE_BODY), yy, mono, SIZE_BODY);
     drawTextRight(fmtMoney(totals.net), cTotalRight, yy, mono, SIZE_BODY);
     yy -= LINE_H * 1.4;
+    if (mode === 'S') {
+      const vatGroups = Object.values(totals.groups || {}).filter(g => g.basis > 0);
+      for (const g of vatGroups) {
+        const rateStr = g.rate % 1 === 0 ? String(g.rate) : fmt(g.rate);
+        const vatLine = `${tI('total_tax_S')} ${rateStr}%`;
+        drawText(vatLine, cAmountRight - widthAt(vatLine, mono, SIZE_BODY), yy, mono, SIZE_BODY);
+        drawTextRight(fmtMoney(g.amount), cTotalRight, yy, mono, SIZE_BODY);
+        yy -= LINE_H * 1.4;
+      }
+    }
     const grandLabel = tI('pdf_grand_total');
     drawText(grandLabel, cAmountRight - widthAt(grandLabel, monoBold, SIZE_BODY), yy, monoBold, SIZE_BODY);
     drawTextRight(fmtMoney(totals.grand), cTotalRight, yy, monoBold, SIZE_BODY);
     yy -= LINE_H * 2.2;
 
-    const vatLabel = mode === 'S' && totals.tax
-      ? `${tI('pdf_vat_label')} ${fmt(totals.tax)} ${currencySym} (${tI('pdf_vat_S').replace(/^[^:]+:\s*/, '')})`
-      : tI('pdf_vat_' + mode);
-    drawText(vatLabel || tI('pdf_vat_label'), M_L, yy, monoBold, SIZE_BODY);
-    yy -= LINE_H * 1.8;
+    if (mode !== 'S') {
+      const vatLabel = tI('pdf_vat_' + mode);
+      drawText(vatLabel || tI('pdf_vat_label'), M_L, yy, monoBold, SIZE_BODY);
+      yy -= LINE_H * 1.8;
+    }
 
     if (footnote) {
       const footLines = wrapText(footnote, mono, SIZE_BODY - 1, contentW);
