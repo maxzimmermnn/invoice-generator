@@ -111,10 +111,12 @@ buttons appearing in the header row when expanded.
 
 ### Customer database
 Add, select, delete customers. Selecting a saved customer fills all buyer
-fields. Buyer reference / Leitweg-ID is stored as BT-10 in the XML
-(required for German government clients). When you select a buyer the
-tool also shows the date and amount of the most recent invoice you sent
-them, so you have context without leaving the form.
+fields. An optional second name line (e.g. department or trading name)
+prints below the buyer name and is stored as BT-45 in the XML. Buyer
+reference / Leitweg-ID is stored as BT-10 in the XML (required for German
+government clients). When you select a buyer the tool also shows the date
+and amount of the most recent invoice you sent them, so you have context
+without leaving the form.
 
 The customer-name input is also backed by a memory of names from past
 invoices (deduplicated, most recent first, capped at 20). Typing or
@@ -131,7 +133,7 @@ from another tool and want to continue an existing series.
 
 ### Date fields
 - Invoice date
-- Due date (with quick chips +14 / +30 / +60 days)
+- Due date (with quick chips +14 / +30 / +60 / +90 days)
 - Service date (required for e-invoicing)
 - Service date end (optional, for date ranges; encoded as
   BillingSpecifiedPeriod in the XML)

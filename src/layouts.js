@@ -232,6 +232,7 @@ async function renderInvoiceDIN5008(pdfDoc, ctx) {
   // Recipient block (Form B: starts at 50mm from top, max 9 lines)
   const recipientLines = [
     buyer.name,
+    buyer.name2,
     buyer.line1,
     `${buyer.zip || ''} ${buyer.city || ''}`.trim(),
     (buyer.country && buyer.country !== seller.country) ? cn(buyer.country).toUpperCase() : '',
@@ -543,6 +544,7 @@ async function renderInvoiceModern(pdfDoc, ctx) {
 
   let yL2 = y, yR2 = y;
   if (buyer.name)  { drawText(buyer.name,  colL, yL2, monoBold, SIZE_BODY); yL2 -= LINE; }
+  if (buyer.name2) { drawText(buyer.name2, colL, yL2, monoBold, SIZE_BODY); yL2 -= LINE; }
   if (seller.name) { drawText(seller.name, colR, yR2, monoBold, SIZE_BODY); yR2 -= LINE; }
 
   const buyerLines  = formatPartyAddress(buyer,  cn, { includeReference: true });
@@ -805,6 +807,7 @@ async function renderInvoiceTypewriter(pdfDoc, ctx) {
   let yBuyer = topY - RULE_NAME_GAP;
   let ySeller = topY - RULE_NAME_GAP;
   if (buyer.name)  { drawText(buyer.name, colBuyerX, yBuyer, monoBold, SIZE_BODY); yBuyer -= LINE_H; }
+  if (buyer.name2) { drawText(buyer.name2, colBuyerX, yBuyer, monoBold, SIZE_BODY); yBuyer -= LINE_H; }
   if (seller.name) { drawTextRight(seller.name, colSellerX, ySeller, monoBold, SIZE_BODY); ySeller -= LINE_H; }
   for (const ln of buyerAddr)  { drawText(ln, colBuyerX, yBuyer, mono, SIZE_BODY); yBuyer -= LINE_TIGHT; }
   for (const ln of sellerAddr) { drawTextRight(ln, colSellerX, ySeller, mono, SIZE_BODY); ySeller -= LINE_TIGHT; }

@@ -1,3 +1,59 @@
+## [1.9.0] - 2026-07-05
+
+Buyer name line 2 and alpha-3 country input on the form side, plus a
+round of code-review fixes — most importantly, multi-page rendering
+works again in all three layouts.
+
+### Added
+
+- **Buyer name line 2 (optional).** Prints below the buyer name in all
+  three layouts and is emitted as BT-45 (`TradingBusinessName`) inside
+  `SpecifiedLegalOrganization` in the XML. Covered by buyer profiles,
+  history snapshots, and the name-autofill emptiness check.
+- **ISO 3166-1 alpha-3 country input.** DEU/FRA/USA etc. are accepted
+  in the country fields and collapsed to alpha-2 on blur;
+  `normalizeCountry` and the default-VAT lookup understand alpha-3
+  directly. More country names for invoice rendering (all EU plus
+  common non-EU).
+- **+90 days due-date chip.**
+- Backup format v6: `preview_enabled` and `seller_collapsed` are now
+  exported and imported.
+- XML validator warns when an out-of-scope (O) invoice carries seller
+  or buyer VAT IDs (BR-O rules).
+
+### Fixed
+
+- **Multi-page rendering.** `makeDrawKit` never exposed `newPage()`, so
+  any invoice whose items overflowed page 1 crashed during generation
+  in all three layouts (broken since v1.5.0). Also added the missing
+  `pdf_page_of` / `pdf_continued` strings in de/en/fr so page footers
+  and continuation headers render translated instead of as raw keys.
+- **Clone from history.** Invoice language, font and layout are now
+  persisted when cloning, so the generated PDF/XML matches what the
+  dropdowns show instead of silently using the previous settings; the
+  snapshot's currency is restored too.
+- **EN 16931 conformance for edge tax modes.** Zero-rated (Z) no longer
+  emits an exemption reason (BR-Z-10); out-of-scope (O) no longer emits
+  a VAT rate at line or breakdown level (BR-O-5).
+- Local-time "today" defaults (invoice date, past-invoice date, due
+  chips) — previously UTC, which was yesterday shortly after midnight
+  in UTC+ timezones.
+- Deleting a buyer left the picker on a stale index; a follow-up "save
+  as customer" could overwrite the wrong profile.
+- Embed-XML path now saves with the same PDF options as the generate
+  path (`useObjectStreams: false`).
+- `{counter:N}` patterns keep matching after the counter outgrows its
+  pad width — previously the counter froze at the N-digit maximum.
+- Past-invoice modal referenced a nonexistent i18n key
+  (`past_modal_intro`) and displayed the raw key text.
+
+### Internal
+
+- Stats overview translates only its own subtree instead of the whole
+  document; VAT inline validation understands alpha-3 country codes;
+  stale comments corrected in `main.js` and `CLAUDE.md`; README and
+  bundled help document the new fields and chips.
+
 ## [1.8.0] - 2026-05-14
 
 Adds a live side-by-side preview of the rendered invoice on desktop

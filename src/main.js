@@ -55,6 +55,14 @@ function parseInvoiceDate(iso) {
   if (!m) return new Date(iso);
   return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
 }
+// Today as 'YYYY-MM-DD' in LOCAL time — the write-side counterpart of
+// parseInvoiceDate. `new Date().toISOString()` is UTC, so in UTC+ timezones
+// it yields yesterday between local midnight and the offset. Every "default
+// to today" in the form must go through this.
+function todayLocalISO(d = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 // Parse a money-like input. Accepts both German (1.234,56 / 1234,56) and
 // English (1,234.56 / 1234.56) conventions, as well as bare integers. The
 // LAST '.' or ',' is treated as the decimal separator, everything before it as
@@ -121,7 +129,10 @@ function validateIBANInline(value) {
 function validateVatInline(value, countryCode) {
   const v = String(value || '').replace(/\s+/g, '').toUpperCase();
   if (!v) return null;
-  const cc = String(countryCode || '').trim().toUpperCase();
+  // Accept a not-yet-collapsed alpha-3 code (DEU/FRA) so the strict
+  // per-country pattern still applies while the field awaits its blur.
+  let cc = String(countryCode || '').trim().toUpperCase();
+  if (cc.length === 3 && cc in ISO_ALPHA3_TO_ALPHA2) cc = ISO_ALPHA3_TO_ALPHA2[cc];
   if (cc === 'DE') return /^DE\d{9}$/.test(v) ? null : 'err_vat_format_de';
   if (cc === 'FR') return /^FR[A-Z0-9]{2}\d{9}$/.test(v) ? null : 'err_vat_format_fr';
   // Generic shape: country prefix + body of digits/letters, total 4-14 chars.
@@ -175,6 +186,19 @@ function setupInlineValidation() {
   // explicit user input — programmatic value changes from loadSeller
   // don't fire 'input', so persisted state isn't clobbered.
   $('s_country')?.addEventListener('input', applyCountryDefaultVat);
+
+  // Collapse a typed ISO 3166-1 alpha-3 code (DEU/FRA/USA…) to alpha-2 on
+  // blur. EN 16931 CountryID is alpha-2, and downstream code expects 2
+  // letters; this keeps what the user sees consistent with what gets saved.
+  const collapseAlpha3 = (el) => {
+    const v = el.value.trim().toUpperCase();
+    if (v.length === 3 && v in ISO_ALPHA3_TO_ALPHA2) {
+      el.value = ISO_ALPHA3_TO_ALPHA2[v];
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  };
+  $('s_country')?.addEventListener('blur', (e) => collapseAlpha3(e.target));
+  $('b_country')?.addEventListener('blur', (e) => collapseAlpha3(e.target));
 
   // Soft date checks — chained re-evaluations because they share state.
   function checkDates() {
@@ -309,6 +333,7 @@ const I18N = {
     drop_pdf: 'PDF hier ablegen oder klicken zum Auswählen',
     // Field labels — seller
     f_company: 'Firmenname / Name',
+    f_company2: 'Firmenname Zeile 2 (optional)',
     f_address: 'Adresszeile',
     f_zip: 'Postleitzahl',
     f_city: 'Stadt',
@@ -463,6 +488,8 @@ const I18N = {
     pdf_payment: 'ZAHLUNG',
     pdf_invoice_label: 'RECHNUNG',
     pdf_vat_id_label: 'USt-IdNr.',
+    pdf_page_of: 'Seite {n} / {total}',
+    pdf_continued: 'Fortsetzung',
     // XML / legal notes
     rc_note: 'Steuerschuldnerschaft des Leistungsempfängers. Reverse charge nach Art. 196 Richtlinie 2006/112/EG.',
     rc_note_Z: 'Steuersatz 0%.',
@@ -503,6 +530,7 @@ const I18N = {
     validate_missing_items: 'Mindestens eine Position erforderlich',
     validate_negative_amounts: 'Negative Summen in Positionen',
     validate_invalid_iban: 'IBAN ungültig (BT-84) — Prüfsumme oder Format stimmt nicht',
+    validate_o_vat_ids: 'Nicht steuerbar (O): USt-IdNrn. von Verkäufer/Käufer dürfen laut EN 16931 (BR-O) nicht angegeben werden',
     // --- PDF metadata (Info dictionary + XMP) ---
     pdf_doc_title: 'Rechnung',
     pdf_doc_subject: 'Factur-X / ZUGFeRD EN 16931 E-Rechnung',
@@ -721,6 +749,7 @@ const I18N = {
     mode_generate_hint: 'The tool generates a clean A4 PDF from your data and embeds the EN 16931 XML.',
     drop_pdf: 'Drop PDF here or click to select',
     f_company: 'Company / Name',
+    f_company2: 'Company name line 2 (optional)',
     f_address: 'Address line',
     f_zip: 'ZIP / Postal code',
     f_city: 'City',
@@ -867,6 +896,8 @@ const I18N = {
     pdf_payment: 'PAYMENT',
     pdf_invoice_label: 'INVOICE',
     pdf_vat_id_label: 'VAT No.',
+    pdf_page_of: 'Page {n} / {total}',
+    pdf_continued: 'continued',
     rc_note: 'Reverse charge: recipient liable for VAT under Art. 196 of Council Directive 2006/112/EC.',
     rc_note_Z: 'VAT 0%.',
     rc_note_E: 'VAT exempt.',
@@ -906,6 +937,7 @@ const I18N = {
     validate_missing_items: 'At least one line item is required',
     validate_negative_amounts: 'Negative amounts in line items',
     validate_invalid_iban: 'IBAN looks invalid (BT-84) — checksum or format mismatch',
+    validate_o_vat_ids: 'Out of scope (O): seller/buyer VAT IDs must not be present per EN 16931 (BR-O rules)',
     // --- PDF metadata (Info dictionary + XMP) ---
     pdf_doc_title: 'Invoice',
     pdf_doc_subject: 'Factur-X / ZUGFeRD EN 16931 e-invoice',
@@ -1124,6 +1156,7 @@ const I18N = {
     mode_generate_hint: 'L\'outil génère une PDF A4 propre à partir de vos données et y intègre le XML EN 16931.',
     drop_pdf: 'Déposez la PDF ici ou cliquez pour la sélectionner',
     f_company: 'Société / Nom',
+    f_company2: 'Société ligne 2 (optionnel)',
     f_address: 'Adresse',
     f_zip: 'Code postal',
     f_city: 'Ville',
@@ -1270,6 +1303,8 @@ const I18N = {
     pdf_payment: 'PAIEMENT',
     pdf_invoice_label: 'FACTURE',
     pdf_vat_id_label: 'N° TVA',
+    pdf_page_of: 'Page {n} / {total}',
+    pdf_continued: 'suite',
     rc_note: 'Autoliquidation : TVA due par le preneur conformément à l\'art. 196 de la directive 2006/112/CE.',
     rc_note_Z: 'TVA 0%.',
     rc_note_E: 'Exonéré de TVA.',
@@ -1309,6 +1344,7 @@ const I18N = {
     validate_missing_items: 'Au moins une ligne est requise',
     validate_negative_amounts: 'Montants négatifs dans les lignes',
     validate_invalid_iban: 'IBAN invalide (BT-84) — somme de contrôle ou format incorrect',
+    validate_o_vat_ids: 'Hors champ (O) : les n° TVA vendeur/acheteur ne doivent pas figurer selon EN 16931 (règles BR-O)',
     // --- PDF metadata (Info dictionary + XMP) ---
     pdf_doc_title: 'Facture',
     pdf_doc_subject: 'Facture électronique Factur-X / ZUGFeRD EN 16931',
@@ -1772,6 +1808,7 @@ async function loadBoilerplateForLang(lang) {
 function collectBuyer() {
   return {
     name: $('b_name').value.trim(),
+    name2: $('b_name2').value.trim(),
     line1: $('b_line1').value.trim(),
     zip: $('b_zip').value.trim(),
     city: $('b_city').value.trim(),
@@ -1783,6 +1820,7 @@ function collectBuyer() {
 }
 function applyBuyer(b) {
   $('b_name').value = nz(b.name);
+  $('b_name2').value = nz(b.name2);
   $('b_line1').value = nz(b.line1);
   $('b_zip').value = nz(b.zip);
   $('b_city').value = nz(b.city);
@@ -1795,6 +1833,7 @@ function applyBuyer(b) {
 }
 function clearBuyer() {
   $('b_name').value = '';
+  $('b_name2').value = '';
   $('b_line1').value = '';
   $('b_zip').value = '';
   $('b_city').value = '';
@@ -1865,7 +1904,8 @@ function findHistoryBuyerByName(name) {
 // True iff every buyer address field except the name is empty. Used to
 // decide whether a datalist pick should autofill without clobbering input.
 function buyerAddressEmpty() {
-  return !$('b_line1').value.trim()
+  return !$('b_name2').value.trim()
+    && !$('b_line1').value.trim()
     && !$('b_zip').value.trim()
     && !$('b_city').value.trim()
     && !$('b_vat').value.trim()
@@ -1908,6 +1948,10 @@ async function deleteBuyer() {
   state.buyers.splice(idx, 1);
   await persistBuyers();
   renderBuyerPicker();
+  // renderBuyerPicker re-selects the old index, which now points at the NEXT
+  // buyer in the list — a later "save as customer" would overwrite that one.
+  // Force the placeholder so the cleared form matches an empty selection.
+  picker.value = '';
   clearBuyer();
   toast(t('msg_deleted'), 'ok');
 }
@@ -1978,7 +2022,10 @@ function patternToCounterRegex(pattern) {
       else if (tok === 'counter') { out += '(\\d+)'; hasCounter = true; }
       else if (tok.startsWith('counter:')) {
         const n = parseInt(tok.slice('counter:'.length), 10);
-        out += Number.isFinite(n) && n > 0 ? `(\\d{${n}})` : '(\\d+)';
+        // {counter:N} pads to N digits but never truncates, so once the
+        // counter outgrows N the number is longer than N digits — match
+        // "at least N" or the counter would silently stop advancing.
+        out += Number.isFinite(n) && n > 0 ? `(\\d{${n},})` : '(\\d+)';
         hasCounter = true;
       } else {
         out += escape('{' + tok + '}');
@@ -2088,8 +2135,8 @@ async function loadFilenamePattern() {
 // Some early versions of the tool stored filename patterns with German
 // token names ({verkäufer}, {projekt}, {kunde}, {kategorie}, {datum}).
 // Rewrite to canonical English tokens on load so the input field shows
-// the documented form. The resolver still accepts the German tokens for
-// compatibility with any patterns we might have missed.
+// the documented form. The resolver itself only knows the English tokens,
+// so every entry point (loadFilenamePattern, importData) must migrate.
 function migrateLegacyFilenameTokens(pattern) {
   return pattern
     .replaceAll('{verkäufer}', '{seller}')
@@ -2326,9 +2373,9 @@ function buildHistorySnapshot() {
 
 // Save a generated invoice to history (no-op when disabled).
 // Hard cap of HISTORY_LIMIT entries — oldest is dropped when full.
-// `mode` records the trigger: 'exported' (PDF generated here, default),
-// 'final' (XML embedded into an existing PDF). Past-invoice manual entries
-// set status separately via buildPastInvoiceSnapshot.
+// `mode` becomes the snapshot's status; both the generate path (btnPDF) and
+// the embed path (runEmbedXML) record the default 'exported'. Past-invoice
+// manual entries build their own snapshot with status 'draft'.
 async function recordHistoryEntry(mode = 'exported') {
   if (!state.historyEnabled) return;
   const snap = buildHistorySnapshot();
@@ -2491,8 +2538,9 @@ function renderHistoryPicker() {
 
 // Apply a history snapshot back into the form. All fields from the snapshot
 // are applied, including the buyer (overwrites whatever is currently there).
-// Date fields stay empty so the user fills them explicitly. Invoice number
-// is auto-assigned via applyNextInvoiceNumber.
+// The invoice date resets to today; delivery and due dates stay empty so the
+// user fills them explicitly. Invoice number is auto-assigned via
+// applyNextInvoiceNumber.
 async function applyHistorySnapshot(snap) {
   const f = snap.form || {};
 
@@ -2510,10 +2558,11 @@ async function applyHistorySnapshot(snap) {
   }));
   renderItems();
 
-  // Project / category / mode
+  // Project / category / mode / currency
   $('r_project').value = nz(f.project);
   $('r_category').value = nz(f.category);
   if (f.taxmode) $('r_taxmode').value = f.taxmode;
+  if (f.currency) $('r_currency').value = f.currency;
 
   // Boilerplate texts
   $('r_intro').value = nz(f.intro);
@@ -2522,14 +2571,30 @@ async function applyHistorySnapshot(snap) {
   $('r_signature').value = nz(f.signature);
   $('r_footnote').value = nz(f.footnote);
 
-  // Invoice settings
-  if (f.invoiceLang !== undefined) $('invoiceLangSelect').value = f.invoiceLang || '';
-  if (f.font) $('invoiceFontSelect').value = f.font;
-  if (f.layout) $('invoiceLayoutSelect').value = f.layout;
+  // Invoice settings. Setting a <select>'s value programmatically doesn't
+  // fire its change handler, so persist explicitly — generation reads the
+  // store (font/layout) and the INVOICE_LANG global (tInvoice), not the DOM.
+  // Don't route through setInvoiceLang() here: it reloads the per-language
+  // boilerplate, which would clobber the snapshot texts applied above.
+  if (f.invoiceLang !== undefined) {
+    const lang = (f.invoiceLang && I18N[f.invoiceLang]) ? f.invoiceLang : '';
+    $('invoiceLangSelect').value = lang;
+    INVOICE_LANG = lang || null;
+    if (lang) localStorage.setItem(INVOICE_LANG_KEY, lang);
+    else localStorage.removeItem(INVOICE_LANG_KEY);
+  }
+  if (f.font && FONT_OPTIONS[f.font]) {
+    $('invoiceFontSelect').value = f.font;
+    await store.set(FONT_KEY, f.font);
+  }
+  if (f.layout && LAYOUTS[f.layout]) {
+    $('invoiceLayoutSelect').value = f.layout;
+    await store.set(LAYOUT_KEY, f.layout);
+  }
 
-  // Date fields stay empty by design — user fills them explicitly
+  // Invoice date resets to today; delivery/due stay empty for explicit entry.
   $('r_number').value = '';
-  $('r_date').value = new Date().toISOString().slice(0, 10);
+  $('r_date').value = todayLocalISO();
   $('r_delivery').value = '';
   $('r_delivery_end').value = '';
   $('r_due').value = '';
@@ -2611,7 +2676,7 @@ function openPastInvoiceModal() {
   closeHistoryModal();
 
   // Pre-fill defaults
-  $('past_date').value = new Date().toISOString().slice(0, 10);
+  $('past_date').value = todayLocalISO();
   $('past_buyer_text').value = '';
   $('past_total').value = '';
   $('past_currency').value = $('r_currency').value || 'EUR';
@@ -3401,7 +3466,9 @@ function renderStatisticsOverview() {
 
   body.innerHTML = yoyBanner + blocks;
   attachChartTooltips();
-  applyTranslations();
+  // Scope to the freshly injected subtree — the global pass re-renders
+  // items/pickers/totals page-wide, which is wasted work here.
+  applyTranslations(body);
 }
 
 // Render the quarterly tax-breakdown view.
@@ -3813,7 +3880,7 @@ function exportOverviewCSV() {
     ];
   });
   const csv = buildCSV(headers, rows);
-  const ts = new Date().toISOString().slice(0, 10);
+  const ts = todayLocalISO();
   const periodLabel = period.replace(/[^a-z0-9]/gi, '_');
   downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }),
     `erechnung-stats-${periodLabel}-${ts}.csv`);
@@ -4208,12 +4275,50 @@ const COUNTRY_ALIAS_MAP = Object.freeze({
   "ÉTATS-UNIS":"US","ÖSTERREICH":"AT","ČESKO":"CZ",
 });
 
+// ISO 3166-1 alpha-3 → alpha-2. EN 16931 / Factur-X CountryID is alpha-2 only,
+// so user-typed alpha-3 input is converted before XML emission.
+const ISO_ALPHA3_TO_ALPHA2 = Object.freeze({
+  AFG:'AF',ALA:'AX',ALB:'AL',DZA:'DZ',ASM:'AS',AND:'AD',AGO:'AO',AIA:'AI',
+  ATA:'AQ',ATG:'AG',ARG:'AR',ARM:'AM',ABW:'AW',AUS:'AU',AUT:'AT',AZE:'AZ',
+  BHS:'BS',BHR:'BH',BGD:'BD',BRB:'BB',BLR:'BY',BEL:'BE',BLZ:'BZ',BEN:'BJ',
+  BMU:'BM',BTN:'BT',BOL:'BO',BES:'BQ',BIH:'BA',BWA:'BW',BVT:'BV',BRA:'BR',
+  IOT:'IO',BRN:'BN',BGR:'BG',BFA:'BF',BDI:'BI',CPV:'CV',KHM:'KH',CMR:'CM',
+  CAN:'CA',CYM:'KY',CAF:'CF',TCD:'TD',CHL:'CL',CHN:'CN',CXR:'CX',CCK:'CC',
+  COL:'CO',COM:'KM',COG:'CG',COD:'CD',COK:'CK',CRI:'CR',CIV:'CI',HRV:'HR',
+  CUB:'CU',CUW:'CW',CYP:'CY',CZE:'CZ',DNK:'DK',DJI:'DJ',DMA:'DM',DOM:'DO',
+  ECU:'EC',EGY:'EG',SLV:'SV',GNQ:'GQ',ERI:'ER',EST:'EE',SWZ:'SZ',ETH:'ET',
+  FLK:'FK',FRO:'FO',FJI:'FJ',FIN:'FI',FRA:'FR',GUF:'GF',PYF:'PF',ATF:'TF',
+  GAB:'GA',GMB:'GM',GEO:'GE',DEU:'DE',GHA:'GH',GIB:'GI',GRC:'GR',GRL:'GL',
+  GRD:'GD',GLP:'GP',GUM:'GU',GTM:'GT',GGY:'GG',GIN:'GN',GNB:'GW',GUY:'GY',
+  HTI:'HT',HMD:'HM',VAT:'VA',HND:'HN',HKG:'HK',HUN:'HU',ISL:'IS',IND:'IN',
+  IDN:'ID',IRN:'IR',IRQ:'IQ',IRL:'IE',IMN:'IM',ISR:'IL',ITA:'IT',JAM:'JM',
+  JPN:'JP',JEY:'JE',JOR:'JO',KAZ:'KZ',KEN:'KE',KIR:'KI',PRK:'KP',KOR:'KR',
+  KWT:'KW',KGZ:'KG',LAO:'LA',LVA:'LV',LBN:'LB',LSO:'LS',LBR:'LR',LBY:'LY',
+  LIE:'LI',LTU:'LT',LUX:'LU',MAC:'MO',MKD:'MK',MDG:'MG',MWI:'MW',MYS:'MY',
+  MDV:'MV',MLI:'ML',MLT:'MT',MHL:'MH',MTQ:'MQ',MRT:'MR',MUS:'MU',MYT:'YT',
+  MEX:'MX',FSM:'FM',MDA:'MD',MCO:'MC',MNG:'MN',MNE:'ME',MSR:'MS',MAR:'MA',
+  MOZ:'MZ',MMR:'MM',NAM:'NA',NRU:'NR',NPL:'NP',NLD:'NL',NCL:'NC',NZL:'NZ',
+  NIC:'NI',NER:'NE',NGA:'NG',NIU:'NU',NFK:'NF',MNP:'MP',NOR:'NO',OMN:'OM',
+  PAK:'PK',PLW:'PW',PSE:'PS',PAN:'PA',PNG:'PG',PRY:'PY',PER:'PE',PHL:'PH',
+  PCN:'PN',POL:'PL',PRT:'PT',PRI:'PR',QAT:'QA',REU:'RE',ROU:'RO',RUS:'RU',
+  RWA:'RW',BLM:'BL',SHN:'SH',KNA:'KN',LCA:'LC',MAF:'MF',SPM:'PM',VCT:'VC',
+  WSM:'WS',SMR:'SM',STP:'ST',SAU:'SA',SEN:'SN',SRB:'RS',SYC:'SC',SLE:'SL',
+  SGP:'SG',SXM:'SX',SVK:'SK',SVN:'SI',SLB:'SB',SOM:'SO',ZAF:'ZA',SGS:'GS',
+  SSD:'SS',ESP:'ES',LKA:'LK',SDN:'SD',SUR:'SR',SJM:'SJ',SWE:'SE',CHE:'CH',
+  SYR:'SY',TWN:'TW',TJK:'TJ',TZA:'TZ',THA:'TH',TLS:'TL',TGO:'TG',TKL:'TK',
+  TON:'TO',TTO:'TT',TUN:'TN',TUR:'TR',TKM:'TM',TCA:'TC',TUV:'TV',UGA:'UG',
+  UKR:'UA',ARE:'AE',GBR:'GB',USA:'US',UMI:'UM',URY:'UY',UZB:'UZ',VUT:'VU',
+  VEN:'VE',VNM:'VN',VGB:'VG',VIR:'VI',WLF:'WF',ESH:'EH',YEM:'YE',ZMB:'ZM',
+  ZWE:'ZW',
+});
+
 function normalizeCountry(input) {
   if (!input || typeof input !== 'string') {
     throw new Error(t('err_country_required'));
   }
   const key = input.trim().toUpperCase().replace(/\s+/g, ' ').replace(/\.$/, '');
   if (key in COUNTRY_ALIAS_MAP) return COUNTRY_ALIAS_MAP[key];
+  if (key in ISO_ALPHA3_TO_ALPHA2) return ISO_ALPHA3_TO_ALPHA2[key];
   // Fall through: any unknown 2-letter uppercase code (e.g. exotic ISO codes)
   if (/^[A-Z]{2}$/.test(key)) return key;
   throw new Error(t('err_country_unknown', { input }));
@@ -4227,6 +4332,13 @@ const COUNTRY_NAMES = Object.freeze({
   GB: 'United Kingdom', US: 'United States', LU: 'Luxembourg',
   DK: 'Denmark', SE: 'Sweden', NO: 'Norway', FI: 'Finland',
   PL: 'Poland', CZ: 'Czech Republic', PT: 'Portugal', IE: 'Ireland',
+  GR: 'Greece', BG: 'Bulgaria', HR: 'Croatia', CY: 'Cyprus',
+  EE: 'Estonia', HU: 'Hungary', LV: 'Latvia', LT: 'Lithuania',
+  MT: 'Malta', RO: 'Romania', SK: 'Slovakia', SI: 'Slovenia',
+  IS: 'Iceland', LI: 'Liechtenstein', RS: 'Serbia', TR: 'Türkiye',
+  UA: 'Ukraine', CA: 'Canada', MX: 'Mexico', BR: 'Brazil',
+  AU: 'Australia', NZ: 'New Zealand', JP: 'Japan', CN: 'China',
+  IN: 'India',
 });
 
 export function countryName(code) {
@@ -4243,7 +4355,8 @@ const DEFAULT_VAT_BY_COUNTRY = Object.freeze({
   LT: 21, MT: 18, CY: 19, GB: 20, NO: 25, CH: 8.1, IS: 24, LI: 8.1,
 });
 function defaultVatForCountry(cc) {
-  const k = String(cc || '').trim().toUpperCase();
+  let k = String(cc || '').trim().toUpperCase();
+  if (k.length === 3 && k in ISO_ALPHA3_TO_ALPHA2) k = ISO_ALPHA3_TO_ALPHA2[k];
   return DEFAULT_VAT_BY_COUNTRY[k] ?? 20;
 }
 
@@ -4316,8 +4429,8 @@ function buildXML() {
       <ram:SpecifiedLineTradeSettlement>
         <ram:ApplicableTradeTax>
           <ram:TypeCode>VAT</ram:TypeCode>
-          <ram:CategoryCode>${mode}</ram:CategoryCode>
-          <ram:RateApplicablePercent>${rate.toFixed(2)}</ram:RateApplicablePercent>
+          <ram:CategoryCode>${mode}</ram:CategoryCode>${mode === 'O' ? '' : `
+          <ram:RateApplicablePercent>${rate.toFixed(2)}</ram:RateApplicablePercent>`}
         </ram:ApplicableTradeTax>
         <ram:SpecifiedTradeSettlementLineMonetarySummation>
           <ram:LineTotalAmount>${lineNet.toFixed(2)}</ram:LineTotalAmount>
@@ -4334,16 +4447,19 @@ function buildXML() {
     O: 'VATEX-EU-O',
   };
 
-  // Tax breakdown XML
+  // Tax breakdown XML. Category quirks per EN 16931:
+  //   Z (BR-Z-10): must NOT carry an exemption reason text or code.
+  //   O (BR-O-5 + breakdown counterpart): must NOT carry a VAT rate at all,
+  //     but DOES need an exemption reason (VATEX-EU-O covers the code).
   const taxBreakdownXML = Object.values(taxGroups).map(g => `
       <ram:ApplicableTradeTax>
         <ram:CalculatedAmount>${g.amount.toFixed(2)}</ram:CalculatedAmount>
         <ram:TypeCode>VAT</ram:TypeCode>
-        ${mode !== 'S' && reverseChargeNote ? `<ram:ExemptionReason>${esc(reverseChargeNote)}</ram:ExemptionReason>` : ''}
+        ${mode !== 'S' && mode !== 'Z' && reverseChargeNote ? `<ram:ExemptionReason>${esc(reverseChargeNote)}</ram:ExemptionReason>` : ''}
         <ram:BasisAmount>${g.basis.toFixed(2)}</ram:BasisAmount>
         <ram:CategoryCode>${mode}</ram:CategoryCode>
-        ${exemptionCodes[mode] ? `<ram:ExemptionReasonCode>${exemptionCodes[mode]}</ram:ExemptionReasonCode>` : ''}
-        <ram:RateApplicablePercent>${g.rate.toFixed(2)}</ram:RateApplicablePercent>
+        ${exemptionCodes[mode] ? `<ram:ExemptionReasonCode>${exemptionCodes[mode]}</ram:ExemptionReasonCode>` : ''}${mode === 'O' ? '' : `
+        <ram:RateApplicablePercent>${g.rate.toFixed(2)}</ram:RateApplicablePercent>`}
       </ram:ApplicableTradeTax>`).join('');
 
   const paymentMeansXML = seller.iban ? `
@@ -4415,9 +4531,10 @@ function buildXML() {
       </ram:SellerTradeParty>
       <ram:BuyerTradeParty>
         <ram:Name>${esc(buyer.name)}</ram:Name>
-        ${buyer.siret ? `
-        <ram:SpecifiedLegalOrganization>
-          <ram:ID schemeID="${buyer.siret.replace(/\s/g, '').length === 14 ? '0002' : '0009'}">${esc(buyer.siret.replace(/\s/g, ''))}</ram:ID>
+        ${(buyer.siret || buyer.name2) ? `
+        <ram:SpecifiedLegalOrganization>${buyer.siret ? `
+          <ram:ID schemeID="${buyer.siret.replace(/\s/g, '').length === 14 ? '0002' : '0009'}">${esc(buyer.siret.replace(/\s/g, ''))}</ram:ID>` : ''}${buyer.name2 ? `
+          <ram:TradingBusinessName>${esc(buyer.name2)}</ram:TradingBusinessName>` : ''}
         </ram:SpecifiedLegalOrganization>` : ''}
         <ram:PostalTradeAddress>
           <ram:PostcodeCode>${esc(buyer.zip)}</ram:PostcodeCode>
@@ -4709,6 +4826,9 @@ $('btnValidate').addEventListener('click', () => {
       mode === 'AE' && !$('s_vat').value.trim() ? t('validate_rc_seller_vat') : null,
       mode === 'AE' && !$('b_vat').value.trim() ? t('validate_rc_buyer_vat') : null,
       mode === 'S' && !$('s_vat').value.trim() ? t('validate_recommend_seller_vat') : null,
+      // BR-O-2/-3/-4: an invoice that is entirely out of scope must not carry
+      // seller or buyer VAT identifiers. Soft warning — emission isn't blocked.
+      mode === 'O' && ($('s_vat').value.trim() || $('b_vat').value.trim()) ? t('validate_o_vat_ids') : null,
       state.items.length > 0 ? null : t('validate_missing_items'),
       nums.every(x => x >= 0) ? null : t('validate_negative_amounts'),
       // IBAN: only flag when present-but-malformed — leaving it blank is fine
@@ -4998,8 +5118,15 @@ export function makeDrawKit(pdfDoc, fonts, opts = {}) {
     page.drawLine({ start: { x: x1, y }, end: { x: x2, y }, thickness, color: INK });
   }
 
+  // Start a fresh page; all draw helpers target it from here on. The `page`
+  // getter below is what keeps renderers seeing the current page.
+  function newPage() {
+    page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+    return page;
+  }
+
   return { mono, monoBold, INK, SOFT, PAGE_W, PAGE_H, get page() { return page; },
-    widthAt, wrapText, drawText, drawTextRight, drawTextCenter, drawRule };
+    widthAt, wrapText, drawText, drawTextRight, drawTextCenter, drawRule, newPage };
 }
 
 // -------- PDF/A: sRGB ICC profile (IEC61966-2.1, 588 bytes) --------
@@ -5227,7 +5354,7 @@ async function exportData() {
   const numberPattern = await store.get(NUMBER_PATTERN_KEY);
   const payload = {
     format: 'erechnung-backup',
-    version: 5,
+    version: 6,
     exported_at: new Date().toISOString(),
     seller: sellerJSON ? JSON.parse(sellerJSON) : null,
     boilerplate: boilerplateJSON ? JSON.parse(boilerplateJSON) : {},
@@ -5246,9 +5373,12 @@ async function exportData() {
     lang: localStorage.getItem(LANG_KEY),
     invoice_lang: localStorage.getItem(INVOICE_LANG_KEY),
     theme: localStorage.getItem(THEME_KEY),
+    // v6+
+    preview_enabled: previewEnabled,
+    seller_collapsed: sellerCollapsed,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const ts = new Date().toISOString().slice(0, 10);
+  const ts = todayLocalISO();
   downloadBlob(blob, `erechnung-backup-${ts}.json`);
   toast(`${t('msg_backup_export')} 1 ${t('msg_backup_seller')}, ${payload.buyers.length} ${t('msg_backup_buyers')}, ${payload.footnotes.length} ${t('msg_backup_footnotes')}.`, 'ok');
 }
@@ -5340,6 +5470,8 @@ function sanitizeBackupPayload(raw) {
     } else issues.push('history');
   }
   if (typeof raw.history_enabled === 'boolean') clean.history_enabled = raw.history_enabled;
+  if (typeof raw.preview_enabled === 'boolean') clean.preview_enabled = raw.preview_enabled;
+  if (typeof raw.seller_collapsed === 'boolean') clean.seller_collapsed = raw.seller_collapsed;
   if (raw.number_pattern !== undefined && raw.number_pattern !== null) {
     if (typeof raw.number_pattern === 'string') clean.number_pattern = raw.number_pattern;
     else issues.push('number_pattern');
@@ -5468,6 +5600,14 @@ async function importData(file) {
         localStorage.setItem(THEME_KEY, payload.theme);
         applyTheme(payload.theme);
       }
+    }
+    // Preview + seller-collapse toggles (v6+). The setters persist and
+    // apply the UI state in one go.
+    if (typeof payload.preview_enabled === 'boolean') {
+      await setPreviewEnabled(payload.preview_enabled);
+    }
+    if (typeof payload.seller_collapsed === 'boolean') {
+      await setSellerCollapsed(payload.seller_collapsed);
     }
     toast(`${t('msg_backup_import_done')} ${sellerCount} ${t('msg_backup_seller')}, ${buyerCount} ${t('msg_backup_buyers')}, ${footnoteCount} ${t('msg_backup_footnotes')}.`, 'ok');
     if (issues.length) {
@@ -5660,14 +5800,14 @@ All three layouts support multi-page rendering when item lists overflow a single
 Master data (address, VAT ID, IBAN, BIC, bank, optional SIRET) is stored locally. The seller section collapses to a one-line summary (\`Company · VAT ID · Country\`) once filled in, with save and reset buttons appearing in the header row when expanded.
 
 ### Customer database
-Add, select, delete customers. Selecting a saved customer fills all buyer fields. Buyer reference / Leitweg-ID is stored as BT-10 in the XML (required for German government clients). When you select a buyer the tool also shows the date and amount of the most recent invoice you sent them.
+Add, select, delete customers. Selecting a saved customer fills all buyer fields. An optional second name line (e.g. department or trading name) prints below the buyer name and is stored as BT-45 in the XML. Buyer reference / Leitweg-ID is stored as BT-10 in the XML (required for German government clients). When you select a buyer the tool also shows the date and amount of the most recent invoice you sent them.
 
 ### Invoice number with pattern
 Default pattern: \`{yyyy}-{counter:5}\` e.g. \`2026-00042\`. An internal counter increments by 1 after each invoice. Available tokens: \`{yyyy}\`, \`{yy}\`, \`{mm}\`, \`{dd}\`, \`{counter}\`, \`{counter:N}\`. The pattern is editable and persistent.
 
 ### Date fields
 - Invoice date
-- Due date with quick chips +14 / +30 / +60 days
+- Due date with quick chips +14 / +30 / +60 / +90 days
 - Service date (required for e-invoicing)
 - Service date end (optional, for date ranges; encoded as BillingSpecifiedPeriod in the XML)
 
@@ -5902,7 +6042,9 @@ async function runEmbedXML() {
     setPDFTrailerID(pdfDoc);
 
     const outName = resolveFilenamePattern($('r_filename').value) + '.pdf';
-    const finalBytes = await pdfDoc.save();
+    // Same save options as the generate path (btnPDF) so both outputs get
+    // identical PDF structure for downstream validators.
+    const finalBytes = await pdfDoc.save({ useObjectStreams: false });
     const blob = new Blob([finalBytes], { type: 'application/pdf' });
     downloadBlob(blob, outName);
 
@@ -6232,7 +6374,7 @@ $('saveFilenamePattern').addEventListener('click', saveFilenamePattern);
 document.querySelectorAll('.due-chips button').forEach(btn => {
   btn.addEventListener('click', () => {
     const days = parseInt(btn.dataset.days, 10);
-    const baseStr = $('r_date').value || new Date().toISOString().slice(0, 10);
+    const baseStr = $('r_date').value || todayLocalISO();
     // Parse as local date to avoid timezone shifts
     const [y, m, d] = baseStr.split('-').map(Number);
     const base = new Date(y, m - 1, d);
@@ -6305,7 +6447,7 @@ async function init() {
   applyTranslations();
 
   // 2. Defaults the user can immediately edit.
-  $('r_date').value = new Date().toISOString().slice(0, 10);
+  $('r_date').value = todayLocalISO();
   addItem({ desc: '', qty: 1, price: 0 });
 
   // 3. Populate the layout dropdown (its options come from LAYOUTS at runtime).

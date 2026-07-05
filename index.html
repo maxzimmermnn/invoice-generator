@@ -143,7 +143,7 @@
       <input type="text" id="s_city" autocomplete="off">
     </label>
     <label><span data-i18n="f_country_de"></span>
-      <input type="text" id="s_country" value="DE" maxlength="2" autocomplete="off">
+      <input type="text" id="s_country" value="DE" maxlength="3" autocomplete="off">
     </label>
     <label><span data-i18n="f_vat_de"></span>
       <input type="text" id="s_vat" autocomplete="off">
@@ -191,6 +191,9 @@
       <input type="text" id="b_name" list="buyerNamesMemory" autocomplete="off">
       <datalist id="buyerNamesMemory"></datalist>
     </label>
+    <label class="full"><span data-i18n="f_company2"></span>
+      <input type="text" id="b_name2" autocomplete="off">
+    </label>
     <label class="full"><span data-i18n="f_address"></span>
       <input type="text" id="b_line1">
     </label>
@@ -201,7 +204,7 @@
       <input type="text" id="b_city">
     </label>
     <label><span data-i18n="f_country"></span>
-      <input type="text" id="b_country" value="FR" maxlength="2">
+      <input type="text" id="b_country" value="FR" maxlength="3">
     </label>
     <label><span data-i18n="f_vat_b2b"></span>
       <input type="text" id="b_vat">
@@ -254,6 +257,7 @@
         <button type="button" data-days="14">+14 <span data-i18n="chip_days"></span></button>
         <button type="button" data-days="30">+30 <span data-i18n="chip_days"></span></button>
         <button type="button" data-days="60">+60 <span data-i18n="chip_days"></span></button>
+        <button type="button" data-days="90">+90 <span data-i18n="chip_days"></span></button>
       </span>
     </label>
     <label>
@@ -568,7 +572,7 @@
       <h2 data-i18n="past_modal_title"></h2>
       <button id="pastCancel" class="tiny-btn" type="button" data-i18n="past_cancel"></button>
     </div>
-    <p class="modal-intro" data-i18n="past_modal_intro"></p>
+    <p class="modal-intro" data-i18n="past_modal_hint"></p>
     <div class="grid">
       <label><span data-i18n="past_field_date"></span>
         <input type="date" id="past_date">
