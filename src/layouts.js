@@ -354,7 +354,7 @@ async function renderInvoiceDIN5008(pdfDoc, ctx) {
     const footY = mm(20);
     drawRule(footY + LINE * 1.5, 0.3, M_L, colRight);
     const colW = contentW / 3;
-    const col1 = [seller.name, seller.line1, `${seller.zip || ''} ${seller.city || ''}`.trim(), seller.country ? cn(seller.country) : ''].filter(Boolean);
+    const col1 = [seller.name, seller.name2, seller.line1, `${seller.zip || ''} ${seller.city || ''}`.trim(), seller.country ? cn(seller.country) : ''].filter(Boolean);
     const col2 = [seller.phone, seller.email, seller.vat ? `${tI('pdf_vat_id_label')}: ${seller.vat}` : '', seller.siret ? `SIRET: ${seller.siret}` : ''].filter(Boolean);
     const col3 = [seller.bank, seller.iban ? `IBAN: ${seller.iban.replace(/(.{4})/g, '$1 ').trim()}` : '', seller.bic ? `BIC: ${seller.bic}` : ''].filter(Boolean);
     const drawCol = (lines, x) => {
@@ -545,7 +545,8 @@ async function renderInvoiceModern(pdfDoc, ctx) {
   let yL2 = y, yR2 = y;
   if (buyer.name)  { drawText(buyer.name,  colL, yL2, monoBold, SIZE_BODY); yL2 -= LINE; }
   if (buyer.name2) { drawText(buyer.name2, colL, yL2, monoBold, SIZE_BODY); yL2 -= LINE; }
-  if (seller.name) { drawText(seller.name, colR, yR2, monoBold, SIZE_BODY); yR2 -= LINE; }
+  if (seller.name)  { drawText(seller.name,  colR, yR2, monoBold, SIZE_BODY); yR2 -= LINE; }
+  if (seller.name2) { drawText(seller.name2, colR, yR2, monoBold, SIZE_BODY); yR2 -= LINE; }
 
   const buyerLines  = formatPartyAddress(buyer,  cn, { includeReference: true });
   const sellerLines = formatPartyAddress(seller, cn, { includeContact: true });
@@ -808,7 +809,8 @@ async function renderInvoiceTypewriter(pdfDoc, ctx) {
   let ySeller = topY - RULE_NAME_GAP;
   if (buyer.name)  { drawText(buyer.name, colBuyerX, yBuyer, monoBold, SIZE_BODY); yBuyer -= LINE_H; }
   if (buyer.name2) { drawText(buyer.name2, colBuyerX, yBuyer, monoBold, SIZE_BODY); yBuyer -= LINE_H; }
-  if (seller.name) { drawTextRight(seller.name, colSellerX, ySeller, monoBold, SIZE_BODY); ySeller -= LINE_H; }
+  if (seller.name)  { drawTextRight(seller.name, colSellerX, ySeller, monoBold, SIZE_BODY); ySeller -= LINE_H; }
+  if (seller.name2) { drawTextRight(seller.name2, colSellerX, ySeller, monoBold, SIZE_BODY); ySeller -= LINE_H; }
   for (const ln of buyerAddr)  { drawText(ln, colBuyerX, yBuyer, mono, SIZE_BODY); yBuyer -= LINE_TIGHT; }
   for (const ln of sellerAddr) { drawTextRight(ln, colSellerX, ySeller, mono, SIZE_BODY); ySeller -= LINE_TIGHT; }
 

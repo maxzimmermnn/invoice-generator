@@ -23,13 +23,20 @@ const HISTORY_ENABLED_KEY = 'erechnung:history_enabled:v1';
 const HISTORY_LIMIT = 1000;
 const YOY_ENABLED_KEY = 'erechnung:yoy_enabled:v1';
 const YOY_DATA_KEY = 'erechnung:yoy:v1';
-const SELLER_COLLAPSED_KEY = 'erechnung:seller_collapsed:v1';
+const TEXTPRESETS_KEY = 'erechnung:textpresets:v1';
+const DUE_DAYS_KEY = 'erechnung:due_days:v1';
 
 const state = {
   items: [],
   pdfFile: null,
   buyers: [],
   footnotes: [],
+  // Text-block presets: { intro: [{id,name,text}], paymentNote: [...], footnote: [...] }
+  // plus the currently selected preset id per block. Persisted under
+  // TEXTPRESETS_KEY; legacy FOOTNOTES_KEY entries are migrated in on first load.
+  textPresets: { intro: [], paymentNote: [], footnote: [] },
+  selectedPreset: { intro: '', paymentNote: '', footnote: '' },
+  dueDays: 14,            // active due-date chip (+N days on the issue date)
   history: [],            // array of invoice snapshots, newest first
   historyEnabled: true,   // user toggle; defaults to on
   yoyEnabled: false,      // year-over-year arrow visibility (default off)
@@ -264,6 +271,113 @@ function refreshInlineValidation() {
 // -------- i18n: language dictionary --------
 const I18N = {
   de: {
+    // Redesign 1a: shell, tabs, seller chip, onboarding, presets, backup
+    tab_buyer: 'Käufer',
+    tab_items: 'Positionen',
+    tab_details: 'Rechnungsdaten',
+    label_history: 'Verlauf',
+    label_stats: 'Statistik',
+    btn_duplicate_short: 'Letzte duplizieren',
+    menu_ui_language: 'UI-Sprache',
+    menu_theme: 'Design',
+    seg_light: 'Hell',
+    seg_dark: 'Dunkel',
+    seg_auto: 'Auto',
+    menu_help: 'Hilfe & Doku',
+    menu_backup: 'Backup / Wiederherstellen…',
+    menu_rerun_setup: 'Ersteinrichtung ansehen…',
+    seller_profile_caption: 'Verkäuferprofil',
+    seller_edit_title: 'Verkäuferprofil bearbeiten',
+    seller_chip_empty: 'Verkäufer einrichten…',
+    f_vat_short: 'USt-IdNr.',
+    btn_edit: 'Bearbeiten',
+    btn_rerun_setup: 'Zurücksetzen & neu einrichten',
+    btn_cancel: 'Abbrechen',
+    btn_save: 'Speichern',
+    recent_customers: 'Letzte Kunden',
+    recent_customers_empty: 'Noch keine gespeicherten Kunden.',
+    buyer_name_placeholder: 'Tippen — ergänzt aus früheren Käufern',
+    buyer_more_summary: 'Mehr: Namenszeile 2, SIRET, Leitweg-ID',
+    btn_save_customer: 'Als Kunde speichern',
+    btn_update_customer: 'Kunde aktualisieren',
+    btn_delete: 'Löschen',
+    confirm_delete_customer: 'Diesen Kunden löschen?',
+    confirm_yes: 'Ja',
+    confirm_no: 'Nein',
+    th_total: 'Summe',
+    items_empty_hint: 'Noch keine Positionen — füge hinzu, was du abrechnest.',
+    btn_add_first_line: '+ Erste Position',
+    totals_net_at: 'Netto @ {rate}%',
+    sec_numbering: 'Nummern & Termine',
+    sec_project_category: 'Projekt & Kategorie',
+    sec_text_blocks: 'Textbausteine',
+    sec_currency_tax: 'Währung & Steuer',
+    sec_layout: 'Layout',
+    sec_filename: 'Dateimuster',
+    btn_make_period: '+ Zeitraum daraus machen',
+    btn_remove_period: 'Enddatum entfernen',
+    preset_save_as: 'Als neues Preset speichern…',
+    preset_name_placeholder: 'Preset-Name',
+    preset_delete_title: 'Preset löschen',
+    preset_name_standard: 'Standard',
+    preset_name_short: 'Kurz',
+    preset_name_net30: '30 Tage netto',
+    preset_name_none: 'Ohne',
+    preset_name_smallbiz: 'Kleinunternehmer (§19 UStG)',
+    preset_text_intro_standard: 'Vielen Dank für die gute Zusammenarbeit. Wie vereinbart stelle ich Ihnen folgende Leistungen in Rechnung:',
+    preset_text_intro_short: 'Anbei die Rechnung für die unten aufgeführten Leistungen.',
+    preset_text_payment_standard: 'Zahlbar bis {due} per Überweisung auf das unten genannte Konto.',
+    preset_text_payment_net30: 'Zahlbar innerhalb von 30 Tagen ab Rechnungsdatum per Überweisung.',
+    preset_text_footnote_smallbiz: 'Als Kleinunternehmer im Sinne von §19 UStG wird keine Umsatzsteuer berechnet.',
+    msg_preset_saved: 'Preset gespeichert',
+    msg_preset_deleted: 'Preset gelöscht',
+    filename_insert_label: 'Einfügen:',
+    validate_title: 'Validierungs-Checkliste',
+    validate_pass_xml: 'XML wohlgeformt',
+    validate_pass_fields: 'Pflichtfelder vorhanden',
+    validate_pass_iban: 'IBAN-Prüfsumme gültig',
+    validate_footer: 'Nicht blockierend — Export ist trotzdem möglich.',
+    history_autosave: 'Auto-Speichern',
+    history_count_label: '{n} / {limit} gespeichert',
+    th_number: 'Nr.',
+    th_buyer: 'Käufer',
+    th_date: 'Datum',
+    th_total_col: 'Summe',
+    btn_history_reload: 'Laden',
+    confirm_delete_short: 'Löschen?',
+    clear_all_confirm: 'Alle {count} Einträge löschen?',
+    btn_yes_clear: 'Ja, löschen',
+    stats_empty_title: 'Noch keine Rechnungen',
+    stats_empty_cta: 'Erste Rechnung erstellen',
+    backup_title: 'Backup & Wiederherstellung',
+    backup_export_head: 'Export',
+    backup_export_body: 'Lädt alles als eine JSON-Datei herunter: Verkäuferprofil, {buyers} Kundenprofil(e), {history} Rechnung(en) im Verlauf, Text-Presets und Einstellungen.',
+    btn_download_backup: 'backup.json herunterladen',
+    backup_import_head: 'Import',
+    backup_import_body: 'Stellt Daten aus einer zuvor exportierten Backup-Datei wieder her. Ersetzt aktuelle Kunden, Verlauf und Presets.',
+    backup_choose_file: 'backup.json auswählen…',
+    backup_ready: 'Bereit zur Wiederherstellung:',
+    backup_restore: 'Backup wiederherstellen',
+    backup_seller_line: 'Verkäuferprofil: {name}',
+    backup_buyers_line: '{n} Kundenprofil(e)',
+    backup_history_line: '{n} Rechnung(en) im Verlauf',
+    ob_step_1: 'Schritt 1 von 2',
+    ob_step_2: 'Schritt 2 von 2',
+    ob_title_seller: 'Verkäuferprofil einrichten',
+    ob_body_seller: 'Deine Geschäftsdaten — sie erscheinen auf jeder Rechnung und werden nur einmal eingegeben.',
+    ob_company_placeholder: 'z. B. Max Mustermann',
+    ob_load_demo: 'Beispieldaten laden',
+    ob_continue: 'Weiter →',
+    ob_title_number: 'Rechnungsnummern festlegen',
+    ob_body_number: 'Einmal ein Muster wählen — jede neue Rechnung nummeriert sich ab hier selbst.',
+    ob_tokens_label: 'Bausteine:',
+    ob_next_numbers: 'Nächste Nummern',
+    ob_back: '← Zurück',
+    ob_finish: 'Einrichtung abschließen',
+    msg_setup_done: 'Einrichtung gespeichert',
+    help_search_placeholder: 'Themen durchsuchen…',
+    help_no_results: 'Keine Treffer.',
+    f_buyer_reference_placeholder: 'für Behörden (Leitweg-ID)',
     // Header
     title: 'E-Rechnung Generator',
     subtitle: 'ZUGFeRD 2.3 · Factur-X · EN 16931 (Comfort)',
@@ -687,6 +801,113 @@ const I18N = {
     buyer_history_hint_no_date: 'Letzte Rechnung an diesen Kunden: {number} · {total}',
   },
   en: {
+    // Redesign 1a: shell, tabs, seller chip, onboarding, presets, backup
+    tab_buyer: 'Buyer',
+    tab_items: 'Items',
+    tab_details: 'Invoice info',
+    label_history: 'History',
+    label_stats: 'Stats',
+    btn_duplicate_short: 'Duplicate last',
+    menu_ui_language: 'UI language',
+    menu_theme: 'Theme',
+    seg_light: 'Light',
+    seg_dark: 'Dark',
+    seg_auto: 'Auto',
+    menu_help: 'Help & docs',
+    menu_backup: 'Backup / restore data…',
+    menu_rerun_setup: 'Preview first-run setup…',
+    seller_profile_caption: 'Seller profile',
+    seller_edit_title: 'Edit seller profile',
+    seller_chip_empty: 'Set up seller…',
+    f_vat_short: 'VAT ID',
+    btn_edit: 'Edit',
+    btn_rerun_setup: 'Reset & re-run setup',
+    btn_cancel: 'Cancel',
+    btn_save: 'Save',
+    recent_customers: 'Recent customers',
+    recent_customers_empty: 'No saved customers yet.',
+    buyer_name_placeholder: 'Start typing — autocompletes from past buyers',
+    buyer_more_summary: 'More: name line 2, SIRET, buyer reference / Leitweg-ID',
+    btn_save_customer: 'Save as customer',
+    btn_update_customer: 'Update customer',
+    btn_delete: 'Delete',
+    confirm_delete_customer: 'Delete this customer?',
+    confirm_yes: 'Yes',
+    confirm_no: 'No',
+    th_total: 'Total',
+    items_empty_hint: 'No line items yet — add what you\'re billing for.',
+    btn_add_first_line: '+ Add first line',
+    totals_net_at: 'Net @ {rate}%',
+    sec_numbering: 'Numbering & dates',
+    sec_project_category: 'Project & category',
+    sec_text_blocks: 'Text blocks',
+    sec_currency_tax: 'Currency & tax',
+    sec_layout: 'Layout',
+    sec_filename: 'Filename pattern',
+    btn_make_period: '+ Make it a period',
+    btn_remove_period: 'Remove end date',
+    preset_save_as: 'Save as new preset…',
+    preset_name_placeholder: 'Preset name',
+    preset_delete_title: 'Delete preset',
+    preset_name_standard: 'Standard',
+    preset_name_short: 'Short',
+    preset_name_net30: 'Net 30',
+    preset_name_none: 'None',
+    preset_name_smallbiz: 'Small business note (§19 UStG)',
+    preset_text_intro_standard: 'Thank you for the good cooperation and, as agreed, I will invoice you for the following services:',
+    preset_text_intro_short: 'Please find the invoice for the services below.',
+    preset_text_payment_standard: 'Payment due until {due} by money transfer only to the account found at the bottom of the invoice.',
+    preset_text_payment_net30: 'Payment due within 30 days of the invoice date via bank transfer.',
+    preset_text_footnote_smallbiz: 'As a small business owner, I do not charge VAT according to §19 UStG.',
+    msg_preset_saved: 'Preset saved',
+    msg_preset_deleted: 'Preset deleted',
+    filename_insert_label: 'Insert:',
+    validate_title: 'Validation checklist',
+    validate_pass_xml: 'XML well-formed',
+    validate_pass_fields: 'Required fields present',
+    validate_pass_iban: 'IBAN checksum valid',
+    validate_footer: 'Non-blocking — you can still export.',
+    history_autosave: 'Auto-save',
+    history_count_label: '{n} / {limit} saved',
+    th_number: 'No.',
+    th_buyer: 'Buyer',
+    th_date: 'Date',
+    th_total_col: 'Total',
+    btn_history_reload: 'Reload',
+    confirm_delete_short: 'Delete?',
+    clear_all_confirm: 'Delete all {count} snapshots?',
+    btn_yes_clear: 'Yes, clear',
+    stats_empty_title: 'No invoices yet',
+    stats_empty_cta: 'Create your first invoice',
+    backup_title: 'Backup & restore',
+    backup_export_head: 'Export',
+    backup_export_body: 'Downloads everything as one JSON file: seller profile, {buyers} buyer profile(s), {history} invoice(s) in history, text presets, and settings.',
+    btn_download_backup: 'Download backup.json',
+    backup_import_head: 'Import',
+    backup_import_body: 'Restores data from a previously exported backup file. This replaces your current buyers, history, and presets.',
+    backup_choose_file: 'Choose a backup.json file…',
+    backup_ready: 'Ready to restore:',
+    backup_restore: 'Restore backup',
+    backup_seller_line: 'Seller profile: {name}',
+    backup_buyers_line: '{n} buyer profile(s)',
+    backup_history_line: '{n} invoice(s) in history',
+    ob_step_1: 'Step 1 of 2',
+    ob_step_2: 'Step 2 of 2',
+    ob_title_seller: 'Set up your seller profile',
+    ob_body_seller: 'This is your business info — it appears on every invoice and only needs to be entered once.',
+    ob_company_placeholder: 'e.g. Max Mustermann',
+    ob_load_demo: 'Load demo data',
+    ob_continue: 'Continue →',
+    ob_title_number: 'Choose your invoice numbering',
+    ob_body_number: 'Pick a pattern once — every new invoice numbers itself from here.',
+    ob_tokens_label: 'Tokens:',
+    ob_next_numbers: 'Next numbers',
+    ob_back: '← Back',
+    ob_finish: 'Finish setup',
+    msg_setup_done: 'Setup saved',
+    help_search_placeholder: 'Search topics…',
+    help_no_results: 'No topics match.',
+    f_buyer_reference_placeholder: 'government clients (Leitweg-ID)',
     title: 'E-Invoice Generator',
     subtitle: 'ZUGFeRD 2.3 · Factur-X · EN 16931 (Comfort)',
     theme_auto: 'Auto (System)',
@@ -1094,6 +1315,113 @@ const I18N = {
     buyer_history_hint_no_date: 'Last invoice to this buyer: {number} · {total}',
   },
   fr: {
+    // Redesign 1a: shell, tabs, seller chip, onboarding, presets, backup
+    tab_buyer: 'Client',
+    tab_items: 'Lignes',
+    tab_details: 'Infos facture',
+    label_history: 'Historique',
+    label_stats: 'Stats',
+    btn_duplicate_short: 'Dupliquer la dernière',
+    menu_ui_language: 'Langue de l\'interface',
+    menu_theme: 'Thème',
+    seg_light: 'Clair',
+    seg_dark: 'Sombre',
+    seg_auto: 'Auto',
+    menu_help: 'Aide & docs',
+    menu_backup: 'Sauvegarde / restauration…',
+    menu_rerun_setup: 'Revoir la configuration initiale…',
+    seller_profile_caption: 'Profil vendeur',
+    seller_edit_title: 'Modifier le profil vendeur',
+    seller_chip_empty: 'Configurer le vendeur…',
+    f_vat_short: 'N° TVA',
+    btn_edit: 'Modifier',
+    btn_rerun_setup: 'Réinitialiser & reconfigurer',
+    btn_cancel: 'Annuler',
+    btn_save: 'Enregistrer',
+    recent_customers: 'Clients récents',
+    recent_customers_empty: 'Aucun client enregistré pour l\'instant.',
+    buyer_name_placeholder: 'Saisir — complété depuis les clients passés',
+    buyer_more_summary: 'Plus : 2e ligne de nom, SIRET, référence acheteur / Leitweg-ID',
+    btn_save_customer: 'Enregistrer comme client',
+    btn_update_customer: 'Mettre à jour le client',
+    btn_delete: 'Supprimer',
+    confirm_delete_customer: 'Supprimer ce client ?',
+    confirm_yes: 'Oui',
+    confirm_no: 'Non',
+    th_total: 'Total',
+    items_empty_hint: 'Aucune ligne pour l\'instant — ajoutez ce que vous facturez.',
+    btn_add_first_line: '+ Ajouter une première ligne',
+    totals_net_at: 'HT @ {rate}%',
+    sec_numbering: 'Numérotation & dates',
+    sec_project_category: 'Projet & catégorie',
+    sec_text_blocks: 'Blocs de texte',
+    sec_currency_tax: 'Devise & TVA',
+    sec_layout: 'Mise en page',
+    sec_filename: 'Modèle de nom de fichier',
+    btn_make_period: '+ Transformer en période',
+    btn_remove_period: 'Supprimer la date de fin',
+    preset_save_as: 'Enregistrer comme nouveau preset…',
+    preset_name_placeholder: 'Nom du preset',
+    preset_delete_title: 'Supprimer le preset',
+    preset_name_standard: 'Standard',
+    preset_name_short: 'Court',
+    preset_name_net30: '30 jours nets',
+    preset_name_none: 'Aucune',
+    preset_name_smallbiz: 'Franchise en base (§19 UStG)',
+    preset_text_intro_standard: 'Merci pour la bonne collaboration. Comme convenu, je vous facture les prestations suivantes :',
+    preset_text_intro_short: 'Veuillez trouver ci-dessous la facture des prestations.',
+    preset_text_payment_standard: 'Paiement attendu pour le {due} par virement sur le compte indiqué en bas de la facture.',
+    preset_text_payment_net30: 'Paiement à 30 jours à compter de la date de facture, par virement.',
+    preset_text_footnote_smallbiz: 'En tant que micro-entrepreneur au sens du §19 UStG, la TVA n\'est pas facturée.',
+    msg_preset_saved: 'Preset enregistré',
+    msg_preset_deleted: 'Preset supprimé',
+    filename_insert_label: 'Insérer :',
+    validate_title: 'Liste de vérification',
+    validate_pass_xml: 'XML bien formé',
+    validate_pass_fields: 'Champs obligatoires présents',
+    validate_pass_iban: 'Somme de contrôle IBAN valide',
+    validate_footer: 'Non bloquant — l\'export reste possible.',
+    history_autosave: 'Sauvegarde auto',
+    history_count_label: '{n} / {limit} enregistrées',
+    th_number: 'N°',
+    th_buyer: 'Client',
+    th_date: 'Date',
+    th_total_col: 'Total',
+    btn_history_reload: 'Recharger',
+    confirm_delete_short: 'Supprimer ?',
+    clear_all_confirm: 'Supprimer les {count} entrées ?',
+    btn_yes_clear: 'Oui, tout effacer',
+    stats_empty_title: 'Pas encore de factures',
+    stats_empty_cta: 'Créer votre première facture',
+    backup_title: 'Sauvegarde & restauration',
+    backup_export_head: 'Export',
+    backup_export_body: 'Télécharge tout dans un seul fichier JSON : profil vendeur, {buyers} profil(s) client, {history} facture(s) dans l\'historique, presets de texte et réglages.',
+    btn_download_backup: 'Télécharger backup.json',
+    backup_import_head: 'Import',
+    backup_import_body: 'Restaure les données d\'un fichier de sauvegarde exporté auparavant. Remplace vos clients, votre historique et vos presets actuels.',
+    backup_choose_file: 'Choisir un fichier backup.json…',
+    backup_ready: 'Prêt à restaurer :',
+    backup_restore: 'Restaurer la sauvegarde',
+    backup_seller_line: 'Profil vendeur : {name}',
+    backup_buyers_line: '{n} profil(s) client',
+    backup_history_line: '{n} facture(s) dans l\'historique',
+    ob_step_1: 'Étape 1 sur 2',
+    ob_step_2: 'Étape 2 sur 2',
+    ob_title_seller: 'Configurer votre profil vendeur',
+    ob_body_seller: 'Vos informations professionnelles — elles figurent sur chaque facture et ne se saisissent qu\'une fois.',
+    ob_company_placeholder: 'ex. Max Mustermann',
+    ob_load_demo: 'Charger des données de démo',
+    ob_continue: 'Continuer →',
+    ob_title_number: 'Choisir votre numérotation',
+    ob_body_number: 'Choisissez un modèle une fois — chaque nouvelle facture se numérote ensuite toute seule.',
+    ob_tokens_label: 'Jetons :',
+    ob_next_numbers: 'Prochains numéros',
+    ob_back: '← Retour',
+    ob_finish: 'Terminer la configuration',
+    msg_setup_done: 'Configuration enregistrée',
+    help_search_placeholder: 'Rechercher un sujet…',
+    help_no_results: 'Aucun sujet ne correspond.',
+    f_buyer_reference_placeholder: 'clients publics (Leitweg-ID)',
     title: 'Générateur de factures',
     subtitle: 'ZUGFeRD 2.3 · Factur-X · EN 16931 (Comfort)',
     theme_auto: 'Auto (système)',
@@ -1595,13 +1923,17 @@ function applyTranslations(root) {
   // re-render dynamic UI (totals labels depend on tax mode + lang)
   if (typeof calcTotals === 'function') calcTotals();
   if (typeof renderBuyerPicker === 'function') renderBuyerPicker();
-  if (typeof renderFootnotePicker === 'function') renderFootnotePicker();
+  if (typeof renderTextPresetSelects === 'function') renderTextPresetSelects();
   if (typeof renderHistoryPicker === 'function') renderHistoryPicker();
   if (typeof updateBuyerHistoryHint === 'function') updateBuyerHistoryHint();
   if (typeof renderItems === 'function') renderItems();
   if (typeof updateFilenamePreview === 'function') updateFilenamePreview();
-  // re-apply theme so its title gets re-translated
-  if (typeof applyTheme === 'function') applyTheme(localStorage.getItem(THEME_KEY));
+  if (typeof updateBuyerActionUI === 'function') updateBuyerActionUI();
+  if (typeof updateSellerChip === 'function') updateSellerChip();
+  if (typeof updateDueDateUI === 'function') updateDueDateUI();
+  if (typeof updateHistoryCountLabel === 'function') updateHistoryCountLabel();
+  if (typeof updateBackupExportSummary === 'function') updateBackupExportSummary();
+  if (typeof renderHelpTopics === 'function') renderHelpTopics();
   if (typeof updateSuggestNumberChipPreview === 'function') updateSuggestNumberChipPreview();
 }
 
@@ -1610,6 +1942,7 @@ function setLang(lang) {
   CURRENT_LANG = lang;
   localStorage.setItem(LANG_KEY, lang);
   applyTranslations();
+  if (typeof updateLangSegment === 'function') updateLangSegment();
   if (typeof refreshInlineValidation === 'function') refreshInlineValidation();
   // Boilerplate follows the invoice-output language, which by default
   // tracks the UI; only reload it here if the invoice lang follows UI.
@@ -1680,7 +2013,7 @@ async function loadSeller() {
   } catch (e) { console.warn('[erechnung] Failed to load seller profile:', e?.message || e); }
   // Load boilerplate for currently effective invoice language
   await loadBoilerplateForLang(effectiveInvoiceLang());
-  updateSetupCardVisibility();
+  updateSellerChip();
 }
 async function saveSeller() {
   // Stammdaten go into one bucket, boilerplate goes into a per-language bucket.
@@ -1699,32 +2032,15 @@ async function saveSeller() {
   const ok2 = await store.set(BOILERPLATE_KEY, JSON.stringify(bMap));
   if (ok1 && ok2) {
     toast(t('msg_seller_saved'), 'ok');
-    // Auto-collapse after a successful save when the seller has data.
-    // Refresh the summary first so the collapsed view shows current values.
-    if (isSellerConfigured()) {
-      await setSellerCollapsed(true);
-    }
-    updateSetupCardVisibility();
-    updateNumberSetupCardVisibility();
+    updateSellerChip();
   } else {
     toast(t('msg_save_failed'), 'err');
   }
 }
-async function clearSeller() {
-  await store.del(STORAGE_KEY);
-  await store.del(BOILERPLATE_KEY);
-  ['s_name','s_line1','s_zip','s_city','s_country','s_vat','s_siret','s_email','s_phone','s_iban','s_bic','s_bank',
-   'r_intro','r_payment_note','r_greeting','r_signature','r_footnote']
-    .forEach(id => $(id).value = id === 's_country' ? 'DE' : '');
-  // After clearing, the seller is empty — force expanded so the user can re-enter
-  await setSellerCollapsed(false);
-  updateSetupCardVisibility();
-  updateNumberSetupCardVisibility();
-  toast(t('msg_reset'), 'ok');
-}
 function collectSellerStammdaten() {
   return {
     name: $('s_name').value.trim(),
+    name2: $('s_name2').value.trim(),
     line1: $('s_line1').value.trim(),
     zip: $('s_zip').value.trim(),
     city: $('s_city').value.trim(),
@@ -1754,6 +2070,7 @@ function collectSeller() {
 }
 function applySellerStammdaten(s) {
   $('s_name').value = nz(s.name);
+  $('s_name2').value = nz(s.name2);
   $('s_line1').value = nz(s.line1);
   $('s_zip').value = nz(s.zip);
   $('s_city').value = nz(s.city);
@@ -1777,6 +2094,9 @@ function applyBoilerplate(b) {
   $('r_greeting').value = nz(b.greeting);
   $('r_signature').value = nz(b.signature);
   $('r_footnote').value = nz(b.footnote);
+  if (typeof updateTextBlockDirtyUI === 'function') {
+    TEXT_BLOCKS.forEach(updateTextBlockDirtyUI);
+  }
 }
 function applySeller(s) {
   // Legacy entry point for backups that still have boilerplate inside the seller object.
@@ -1864,6 +2184,49 @@ function renderBuyerPicker() {
       .map((b, i) => `<option value="${i}">${esc(b.name || t('msg_buyer_unnamed'))}${b.city ? ' · ' + esc(b.city) : ''}</option>`)
       .join('');
   if (current && state.buyers[current]) picker.value = current;
+  renderRecentCustomerChips();
+  updateBuyerActionUI();
+}
+
+// Pill chips above the profile select — the last four saved buyers,
+// most-recently-added first, active when selected. Clicking a chip is the
+// fast path for "same customer again".
+function renderRecentCustomerChips() {
+  const row = document.getElementById('recentCustomers');
+  if (!row) return;
+  if (state.buyers.length === 0) {
+    row.innerHTML = `<span class="chip-row-empty">${esc(t('recent_customers_empty'))}</span>`;
+    return;
+  }
+  const current = $('buyerPicker').value;
+  row.innerHTML = state.buyers
+    .map((b, i) => ({ b, i }))
+    .slice(-4)
+    .reverse()
+    .map(({ b, i }) => `<button type="button" class="buyer-chip${String(i) === current ? ' active' : ''}" data-idx="${i}">${esc(b.name || t('msg_buyer_unnamed'))}</button>`)
+    .join('');
+  row.querySelectorAll('.buyer-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = btn.dataset.idx;
+      const picker = $('buyerPicker');
+      picker.value = picker.value === idx ? '' : idx;
+      picker.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  });
+}
+
+// Save-button label ("Save as customer" vs "Update customer") and delete
+// visibility both key off whether a profile is selected.
+function updateBuyerActionUI() {
+  const picker = document.getElementById('buyerPicker');
+  const saveBtn = document.getElementById('saveBuyer');
+  const delBtn = document.getElementById('deleteBuyer');
+  const confirmRow = document.getElementById('buyerDeleteConfirm');
+  if (!picker || !saveBtn || !delBtn) return;
+  const hasSelection = picker.value !== '' && state.buyers[picker.value];
+  saveBtn.textContent = t(hasSelection ? 'btn_update_customer' : 'btn_save_customer');
+  delBtn.hidden = !hasSelection || !confirmRow.hidden;
+  if (!hasSelection && confirmRow) confirmRow.hidden = true;
 }
 
 // Datalist suggestions for the buyer name input, derived live from history.
@@ -1928,6 +2291,8 @@ async function saveBuyer() {
       await persistBuyers();
       renderBuyerPicker();
       $('buyerPicker').value = existing;
+      renderRecentCustomerChips();
+      updateBuyerActionUI();
       return;
     }
     state.buyers.push(data);
@@ -1935,16 +2300,19 @@ async function saveBuyer() {
   }
   await persistBuyers();
   renderBuyerPicker();
-  // select the newly saved item
+  // select the newly saved item, then refresh the chips/action row so the
+  // active chip and "Update customer" label reflect the new selection.
   const newIdx = state.buyers.findIndex(b => b.name === data.name);
   if (newIdx >= 0) $('buyerPicker').value = newIdx;
+  renderRecentCustomerChips();
+  updateBuyerActionUI();
 }
+// Actual deletion — reached only via the inline confirm-arm row
+// ("Delete this customer? Yes / No") wired in the redesign shell section.
 async function deleteBuyer() {
   const picker = $('buyerPicker');
   const idx = picker.value;
   if (idx === '' || !state.buyers[idx]) { toast(t('msg_buyer_no_select'), 'err'); return; }
-  const name = state.buyers[idx].name;
-  if (!confirm(`"${name}" ${t('msg_buyer_confirm_delete')}`)) return;
   state.buyers.splice(idx, 1);
   await persistBuyers();
   renderBuyerPicker();
@@ -1953,6 +2321,8 @@ async function deleteBuyer() {
   // Force the placeholder so the cleared form matches an empty selection.
   picker.value = '';
   clearBuyer();
+  renderRecentCustomerChips();
+  updateBuyerActionUI();
   toast(t('msg_deleted'), 'ok');
 }
 
@@ -2146,13 +2516,228 @@ function migrateLegacyFilenameTokens(pattern) {
     .replaceAll('{datum}',     '{date}');
 }
 
-async function saveFilenamePattern() {
-  const ok = await store.set(FILENAME_KEY, $('r_filename').value);
-  if (ok) toast(t('msg_filename_saved'), 'ok');
-  else toast(t('msg_save_failed'), 'err');
+// -------- Text-block presets (intro / payment note / footnote) --------
+// Each block owns a named list of presets plus a selected id. The textarea
+// is the live value; when it diverges from the selected preset's stored
+// text, the block is "dirty" and offers "Save as new preset…". Legacy
+// footnote presets (FOOTNOTES_KEY) are migrated into the footnote block
+// on first load; FOOTNOTES_KEY itself is left untouched for old backups.
+
+const TEXT_BLOCKS = ['intro', 'paymentNote', 'footnote'];
+const TEXT_BLOCK_FIELD = { intro: 'r_intro', paymentNote: 'r_payment_note', footnote: 'r_footnote' };
+
+// Reverse-charge heuristic: when a picked footnote preset reads like an RC
+// note but lacks the precise legal sentence, prepend it (in the invoice
+// language).
+const RC_HEURISTIC = /reverse\s*charge|autoliquidation|steuerschuldnerschaft/i;
+const RC_LEGAL_PRESENT = /art\.\s*196/i;
+
+function presetSlug(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    + '-' + Date.now().toString(36).slice(-4);
 }
 
-// -------- Footnote presets (named templates) --------
+function defaultTextPresets() {
+  return {
+    intro: [
+      { id: 'standard', name: t('preset_name_standard'), text: t('preset_text_intro_standard') },
+      { id: 'short',    name: t('preset_name_short'),    text: t('preset_text_intro_short') },
+    ],
+    paymentNote: [
+      { id: 'standard', name: t('preset_name_standard'), text: t('preset_text_payment_standard') },
+      { id: 'net30',    name: t('preset_name_net30'),    text: t('preset_text_payment_net30') },
+    ],
+    footnote: [
+      { id: 'none',     name: t('preset_name_none'),     text: '' },
+      { id: 'smallbiz', name: t('preset_name_smallbiz'), text: t('preset_text_footnote_smallbiz') },
+    ],
+  };
+}
+
+// Validate an imported/parsed presets object down to the known shape.
+function sanitizeTextPresets(raw) {
+  const out = { intro: [], paymentNote: [], footnote: [] };
+  if (!isPlainObject(raw)) return null;
+  for (const key of TEXT_BLOCKS) {
+    const list = raw[key];
+    if (!Array.isArray(list)) return null;
+    out[key] = list
+      .filter(p => isPlainObject(p) && typeof p.name === 'string' && typeof p.text === 'string')
+      .map(p => ({ id: typeof p.id === 'string' && p.id ? p.id : presetSlug(p.name), name: p.name, text: p.text }));
+    if (out[key].length === 0) return null;
+  }
+  return out;
+}
+
+async function loadTextPresets() {
+  let loaded = null;
+  try {
+    const v = await store.get(TEXTPRESETS_KEY);
+    if (v) {
+      const parsed = JSON.parse(v);
+      const presets = sanitizeTextPresets(parsed.presets);
+      if (presets) {
+        loaded = presets;
+        if (isPlainObject(parsed.selected)) {
+          for (const key of TEXT_BLOCKS) {
+            if (typeof parsed.selected[key] === 'string') state.selectedPreset[key] = parsed.selected[key];
+          }
+        }
+      }
+    }
+  } catch (e) { console.warn('[erechnung] Failed to load text presets:', e?.message || e); }
+
+  if (!loaded) {
+    // First run: seed defaults, then fold in legacy footnote presets.
+    loaded = defaultTextPresets();
+    try {
+      const legacy = await store.get(FOOTNOTES_KEY);
+      const list = legacy ? JSON.parse(legacy) : [];
+      if (Array.isArray(list)) {
+        for (const f of list) {
+          if (isPlainObject(f) && typeof f.name === 'string' && typeof f.text === 'string') {
+            loaded.footnote.push({ id: presetSlug(f.name), name: f.name, text: f.text });
+          }
+        }
+      }
+    } catch (_) {}
+    state.selectedPreset = { intro: 'standard', paymentNote: 'standard', footnote: 'none' };
+    state.textPresets = loaded;
+    await persistTextPresets();
+  } else {
+    state.textPresets = loaded;
+  }
+  // Clamp selections to existing presets.
+  for (const key of TEXT_BLOCKS) {
+    if (!state.textPresets[key].some(p => p.id === state.selectedPreset[key])) {
+      state.selectedPreset[key] = state.textPresets[key][0]?.id || '';
+    }
+  }
+  renderTextPresetSelects();
+}
+
+async function persistTextPresets() {
+  const ok = await store.set(TEXTPRESETS_KEY, JSON.stringify({
+    presets: state.textPresets,
+    selected: state.selectedPreset,
+  }));
+  if (!ok) toast(t('msg_save_failed'), 'err');
+}
+
+function renderTextPresetSelects() {
+  for (const key of TEXT_BLOCKS) {
+    const sel = $('presetSelect_' + key);
+    if (!sel) continue;
+    sel.innerHTML = state.textPresets[key]
+      .map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`)
+      .join('');
+    sel.value = state.selectedPreset[key];
+    const del = $('presetDelete_' + key);
+    if (del) del.hidden = state.textPresets[key].length <= 1;
+    updateTextBlockDirtyUI(key);
+  }
+}
+
+function selectedPresetOf(key) {
+  return state.textPresets[key].find(p => p.id === state.selectedPreset[key]) || null;
+}
+
+// Dirty = textarea diverges from the selected preset's stored text.
+// Shows/hides the "Save as new preset…" affordance.
+function updateTextBlockDirtyUI(key) {
+  const field = $(TEXT_BLOCK_FIELD[key]);
+  const row = $('presetSaveRow_' + key);
+  if (!field || !row) return;
+  const preset = selectedPresetOf(key);
+  const dirty = !preset || preset.text !== field.value;
+  row.hidden = !dirty;
+  if (!dirty) {
+    const naming = $('presetNaming_' + key);
+    const link = $('presetSaveLink_' + key);
+    if (naming) naming.hidden = true;
+    if (link) link.hidden = false;
+  }
+}
+
+async function selectTextPreset(key, presetId) {
+  const preset = state.textPresets[key].find(p => p.id === presetId);
+  if (!preset) return;
+  state.selectedPreset[key] = presetId;
+  let text = preset.text;
+  if (key === 'footnote' && RC_HEURISTIC.test(text) && !RC_LEGAL_PRESENT.test(text)) {
+    text = tInvoice('rc_legal_text') + '\n\n' + text;
+    toast(t('msg_rc_legal_added'), 'ok');
+  }
+  const field = $(TEXT_BLOCK_FIELD[key]);
+  field.value = text;
+  field.dispatchEvent(new Event('input', { bubbles: true }));
+  await persistTextPresets();
+  updateTextBlockDirtyUI(key);
+}
+
+async function saveTextPresetAs(key) {
+  const nameInput = $('presetName_' + key);
+  const name = (nameInput?.value || '').trim();
+  if (!name) return;
+  const preset = { id: presetSlug(name), name, text: $(TEXT_BLOCK_FIELD[key]).value };
+  state.textPresets[key].push(preset);
+  state.selectedPreset[key] = preset.id;
+  await persistTextPresets();
+  renderTextPresetSelects();
+  nameInput.value = '';
+  toast(t('msg_preset_saved'), 'ok');
+}
+
+async function deleteSelectedTextPreset(key) {
+  const remaining = state.textPresets[key].filter(p => p.id !== state.selectedPreset[key]);
+  if (remaining.length === 0) return;
+  state.textPresets[key] = remaining;
+  state.selectedPreset[key] = remaining[0].id;
+  const field = $(TEXT_BLOCK_FIELD[key]);
+  field.value = remaining[0].text;
+  field.dispatchEvent(new Event('input', { bubbles: true }));
+  await persistTextPresets();
+  renderTextPresetSelects();
+  toast(t('msg_preset_deleted'), 'ok');
+}
+
+function setupTextPresetUI() {
+  for (const key of TEXT_BLOCKS) {
+    $('presetSelect_' + key)?.addEventListener('change', (e) => selectTextPreset(key, e.target.value));
+    $('presetDelete_' + key)?.addEventListener('click', () => deleteSelectedTextPreset(key));
+    $('presetSaveLink_' + key)?.addEventListener('click', () => {
+      $('presetSaveLink_' + key).hidden = true;
+      $('presetNaming_' + key).hidden = false;
+      $('presetName_' + key)?.focus();
+    });
+    $('presetNameCancel_' + key)?.addEventListener('click', () => {
+      $('presetNaming_' + key).hidden = true;
+      $('presetSaveLink_' + key).hidden = false;
+    });
+    $('presetNameSave_' + key)?.addEventListener('click', () => saveTextPresetAs(key));
+    $('presetName_' + key)?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); saveTextPresetAs(key); }
+    });
+    $(TEXT_BLOCK_FIELD[key])?.addEventListener('input', () => updateTextBlockDirtyUI(key));
+  }
+}
+
+// First-run nicety: an empty text block adopts its selected preset's text
+// so the form doesn't start with three "dirty" blocks. Runs after both the
+// presets and the per-language boilerplate have loaded; never overwrites
+// existing user text.
+function applyPresetTextsIfEmpty() {
+  for (const key of TEXT_BLOCKS) {
+    const field = $(TEXT_BLOCK_FIELD[key]);
+    if (!field || field.value.trim()) continue;
+    const preset = selectedPresetOf(key);
+    if (preset && preset.text) field.value = preset.text;
+    updateTextBlockDirtyUI(key);
+  }
+}
+
+// Legacy footnote presets — still loaded so backup export keeps carrying
+// them for older app versions; the UI itself uses the text-block system.
 async function loadFootnotes() {
   try {
     const v = await store.get(FOOTNOTES_KEY);
@@ -2161,66 +2746,24 @@ async function loadFootnotes() {
     console.warn('[erechnung] Failed to load footnotes:', e?.message || e);
     state.footnotes = [];
   }
-  renderFootnotePicker();
 }
-async function persistFootnotes() {
-  const ok = await store.set(FOOTNOTES_KEY, JSON.stringify(state.footnotes));
-  if (!ok) toast(t('msg_save_failed'), 'err');
-}
-function renderFootnotePicker() {
-  const picker = $('footnotePicker');
-  const current = picker.value;
-  picker.innerHTML = `<option value="">${esc(t('f_footnote_picker'))}</option>` +
-    state.footnotes
-      .map((f, i) => `<option value="${i}">${esc(f.name)}</option>`)
-      .join('');
-  if (current && state.footnotes[current]) picker.value = current;
-}
-async function saveFootnote() {
-  const text = $('r_footnote').value.trim();
-  if (!text) { toast(t('msg_footnote_no_text'), 'err'); return; }
-  const picker = $('footnotePicker');
-  const idx = picker.value;
-  if (idx !== '' && state.footnotes[idx]) {
-    // Update selected
-    if (!confirm(`"${state.footnotes[idx].name}" ${t('msg_footnote_overwrite')}`)) return;
-    state.footnotes[idx].text = text;
-    await persistFootnotes();
-    toast(`"${state.footnotes[idx].name}" ${t('msg_buyer_updated')}`, 'ok');
-    return;
-  }
-  const name = prompt(t('msg_footnote_name_prompt'));
-  if (!name || !name.trim()) return;
-  const trimName = name.trim();
-  const existing = state.footnotes.findIndex(f => f.name.toLowerCase() === trimName.toLowerCase());
-  if (existing >= 0) {
-    if (!confirm(`"${trimName}" ${t('msg_footnote_overwrite')}`)) return;
-    state.footnotes[existing].text = text;
-  } else {
-    state.footnotes.push({ name: trimName, text });
-  }
-  await persistFootnotes();
-  renderFootnotePicker();
-  const newIdx = state.footnotes.findIndex(f => f.name === trimName);
-  if (newIdx >= 0) $('footnotePicker').value = newIdx;
-  toast(`"${trimName}" ${t('msg_footnote_saved')}`, 'ok');
-}
-async function deleteFootnote() {
-  const picker = $('footnotePicker');
-  const idx = picker.value;
-  if (idx === '' || !state.footnotes[idx]) { toast(t('msg_footnote_no_select'), 'err'); return; }
-  const name = state.footnotes[idx].name;
-  if (!confirm(`"${name}" ${t('msg_buyer_confirm_delete')}`)) return;
-  state.footnotes.splice(idx, 1);
-  await persistFootnotes();
-  renderFootnotePicker();
-  toast(t('msg_deleted'), 'ok');
-}
-// Empty the textarea and reset the preset picker so the dropdown selection
-// no longer claims to be showing content that the textarea has just dropped.
-function clearFootnote() {
-  $('r_footnote').value = '';
-  $('footnotePicker').value = '';
+
+// Boilerplate autosave: the five default-text fields persist (debounced)
+// into the per-invoice-language boilerplate map. Replaces the removed
+// "save seller template" button as the write path for texts.
+let _boilerplateSaveTimer = null;
+function scheduleBoilerplateSave() {
+  if (_boilerplateSaveTimer) clearTimeout(_boilerplateSaveTimer);
+  _boilerplateSaveTimer = setTimeout(async () => {
+    _boilerplateSaveTimer = null;
+    let bMap = {};
+    try {
+      const raw = await store.get(BOILERPLATE_KEY);
+      if (raw) bMap = JSON.parse(raw) || {};
+    } catch (_) {}
+    bMap[effectiveInvoiceLang()] = collectBoilerplate();
+    await store.set(BOILERPLATE_KEY, JSON.stringify(bMap));
+  }, 800);
 }
 
 // -------- History --------
@@ -2458,14 +3001,26 @@ function getFilteredHistory() {
 // Render the history list. Each row shows number/date/buyer/total plus
 // per-row Clone + Delete actions. Reuses the inline-confirm pattern
 // (armRemoveConfirm) for the delete button.
+// Live count caption in the history modal header ("N / 1000 saved").
+function updateHistoryCountLabel() {
+  const el = document.getElementById('historyCount');
+  if (!el) return;
+  el.textContent = t('history_count_label', {
+    n: String(state.history.length),
+    limit: String(HISTORY_LIMIT),
+  });
+}
+
+// Index of the row currently showing the inline "Delete? Yes / No" confirm.
+let _historyConfirmIdx = null;
+
 function renderHistoryPicker() {
   const list = $('historyList');
   if (!list) return;
-  // A previously-armed delete confirm refers to a button we're about to
-  // destroy — clear the singleton before re-rendering.
-  resetRemoveConfirm();
+  updateHistoryCountLabel();
   list.innerHTML = '';
   if (state.history.length === 0) {
+    _historyConfirmIdx = null;
     list.innerHTML = `<li class="history-row-empty">
       <div class="empty-state">
         <h3>${esc(t('empty_history_title'))}</h3>
@@ -2499,39 +3054,42 @@ function renderHistoryPicker() {
     li.dataset.idx = String(i);
     const status = getSnapshotStatus(e);
     const statusLabel = t('history_status_' + status);
+    const confirming = _historyConfirmIdx === i;
+    const actions = confirming
+      ? `<span class="note-small">${esc(t('confirm_delete_short'))}</span>
+         <button class="link-accent history-delete-yes" type="button" data-idx="${i}">${esc(t('confirm_yes'))}</button>
+         <button class="link-muted history-delete-no" type="button" data-idx="${i}">${esc(t('confirm_no'))}</button>`
+      : `<button class="link-accent history-reload-btn" type="button" data-idx="${i}">${esc(t('btn_history_reload'))}</button>
+         <button class="link-faint history-delete-btn" type="button" data-idx="${i}">${esc(t('btn_delete'))}</button>`;
     li.innerHTML = `
-      <div class="history-row-info">
-        <span class="num">${esc(e.number || '—')}</span>
-        <span class="date">${esc(formatDate(e.date))}</span>
-        <span class="buyer">${esc(e.buyerName || '—')}</span>
-        <span class="total">${esc(formatTotal(e.total, e.currency))}</span>
-        <span class="status-pill ${status}">${esc(statusLabel)}</span>
-      </div>
-      <div class="history-row-actions">
-        <button class="tiny-btn history-clone-btn" type="button" data-idx="${i}">${esc(t('btn_history_clone'))}</button>
-        <button class="remove history-delete-btn" type="button" data-idx="${i}" aria-label="${esc(t('aria_remove_item'))}">×</button>
-      </div>
+      <div class="h-num">${esc(e.number || '—')}</div>
+      <div class="h-buyer">${esc(e.buyerName || '—')}<span class="status-pill ${status}">${esc(statusLabel)}</span></div>
+      <div class="h-date">${esc(formatDate(e.date))}</div>
+      <div class="h-total">${esc(formatTotal(e.total, e.currency))}</div>
+      <div class="history-row-actions">${actions}</div>
     `;
     list.appendChild(li);
   }
-  // Per-row clone handler
-  list.querySelectorAll('.history-clone-btn').forEach(btn => {
+  list.querySelectorAll('.history-reload-btn').forEach(btn => {
+    btn.addEventListener('click', () => cloneFromHistory(Number(btn.dataset.idx)));
+  });
+  list.querySelectorAll('.history-delete-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      const idx = Number(btn.dataset.idx);
-      cloneFromHistory(idx);
+      _historyConfirmIdx = Number(btn.dataset.idx);
+      renderHistoryPicker();
     });
   });
-  // Per-row delete handler — reuses inline-confirm pattern.
-  list.querySelectorAll('.history-delete-btn').forEach(btn => {
+  list.querySelectorAll('.history-delete-no').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _historyConfirmIdx = null;
+      renderHistoryPicker();
+    });
+  });
+  list.querySelectorAll('.history-delete-yes').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (btn.classList.contains('confirming')) {
-        resetRemoveConfirm();
-        const idx = Number(btn.dataset.idx);
-        await deleteHistoryEntry(idx);
-      } else {
-        armRemoveConfirm(btn);
-        btn.focus();
-      }
+      const idx = Number(btn.dataset.idx);
+      _historyConfirmIdx = null;
+      await deleteHistoryEntry(idx);
     });
   });
 }
@@ -2544,8 +3102,13 @@ function renderHistoryPicker() {
 async function applyHistorySnapshot(snap) {
   const f = snap.form || {};
 
-  // Buyer — full overwrite
+  // Buyer — full overwrite. Also point the profile picker at the matching
+  // saved profile (by name, case-insensitive) so the chips/save-button
+  // reflect the loaded customer; fall back to "new customer".
   applyBuyer(f.buyer || {});
+  const loadedName = ((f.buyer && f.buyer.name) || '').toLowerCase().trim();
+  const matchIdx = state.buyers.findIndex(b => (b.name || '').toLowerCase().trim() === loadedName);
+  $('buyerPicker').value = matchIdx >= 0 ? String(matchIdx) : '';
 
   // Items
   state.items = (f.items || []).map(it => ({
@@ -2592,12 +3155,12 @@ async function applyHistorySnapshot(snap) {
     await store.set(LAYOUT_KEY, f.layout);
   }
 
-  // Invoice date resets to today; delivery/due stay empty for explicit entry.
+  // Invoice date resets to today; delivery stays empty for explicit entry.
+  // The due date is chip-driven (issue date + dueDays) and recomputes below.
   $('r_number').value = '';
   $('r_date').value = todayLocalISO();
   $('r_delivery').value = '';
   $('r_delivery_end').value = '';
-  $('r_due').value = '';
 
   // Auto-assign the next invoice number
   await applyNextInvoiceNumber();
@@ -2605,6 +3168,11 @@ async function applyHistorySnapshot(snap) {
   calcTotals();
   updateFilenamePreview();
   updateBuyerHistoryHint();
+  if (typeof applyDueDays === 'function') applyDueDays();
+  if (typeof updateDeliveryPeriodUI === 'function') updateDeliveryPeriodUI();
+  if (typeof updateBuyerActionUI === 'function') updateBuyerActionUI();
+  if (typeof renderRecentCustomerChips === 'function') renderRecentCustomerChips();
+  if (typeof updateSummaryValues === 'function') updateSummaryValues();
 }
 
 async function cloneFromHistory(idx) {
@@ -2625,14 +3193,16 @@ async function duplicateLastInvoice() {
     return;
   }
   await applyHistorySnapshot(state.history[0]);
+  if (typeof setActiveTab === 'function') setActiveTab('buyer');
   toast(t('msg_duplicated_last'), 'ok');
 }
 
-// Hide the top-bar duplicate button when there's nothing to duplicate.
+// Dim the top-bar duplicate button when there's nothing to duplicate.
+// It stays clickable so the click can explain why (toast above).
 function updateDuplicateLastVisibility() {
   const btn = document.getElementById('duplicateLast');
   if (!btn) return;
-  btn.hidden = state.history.length === 0;
+  btn.setAttribute('aria-disabled', String(state.history.length === 0));
 }
 
 async function deleteHistoryEntry(idx) {
@@ -2648,10 +3218,10 @@ async function deleteHistoryEntry(idx) {
   toast(t('msg_history_deleted'), 'ok');
 }
 
+// Actual clear — reached only via the inline confirm-arm row in the
+// history modal footer ("Delete all N snapshots? Yes, clear / Cancel").
 async function clearAllHistory() {
   if (state.history.length === 0) return;
-  const msg = t('history_clear_confirm').replace('{count}', state.history.length);
-  if (!confirm(msg)) return;
   state.history = [];
   await persistHistory();
   renderHistoryPicker();
@@ -3255,7 +3825,8 @@ function updateBuyerHistoryHint() {
   if (!hint) return;
   const name = $('b_name').value.trim();
   const last = findLastInvoiceForBuyer(name);
-  if (!last) { hint.textContent = ''; return; }
+  if (!last) { hint.textContent = ''; hint.hidden = true; return; }
+  hint.hidden = false;
   // Days since last invoice
   let daysAgo = null;
   if (last.date) {
@@ -3369,7 +3940,12 @@ function renderStatisticsOverview() {
   if (!body) return;
 
   if (state.history.length === 0) {
-    body.innerHTML = `<div class="stats-empty">${esc(t('stats_empty'))}</div>`;
+    body.innerHTML = `
+      <div class="stats-empty-cta-wrap">
+        <h3>${esc(t('stats_empty_title'))}</h3>
+        <p>${esc(t('stats_empty'))}</p>
+        <button type="button" class="btn-accent-soft" id="statsEmptyCta">${esc(t('stats_empty_cta'))}</button>
+      </div>`;
     return;
   }
   if (filtered.length === 0) {
@@ -4043,7 +4619,7 @@ function resetRemoveConfirm() {
   _removeConfirmBtn = null;
   if (btn && btn.isConnected) {
     btn.classList.remove('confirming');
-    btn.textContent = '×';
+    btn.textContent = '✕';
     btn.setAttribute('aria-label', t('aria_remove_item'));
   }
 }
@@ -4057,31 +4633,45 @@ function armRemoveConfirm(btn) {
   _removeConfirmTimer = setTimeout(resetRemoveConfirm, REMOVE_CONFIRM_TIMEOUT_MS);
 }
 
+// Standard VAT-rate choices for the per-line select. If a line carries a
+// rate outside this list (history clone, country default like 5.5%), an
+// extra option is added for it so the select still shows the truth.
+const VAT_SELECT_RATES = [0, 7, 19, 20, 21];
+
 function renderItems() {
   const container = $('items');
-  // Remove all rows except head
-  [...container.querySelectorAll('.row:not(.head)')].forEach(r => r.remove());
+  if (!container) return;
+  container.innerHTML = '';
+
+  // Empty state: hide the column header + totals + add-line button, show
+  // the centered hint card with its own "+ Add first line" CTA instead.
+  const empty = state.items.length === 0;
+  const head = document.getElementById('itemsHead');
+  const emptyCard = document.getElementById('itemsEmpty');
+  const addBtn = document.getElementById('addItem');
+  const totalsBlock = document.querySelector('.totals-block');
+  if (head) head.hidden = empty;
+  if (emptyCard) emptyCard.hidden = !empty;
+  if (addBtn) addBtn.hidden = empty;
+  if (totalsBlock) totalsBlock.hidden = empty;
 
   for (const it of state.items) {
     const row = document.createElement('div');
-    row.className = 'row';
+    row.className = 'item-row';
     row.dataset.id = it.id;
+    const rates = VAT_SELECT_RATES.includes(Number(it.vat))
+      ? VAT_SELECT_RATES
+      : [...VAT_SELECT_RATES, Number(it.vat)].sort((a, b) => a - b);
+    const vatOptions = rates
+      .map(r => `<option value="${r}"${Number(it.vat) === r ? ' selected' : ''}>${r}%</option>`)
+      .join('');
     row.innerHTML = `
-      <div class="cell desc" data-label="${esc(t('th_desc'))}">
-        <input type="text" data-k="desc" value="${esc(it.desc)}" placeholder="${esc(t('item_placeholder'))}">
-      </div>
-      <div class="cell num" data-label="${esc(t('th_qty'))}">
-        <input type="number" step="0.01" data-k="qty" value="${it.qty}">
-      </div>
-      <div class="cell num" data-label="${esc(t('th_price'))}">
-        <input type="number" step="0.01" data-k="price" value="${it.price}">
-      </div>
-      <div class="cell num" data-label="${esc(t('th_vat_pct'))}">
-        <input type="number" step="0.1" data-k="vat" value="${it.vat}">
-      </div>
-      <div class="cell">
-        <button class="remove" data-remove aria-label="${esc(t('aria_remove_item'))}">×</button>
-      </div>
+      <input type="text" class="cell-desc" data-k="desc" value="${esc(it.desc)}" placeholder="${esc(t('item_placeholder'))}">
+      <input type="number" class="num" step="0.01" data-k="price" value="${it.price}">
+      <input type="number" class="num" step="0.01" data-k="qty" value="${it.qty}">
+      <select data-k="vat">${vatOptions}</select>
+      <div class="line-total" data-line-total></div>
+      <button class="remove" data-remove aria-label="${esc(t('aria_remove_item'))}">✕</button>
     `;
     container.appendChild(row);
 
@@ -4093,7 +4683,7 @@ function renderItems() {
       el.addEventListener('input', () => {
         const k = el.dataset.k;
         if (isNumeric(k)) {
-          const n = el.valueAsNumber;
+          const n = el.tagName === 'SELECT' ? Number(el.value) : el.valueAsNumber;
           if (!Number.isFinite(n)) return;
           it[k] = n;
         } else {
@@ -4107,19 +4697,19 @@ function renderItems() {
       el.addEventListener('change', () => {
         const k = el.dataset.k;
         if (!isNumeric(k)) return;
-        const n = el.valueAsNumber;
+        const n = el.tagName === 'SELECT' ? Number(el.value) : el.valueAsNumber;
         it[k] = Number.isFinite(n) ? n : 0;
         calcTotals();
       });
-      // Enter on the last field of a row (vat) inserts a new row right after
-      // and jumps focus to its description input.
+      // Enter on the VAT select inserts a new row right after and jumps
+      // focus to its description input.
       el.addEventListener('keydown', (ev) => {
         if (ev.key !== 'Enter' || el.dataset.k !== 'vat') return;
         ev.preventDefault();
         const idx = state.items.findIndex(x => x.id === it.id);
         if (idx < 0) return;
         const newId = addItemAfter(idx);
-        const newRow = $('items').querySelector(`.row[data-id="${newId}"]`);
+        const newRow = $('items').querySelector(`.item-row[data-id="${newId}"]`);
         const target = newRow && newRow.querySelector('input[data-k="desc"]');
         if (target) target.focus();
       });
@@ -4186,12 +4776,45 @@ function calcTotals() {
   }
   const grand = round2(net + tax);
 
-  $('t_net').textContent = fmt(net);
-  $('t_tax').textContent = fmt(tax);
-  $('t_total').textContent = fmt(grand);
+  const sym = currencySymbol($('r_currency')?.value || 'EUR');
 
-  $('t_tax_label').textContent = t('total_tax_' + mode) || t('total_tax_S');
-  $('taxNote').textContent = mode === 'S' ? '' : t('rc_note' + (mode === 'AE' ? '' : '_' + mode));
+  // Per-rate net rows ("Net @ 19%") sorted by rate. In non-standard tax
+  // modes all lines collapse into the 0% group, so a single net row shows.
+  const vatRows = document.getElementById('vatRows');
+  if (vatRows) {
+    vatRows.innerHTML = Object.values(groups)
+      .sort((a, b) => a.rate - b.rate)
+      .map(g => `<div class="vat-row"><span>${esc(t('totals_net_at', { rate: String(g.rate) }))}</span><span>${fmt(g.basis)} ${esc(sym)}</span></div>`)
+      .join('');
+  }
+
+  const taxEl = $('t_tax');
+  const totalEl = $('t_total');
+  if (taxEl) taxEl.textContent = `${fmt(tax)} ${sym}`;
+  if (totalEl) totalEl.textContent = `${fmt(grand)} ${sym}`;
+
+  const taxLabel = $('t_tax_label');
+  if (taxLabel) taxLabel.textContent = t('total_tax_' + mode) || t('total_tax_S');
+
+  // Amber tax-mode note (Items tab): visible only for non-standard modes.
+  const noteEl = $('taxNote');
+  const noteBox = document.getElementById('taxNoteBox');
+  const noteText = mode === 'S' ? '' : t('rc_note' + (mode === 'AE' ? '' : '_' + mode));
+  if (noteEl) noteEl.textContent = noteText;
+  if (noteBox) noteBox.hidden = !noteText || state.items.length === 0;
+
+  // Per-line totals (gross in standard mode, net otherwise).
+  const itemsHost = document.getElementById('items');
+  if (itemsHost) {
+    for (const rowEl of itemsHost.querySelectorAll('.item-row')) {
+      const it = state.items.find(x => x.id === rowEl.dataset.id);
+      const cell = rowEl.querySelector('[data-line-total]');
+      if (!it || !cell) continue;
+      const lineNet = round2((Number(it.qty) || 0) * (Number(it.price) || 0));
+      const lineGross = mode === 'S' ? round2(lineNet * (1 + (Number(it.vat) || 0) / 100)) : lineNet;
+      cell.textContent = `${fmt(lineGross)} ${sym}`;
+    }
+  }
 
   return { net, tax, grand, groups };
 }
@@ -4508,9 +5131,10 @@ function buildXML() {
       ${buyer.reference ? `<ram:BuyerReference>${esc(buyer.reference)}</ram:BuyerReference>` : ''}
       <ram:SellerTradeParty>
         <ram:Name>${esc(seller.name)}</ram:Name>
-        ${seller.siret ? `
-        <ram:SpecifiedLegalOrganization>
-          <ram:ID schemeID="${seller.siret.replace(/\s/g, '').length === 14 ? '0002' : '0009'}">${esc(seller.siret.replace(/\s/g, ''))}</ram:ID>
+        ${(seller.siret || seller.name2) ? `
+        <ram:SpecifiedLegalOrganization>${seller.siret ? `
+          <ram:ID schemeID="${seller.siret.replace(/\s/g, '').length === 14 ? '0002' : '0009'}">${esc(seller.siret.replace(/\s/g, ''))}</ram:ID>` : ''}${seller.name2 ? `
+          <ram:TradingBusinessName>${esc(seller.name2)}</ram:TradingBusinessName>` : ''}
         </ram:SpecifiedLegalOrganization>` : ''}
         ${seller.phone || seller.email ? `
         <ram:DefinedTradeContact>
@@ -4778,9 +5402,9 @@ async function setPreviewEnabled(v) {
 }
 
 function applyPreviewEnabledUI() {
-  const layout = document.querySelector('.page-layout');
+  const card = document.getElementById('appCard');
   const btn = document.getElementById('previewToggle');
-  if (layout) layout.classList.toggle('preview-off', !previewEnabled);
+  if (card) card.classList.toggle('preview-off', !previewEnabled);
   if (btn) btn.setAttribute('aria-pressed', String(previewEnabled));
 }
 
@@ -4803,7 +5427,27 @@ $('btnXML').addEventListener('click', () => {
   }
 });
 
+// Validate popover: a checklist above the button showing ✓ passes and
+// ⚠ warnings. Non-blocking — export always stays possible.
+function closeValidatePopover() {
+  const pop = document.getElementById('validatePopover');
+  if (pop) pop.hidden = true;
+}
+function isValidatePopoverOpen() {
+  const pop = document.getElementById('validatePopover');
+  return pop && !pop.hidden;
+}
+
 $('btnValidate').addEventListener('click', () => {
+  const pop = document.getElementById('validatePopover');
+  if (!pop) return;
+  if (!pop.hidden) { pop.hidden = true; return; }
+
+  const lines = [];
+  const okLine = (msg) => lines.push(`<div class="v-ok">✓ ${esc(msg)}</div>`);
+  const warnLine = (msg) => lines.push(`<div class="v-warn">⚠ ${esc(msg)}</div>`);
+
+  // 1. XML well-formedness
   try {
     const xml = buildXML();
     const parser = new DOMParser();
@@ -4813,36 +5457,45 @@ $('btnValidate').addEventListener('click', () => {
     // is namespace-agnostic and catches all engines.
     const errNode = doc.getElementsByTagName('parsererror')[0]
       || (doc.documentElement && doc.documentElement.tagName === 'parsererror' ? doc.documentElement : null);
-    if (errNode) throw new Error(t('validate_xml_syntax_error') + errNode.textContent);
-    const nums = state.items.map(it => (Number(it.qty)||0) * (Number(it.price)||0));
-    const mode = $('r_taxmode').value;
-    const checks = [
-      $('r_number').value.trim() ? null : t('validate_missing_number'),
-      $('r_date').value ? null : t('validate_missing_date'),
-      $('s_name').value.trim() ? null : t('validate_missing_seller_name'),
-      $('b_name').value.trim() ? null : t('validate_missing_buyer_name'),
-      $('s_country').value.trim() ? null : t('validate_missing_seller_country'),
-      $('b_country').value.trim() ? null : t('validate_missing_buyer_country'),
-      mode === 'AE' && !$('s_vat').value.trim() ? t('validate_rc_seller_vat') : null,
-      mode === 'AE' && !$('b_vat').value.trim() ? t('validate_rc_buyer_vat') : null,
-      mode === 'S' && !$('s_vat').value.trim() ? t('validate_recommend_seller_vat') : null,
-      // BR-O-2/-3/-4: an invoice that is entirely out of scope must not carry
-      // seller or buyer VAT identifiers. Soft warning — emission isn't blocked.
-      mode === 'O' && ($('s_vat').value.trim() || $('b_vat').value.trim()) ? t('validate_o_vat_ids') : null,
-      state.items.length > 0 ? null : t('validate_missing_items'),
-      nums.every(x => x >= 0) ? null : t('validate_negative_amounts'),
-      // IBAN: only flag when present-but-malformed — leaving it blank is fine
-      // (the XML then emits payment-means type 1 instead of SEPA).
-      $('s_iban').value.trim() && !isValidIBAN($('s_iban').value) ? t('validate_invalid_iban') : null,
-    ].filter(Boolean);
-    if (checks.length === 0) {
-      toast(t('msg_xml_valid'), 'ok');
-    } else {
-      toast(t('msg_xml_warnings') + '\n• ' + checks.join('\n• '), 'err');
-    }
+    if (errNode) warnLine(t('validate_xml_syntax_error') + ' ' + errNode.textContent);
+    else okLine(t('validate_pass_xml'));
   } catch (e) {
-    toast(t('msg_error') + ' ' + e.message, 'err');
+    warnLine(t('msg_error') + ' ' + e.message);
   }
+
+  // 2. Required / recommended field checks (same rules as before, now
+  //    rendered as individual checklist entries).
+  const nums = state.items.map(it => (Number(it.qty)||0) * (Number(it.price)||0));
+  const mode = $('r_taxmode').value;
+  const fieldProblems = [
+    $('r_number').value.trim() ? null : t('validate_missing_number'),
+    $('r_date').value ? null : t('validate_missing_date'),
+    $('s_name').value.trim() ? null : t('validate_missing_seller_name'),
+    $('b_name').value.trim() ? null : t('validate_missing_buyer_name'),
+    $('s_country').value.trim() ? null : t('validate_missing_seller_country'),
+    $('b_country').value.trim() ? null : t('validate_missing_buyer_country'),
+    mode === 'AE' && !$('s_vat').value.trim() ? t('validate_rc_seller_vat') : null,
+    mode === 'AE' && !$('b_vat').value.trim() ? t('validate_rc_buyer_vat') : null,
+    mode === 'S' && !$('s_vat').value.trim() ? t('validate_recommend_seller_vat') : null,
+    // BR-O-2/-3/-4: an invoice that is entirely out of scope must not carry
+    // seller or buyer VAT identifiers. Soft warning — emission isn't blocked.
+    mode === 'O' && ($('s_vat').value.trim() || $('b_vat').value.trim()) ? t('validate_o_vat_ids') : null,
+    state.items.length > 0 ? null : t('validate_missing_items'),
+    nums.every(x => x >= 0) ? null : t('validate_negative_amounts'),
+  ].filter(Boolean);
+  if (fieldProblems.length === 0) okLine(t('validate_pass_fields'));
+  else fieldProblems.forEach(warnLine);
+
+  // 3. IBAN: only flag when present-but-malformed — leaving it blank is fine
+  //    (the XML then emits payment-means type 1 instead of SEPA).
+  const iban = $('s_iban').value.trim();
+  if (iban && !isValidIBAN(iban)) warnLine(t('validate_invalid_iban'));
+  else if (iban) okLine(t('validate_pass_iban'));
+
+  pop.innerHTML = `<div class="v-title">${esc(t('validate_title'))}</div>`
+    + lines.join('')
+    + `<div class="v-foot">${esc(t('validate_footer'))}</div>`;
+  pop.hidden = false;
 });
 
 // -------- Font loader: 5 monospace options embedded as base64 --------
@@ -5354,7 +6007,7 @@ async function exportData() {
   const numberPattern = await store.get(NUMBER_PATTERN_KEY);
   const payload = {
     format: 'erechnung-backup',
-    version: 6,
+    version: 7,
     exported_at: new Date().toISOString(),
     seller: sellerJSON ? JSON.parse(sellerJSON) : null,
     boilerplate: boilerplateJSON ? JSON.parse(boilerplateJSON) : {},
@@ -5375,7 +6028,10 @@ async function exportData() {
     theme: localStorage.getItem(THEME_KEY),
     // v6+
     preview_enabled: previewEnabled,
-    seller_collapsed: sellerCollapsed,
+    // v7+ (redesign 1a)
+    text_presets: state.textPresets,
+    selected_presets: state.selectedPreset,
+    due_days: state.dueDays,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const ts = todayLocalISO();
@@ -5471,7 +6127,20 @@ function sanitizeBackupPayload(raw) {
   }
   if (typeof raw.history_enabled === 'boolean') clean.history_enabled = raw.history_enabled;
   if (typeof raw.preview_enabled === 'boolean') clean.preview_enabled = raw.preview_enabled;
-  if (typeof raw.seller_collapsed === 'boolean') clean.seller_collapsed = raw.seller_collapsed;
+  // text_presets (v7): validated down to the known three-block shape.
+  if (raw.text_presets !== undefined) {
+    const presets = sanitizeTextPresets(raw.text_presets);
+    if (presets) {
+      clean.text_presets = presets;
+      if (isPlainObject(raw.selected_presets)) clean.selected_presets = raw.selected_presets;
+    } else {
+      issues.push('text_presets');
+    }
+  }
+  if (raw.due_days !== undefined) {
+    if ([14, 30, 60, 90].includes(raw.due_days)) clean.due_days = raw.due_days;
+    else issues.push('due_days');
+  }
   if (raw.number_pattern !== undefined && raw.number_pattern !== null) {
     if (typeof raw.number_pattern === 'string') clean.number_pattern = raw.number_pattern;
     else issues.push('number_pattern');
@@ -5483,7 +6152,15 @@ function sanitizeBackupPayload(raw) {
   return { payload: clean, issues };
 }
 
-async function importData(file) {
+// Staged import: file selection only parses + sanitizes and shows a
+// confirmation summary in the backup modal. Nothing is applied until the
+// user explicitly clicks "Restore backup".
+let _pendingBackup = null;
+
+async function stageBackupImport(file) {
+  const errBox = document.getElementById('backupImportError');
+  const pendingBox = document.getElementById('backupPending');
+  const dropLabel = document.getElementById('backupDropLabel');
   try {
     const text = await file.text();
     const raw = JSON.parse(text);
@@ -5491,20 +6168,67 @@ async function importData(file) {
       throw new Error(t('msg_backup_invalid'));
     }
     const { payload, issues } = sanitizeBackupPayload(raw);
+    _pendingBackup = { payload, issues };
+    // Summary lines
+    const summary = document.getElementById('backupPendingSummary');
+    if (summary) {
+      const sellerName = (payload.seller && payload.seller.name) || '—';
+      const buyerCount = Array.isArray(payload.buyers) ? payload.buyers.length : 0;
+      const historyCount = Array.isArray(payload.history) ? payload.history.length : 0;
+      summary.innerHTML = [
+        esc(t('backup_seller_line', { name: sellerName })),
+        esc(t('backup_buyers_line', { n: String(buyerCount) })),
+        esc(t('backup_history_line', { n: String(historyCount) })),
+      ].map(s => `<div>${s}</div>`).join('');
+    }
+    const warnBox = document.getElementById('backupPendingWarnings');
+    if (warnBox) {
+      warnBox.hidden = issues.length === 0;
+      warnBox.textContent = issues.join(' · ');
+    }
+    if (errBox) errBox.hidden = true;
+    if (pendingBox) pendingBox.hidden = false;
+    if (dropLabel) dropLabel.hidden = true;
+  } catch (e) {
+    _pendingBackup = null;
+    if (pendingBox) pendingBox.hidden = true;
+    if (dropLabel) dropLabel.hidden = false;
+    if (errBox) {
+      errBox.textContent = t('msg_backup_failed') + ' ' + e.message;
+      errBox.hidden = false;
+    }
+  }
+}
+
+function cancelBackupImport() {
+  _pendingBackup = null;
+  const pendingBox = document.getElementById('backupPending');
+  const dropLabel = document.getElementById('backupDropLabel');
+  const errBox = document.getElementById('backupImportError');
+  if (pendingBox) pendingBox.hidden = true;
+  if (dropLabel) dropLabel.hidden = false;
+  if (errBox) errBox.hidden = true;
+}
+
+async function confirmBackupImport() {
+  if (!_pendingBackup) return;
+  const { payload, issues } = _pendingBackup;
+  await applyBackupPayload(payload, issues);
+  cancelBackupImport();
+  updateBackupExportSummary();
+}
+
+async function applyBackupPayload(payload, issues) {
+  try {
     const sellerCount = payload.seller ? 1 : 0;
     const buyerCount = Array.isArray(payload.buyers) ? payload.buyers.length : 0;
     const footnoteCount = Array.isArray(payload.footnotes) ? payload.footnotes.length : 0;
-    const overwrite = confirm(
-      t('msg_backup_import_confirm', { seller: String(sellerCount), buyers: String(buyerCount), footnotes: String(footnoteCount) })
-    );
-    if (!overwrite) return;
 
     if (payload.seller) {
       // Newer format: stammdaten only. Older format: merged seller+boilerplate.
       await store.set(STORAGE_KEY, JSON.stringify(payload.seller));
       applySellerStammdaten(payload.seller);
-      updateSetupCardVisibility();
-      updateNumberSetupCardVisibility();
+      updateSellerChip();
     }
     // Per-language boilerplate (v2)
     if (payload.boilerplate && typeof payload.boilerplate === 'object') {
@@ -5530,7 +6254,30 @@ async function importData(file) {
     if (Array.isArray(payload.footnotes)) {
       state.footnotes = payload.footnotes;
       await store.set(FOOTNOTES_KEY, JSON.stringify(state.footnotes));
-      renderFootnotePicker();
+    }
+    // Text-block presets (v7). Backups older than v7 keep the current
+    // presets; their legacy footnotes were already stored above.
+    if (payload.text_presets) {
+      state.textPresets = payload.text_presets;
+      if (isPlainObject(payload.selected_presets)) {
+        for (const key of TEXT_BLOCKS) {
+          if (typeof payload.selected_presets[key] === 'string') {
+            state.selectedPreset[key] = payload.selected_presets[key];
+          }
+        }
+      }
+      for (const key of TEXT_BLOCKS) {
+        if (!state.textPresets[key].some(p => p.id === state.selectedPreset[key])) {
+          state.selectedPreset[key] = state.textPresets[key][0]?.id || '';
+        }
+      }
+      await persistTextPresets();
+      renderTextPresetSelects();
+    }
+    if (typeof payload.due_days === 'number') {
+      state.dueDays = payload.due_days;
+      await store.set(DUE_DAYS_KEY, String(state.dueDays));
+      if (typeof applyDueDays === 'function') applyDueDays();
     }
     if (payload.last_invoice) {
       await store.set(COUNTER_KEY, payload.last_invoice);
@@ -5583,7 +6330,6 @@ async function importData(file) {
       }
     }
     if (typeof payload.lang === 'string' && I18N[payload.lang]) {
-      $('langSelect').value = payload.lang;
       setLang(payload.lang);
     }
     if (Object.prototype.hasOwnProperty.call(payload, 'invoice_lang')) {
@@ -5601,13 +6347,11 @@ async function importData(file) {
         applyTheme(payload.theme);
       }
     }
-    // Preview + seller-collapse toggles (v6+). The setters persist and
-    // apply the UI state in one go.
+    // Preview toggle (v6+). The setter persists and applies UI in one go.
+    // (v6 backups may also carry seller_collapsed — the collapsible seller
+    // section no longer exists, so that flag is ignored.)
     if (typeof payload.preview_enabled === 'boolean') {
       await setPreviewEnabled(payload.preview_enabled);
-    }
-    if (typeof payload.seller_collapsed === 'boolean') {
-      await setSellerCollapsed(payload.seller_collapsed);
     }
     toast(`${t('msg_backup_import_done')} ${sellerCount} ${t('msg_backup_seller')}, ${buyerCount} ${t('msg_backup_buyers')}, ${footnoteCount} ${t('msg_backup_footnotes')}.`, 'ok');
     if (issues.length) {
@@ -5618,152 +6362,14 @@ async function importData(file) {
   }
 }
 
-// -------- Seller collapse/expand --------
+// -------- Seller configured check --------
 
 // True if seller stammdaten contain enough data to be considered "configured"
-// — at minimum a name and one of (address, city, country). When configured
-// and no edit is active, the section can collapse to a one-line summary.
+// — at minimum a name and one of (address, city, country). Gates first-run
+// onboarding and the seller-chip empty label.
 function isSellerConfigured() {
   const s = collectSellerStammdaten();
   return Boolean(s.name && (s.line1 || s.city || s.country));
-}
-
-// Show the first-run setup card while the seller profile is still empty.
-// Hidden as soon as the user has minimal master data filled in.
-function updateSetupCardVisibility() {
-  const card = document.getElementById('setupCard');
-  if (!card) return;
-  card.hidden = isSellerConfigured();
-}
-
-// Show the number-scheme setup card only on a fresh slate: seller already
-// configured, but neither pattern nor counter has ever been touched. Once
-// either is set (here or later via the inline editor), the card is gone
-// for good.
-async function updateNumberSetupCardVisibility() {
-  const card = document.getElementById('numberSetupCard');
-  if (!card) return;
-  if (!isSellerConfigured()) { card.hidden = true; return; }
-  const hasPattern = await store.get(NUMBER_PATTERN_KEY);
-  const hasCounter = await store.get(COUNTER_KEY);
-  card.hidden = Boolean(hasPattern || hasCounter);
-}
-
-// Render the live "next number" preview inside the number-setup card.
-function updateNumberSetupPreview() {
-  const patternEl = document.getElementById('numberSetupPattern');
-  const startEl = document.getElementById('numberSetupStart');
-  const previewEl = document.getElementById('numberSetupPreview');
-  if (!patternEl || !startEl || !previewEl) return;
-  const pattern = (patternEl.value || '').trim() || DEFAULT_NUMBER_PATTERN;
-  const start = Math.max(1, parseInt(startEl.value, 10) || 1);
-  previewEl.textContent = resolveNumberPattern(pattern, start);
-}
-
-// Load a realistic demo dataset into the current form (DE → FR reverse charge).
-// Nothing is persisted: seller stays unsaved unless the user clicks Save,
-// no history snapshot is recorded. Used by the setup-card "demo" CTA.
-function loadDemoData() {
-  applySellerStammdaten({
-    name: 'Demo Beratung GmbH',
-    line1: 'Musterstraße 12',
-    zip: '10115',
-    city: 'Berlin',
-    country: 'DE',
-    vat: 'DE123456789',
-    siret: '',
-    email: 'kontakt@demo-beratung.example',
-    phone: '+49 30 1234567',
-    // Placeholder IBAN: all-zero body with mod-97 checksum (36) so it
-    // validates structurally but cannot map to any real account.
-    iban: 'DE36000000000000000000',
-    bic: 'EXMPDEFFXXX',
-    bank: 'Beispielbank',
-  });
-  applyBuyer({
-    name: 'Société Démo SARL',
-    line1: '10 rue de la Paix',
-    zip: '75001',
-    city: 'Paris',
-    country: 'FR',
-    vat: 'FR12345678901',
-    siret: '',
-    reference: '',
-  });
-  state.items = [
-    { id: crypto.randomUUID(), desc: 'Beratungsleistung Mai 2026', qty: 5, unit: 'C62', price: 800, vat: 0 },
-    { id: crypto.randomUUID(), desc: 'Reisekostenpauschale',        qty: 1, unit: 'C62', price: 120, vat: 0 },
-  ];
-  renderItems();
-  $('r_currency').value = 'EUR';
-  $('r_taxmode').value = 'AE';
-  calcTotals();
-  updateFilenamePreview();
-  updateBuyerHistoryHint();
-  updateSetupCardVisibility();
-  toast(t('msg_demo_loaded'), 'ok');
-}
-
-// Build a compact summary line for the collapsed seller header.
-// Pattern: "Name · VAT-or-SIRET · COUNTRY"
-function buildSellerSummary() {
-  const s = collectSellerStammdaten();
-  const bits = [];
-  if (s.name) bits.push(s.name);
-  if (s.vat) bits.push(s.vat);
-  else if (s.siret) bits.push(s.siret);
-  if (s.country) bits.push(s.country);
-  return bits.join(' \u00b7 ');
-}
-
-let sellerCollapsed = false;
-
-async function loadSellerCollapsed() {
-  try {
-    const v = await store.get(SELLER_COLLAPSED_KEY);
-    sellerCollapsed = v === 'true';
-  } catch (e) {
-    console.warn('[erechnung] Failed to load seller-collapsed flag:', e?.message || e);
-    sellerCollapsed = false;
-  }
-}
-
-async function setSellerCollapsed(v, persist = true) {
-  sellerCollapsed = !!v;
-  if (persist) {
-    try { await store.set(SELLER_COLLAPSED_KEY, String(sellerCollapsed)); } catch (_) {}
-  }
-  applySellerCollapsedUI();
-}
-
-// Apply current sellerCollapsed state to the DOM. Also decides whether
-// the toggle button should even be visible (only when seller has data).
-function applySellerCollapsedUI() {
-  const section = $('sellerSection');
-  const body = $('sellerBody');
-  const toggle = $('sellerToggle');
-  const summary = $('sellerSummary');
-  if (!section || !body || !toggle || !summary) return;
-
-  const configured = isSellerConfigured();
-  toggle.hidden = !configured;
-  if (!configured) {
-    // Force expanded — nothing to summarize
-    body.hidden = false;
-    section.classList.remove('collapsed');
-    toggle.setAttribute('aria-expanded', 'true');
-    return;
-  }
-  summary.textContent = buildSellerSummary();
-  if (sellerCollapsed) {
-    body.hidden = true;
-    section.classList.add('collapsed');
-    toggle.setAttribute('aria-expanded', 'false');
-  } else {
-    body.hidden = false;
-    section.classList.remove('collapsed');
-    toggle.setAttribute('aria-expanded', 'true');
-  }
 }
 
 
@@ -5774,113 +6380,55 @@ function applySellerCollapsedUI() {
 // README: headings (#, ##, ###), unordered lists (- and *), inline code
 // (`x`), bold (**x**), italic (*x*), links ([t](url)), paragraphs.
 
-const HELP_README_TEXT = `# E-Invoice Generator
+// Help topics: eight searchable entries rendered into the two-pane help
+// modal. English-only by design — translating the docs would multiply the
+// bundle size, so the help body stays English even when the UI is de/fr.
+// The "Keyboard shortcuts" topic must stay in sync with the actual keydown
+// bindings in setupKeyboardShortcuts().
+const HELP_TOPICS = [
+  { id: 'start', title: 'Getting started', md: `Set up your seller profile once — it appears on every invoice you create. It lives behind the identity chip at the top of the form.
 
-A self-contained, offline-first tool for creating ZUGFeRD- / Factur-X-compliant invoices. Runs fully offline in any modern browser, doesn't store anything on a server.
+Pick a buyer (or add a new one), add line items, and hit Create PDF. The XML is embedded automatically for ZUGFeRD 2.3 / Factur-X (EN 16931 Comfort) compliance.
 
-The motivation came from frustration that essentially all tools that can do this are paid. Adding XML to a PDF and making it compliant with the regulation didn't seem too hard to tackle, so this exists. It tries to have all the features I could ever need, plus customization options. The tool can also retrofit existing PDFs with an XML if you'd like to use another application for fancy layouts.
+Everything runs offline in your browser. All data stays in \`localStorage\`; nothing is uploaded anywhere.` },
+  { id: 'profiles', title: 'Seller & buyer profiles', md: `Your seller profile is a single business identity — edit it any time from the chip at the top of the form. Master data (address, VAT ID, IBAN, BIC, bank, optional SIRET) is stored locally.
 
-This is created with the help of AI; I'm not a finance expert, so use at your own risk. The created files pass current e-invoice viewers and the strict verapdf validation.
+Buyers are saved as reusable profiles. Save, update, or delete them from the Buyer tab; recent customers appear as one-click chips. An optional second name line prints below the buyer name (BT-45), and the buyer reference / Leitweg-ID (BT-10) is required for German government clients.
 
-## Short description
+When you pick a buyer the tool shows the date and amount of the most recent invoice you sent them.` },
+  { id: 'numbering', title: 'Invoice numbering', md: `Numbers follow a pattern with tokens, set during first-run setup. Default: \`{yyyy}-{counter:5}\` e.g. \`2026-00042\`. An internal counter increments after each invoice.
 
-Open the tool in a browser, fill in the invoice data, generate a PDF. The PDF carries machine-readable XML data per EN 16931 (ZUGFeRD 2.3 / Factur-X 1.0, Comfort profile) embedded inside it, making it compliant with German e-invoicing law (§14 UStG, in force since 2025) and a valid Factur-X document for French B2B reverse-charge invoicing.
+- Available tokens: \`{yyyy}\`, \`{yy}\`, \`{mm}\`, \`{dd}\`, \`{counter}\`, \`{counter:N}\`.
+- Change the pattern any time from Invoice info → Numbering & dates → edit pattern.
+- The ↻ chip always previews the next number before you apply it.` },
+  { id: 'tax', title: 'Tax modes', md: `Choose Standard (S), Reverse charge (AE), Zero-rated (Z), Exempt (E), or Out of scope (O) in Invoice info → Currency & tax.
 
-## Layouts
+Non-standard modes replace the per-line VAT calculation with a contextual note printed on the invoice and encoded in the XML (EN 16931 BT-95/BT-96). For reverse charge, the legal note per Art. 196 of Council Directive 2006/112/EC is inserted automatically into both PDF and XML.` },
+  { id: 'compliance', title: 'PDF/A-3 & Factur-X', md: `Every generated PDF embeds a machine-readable Factur-X XML attachment (\`factur-x.xml\`) and conforms to PDF/A-3 for long-term archiving. Profile: EN 16931 (Comfort), \`urn:cen.eu:en16931:2017\`.
 
-- **Modern** large headline, generous whitespace, prominent total block
-- **DIN 5008** German business-letter standard with recipient address top-left (window-envelope compatible) and a 3-column footer
-- **Typewriter** centered two-column header (buyer left, seller right), evenly-spaced meta row, single-line bank footer; body texts are justified
+Use Validate XML before sending to check required fields, IBAN checksum, and VAT-ID plausibility — validation never blocks export.
 
-All three layouts support multi-page rendering when item lists overflow a single page.
+Already have a designed PDF (e.g. from InDesign)? Embed XML… retrofits it with the invoice XML. Generated files pass Quba Viewer, Mustang, ELSTER, and strict verapdf validation.` },
+  { id: 'filenames', title: 'Filename patterns', md: `Build your own filename using tokens in Invoice info → Filename pattern. The pattern is a real text field — type freely, or click a token chip to append one.
 
-## Features
+- Tokens: \`{nr}\`, \`{buyer}\`, \`{project}\`, \`{date}\`, \`{category}\`, \`{seller}\`, \`{layout}\`.
+- A live preview below shows the resolved filename with its \`.pdf\` suffix.
+- The pattern is saved automatically as you type.` },
+  { id: 'history', title: 'History & statistics', md: `Every generated invoice is saved automatically (up to 1000 entries, oldest dropped first) — toggleable via the Auto-save switch in the History modal.
 
-### Seller profile
-Master data (address, VAT ID, IBAN, BIC, bank, optional SIRET) is stored locally. The seller section collapses to a one-line summary (\`Company · VAT ID · Country\`) once filled in, with save and reset buttons appearing in the header row when expanded.
+- **Reload** a past invoice back into the form. All fields including buyer, items, tax mode, language, font and layout are restored; the number is auto-assigned.
+- **Add past invoice** backfills records that predate this tool so statistics cover full periods.
+- Statistics summarizes revenue, invoice counts, averages, a monthly chart and top buyers (click one to drill down), per currency. The Quarters tab shows Q1–Q4 with a year selector, and YoY comparison can be backfilled manually.
+- Export CSV dumps the current view as UTF-8 with semicolon separators.` },
+  { id: 'shortcuts', title: 'Keyboard shortcuts', md: `Shortcuts work anywhere in the app except while typing in a field (Esc always works).
 
-### Customer database
-Add, select, delete customers. Selecting a saved customer fills all buyer fields. An optional second name line (e.g. department or trading name) prints below the buyer name and is stored as BT-45 in the XML. Buyer reference / Leitweg-ID is stored as BT-10 in the XML (required for German government clients). When you select a buyer the tool also shows the date and amount of the most recent invoice you sent them.
+- ⌘/Ctrl + Enter — Create PDF
+- ⌘/Ctrl + D — Duplicate last invoice
+- 1 / 2 / 3 — Jump to Buyer / Items / Invoice info
+- ? — Open this Help panel
+- Esc — Close the current menu, modal, or panel` },
+];
 
-### Invoice number with pattern
-Default pattern: \`{yyyy}-{counter:5}\` e.g. \`2026-00042\`. An internal counter increments by 1 after each invoice. Available tokens: \`{yyyy}\`, \`{yy}\`, \`{mm}\`, \`{dd}\`, \`{counter}\`, \`{counter:N}\`. The pattern is editable and persistent.
-
-### Date fields
-- Invoice date
-- Due date with quick chips +14 / +30 / +60 / +90 days
-- Service date (required for e-invoicing)
-- Service date end (optional, for date ranges; encoded as BillingSpecifiedPeriod in the XML)
-
-### Tax modes
-Standard (S, with VAT), Reverse Charge (AE, B2B EU cross-border), Zero rate (Z), Exempt (E), Out of scope (O). For reverse charge, the legal note per Art. 196 of Council Directive 2006/112/EC is automatically inserted into both PDF and XML. The XML follows EN 16931 BT-95/BT-96 codes.
-
-### Line items
-Description (wraps if long), quantity, unit price, VAT rate. Multi-line descriptions wrap properly across all layouts and pages.
-
-### Default texts (boilerplate)
-Intro, payment note, greeting, signature and footnote are stored per invoice language, separately. The \`{due}\` placeholder in the payment note is replaced with the actual due date at PDF time.
-
-### Footnote presets
-Frequently-used explanations can be saved as named presets and inserted from a dropdown.
-
-### Language selectors
-Two independent dropdowns: UI language and invoice language. You can keep the UI in German and still generate English invoices, for example.
-
-### Fonts
-Five monospace fonts for the PDF (all embedded with proper Bold weight): Courier Prime, IBM Plex Mono, JetBrains Mono, Inconsolata, Space Mono.
-
-### Filename pattern
-Token-based filename builder with chips for one-click insertion. Default: \`{nr}_{buyer}_{project}\`. Tokens: \`{nr}\`, \`{date}\`, \`{buyer}\`, \`{seller}\`, \`{project}\`, \`{category}\`, \`{layout}\`. A live preview shows the resolved filename.
-
-### Invoice history
-A history icon in the top bar opens a modal with all generated invoices (up to 1000 entries, oldest dropped first):
-
-- **Clone** any past invoice back into the form. All fields including buyer, items, project, category, tax mode, language, font and layout are restored. Date fields stay empty so you fill them explicitly; the invoice number is auto-assigned to the next available one. Cloning closes the modal so you land back on the form.
-- **Add past invoice** to backfill older invoices generated elsewhere, so the statistics view can cover a complete period.
-- **Delete entry** to remove a single record.
-- **Delete all** to clear the history with a confirmation prompt.
-- **Save invoices to history** toggle. When off, new invoices won't be saved, but existing entries remain accessible.
-
-### Statistics
-A statistics icon in the top bar opens a modal with everything you need to look back at your billing. For each currency separately (EUR / USD / GBP / CHF), the **Overview** tab shows gross total, net, VAT, average per invoice, a 12-month bar chart with hover tooltips, and Top 3 buyers (each clickable to drill down into a buyer-specific view with their KPIs and chronological invoice list).
-
-The **Quarters** tab shows Q1 to Q4 totals with columns adapted to the tax mode, and a year selector to flip through past years.
-
-A **YoY toggle** in the header adds year-over-year arrows next to the KPIs and a comparison bar in the chart tooltip. If you only have history for the current year, a Set previous year button opens a small backfill form where you enter monthly totals manually for any past year and currency.
-
-Period filter on the Overview tab: this year, last 12 months, last 6 months, last 3 months, last 30 days, all time.
-
-A CSV export button in the header dumps the current view (overview, quarters, or buyer detail) as UTF-8 with semicolon separators, ready for Excel / Numbers.
-
-### XML validation
-The Validate XML button checks whether all EN 16931 mandatory fields are populated. Download XML only produces just the XML file, without a PDF.
-
-### Embed XML into existing PDF
-If you already have a finished invoice PDF (designed in InDesign, exported from another tool, etc.), the Embed XML button opens a modal where you drop the PDF in and get back a ZUGFeRD-compliant version with the XML attached. The form fields in the tool fill the XML side, the PDF visual is whatever you uploaded.
-
-### Backup
-Export and import the entire tool state as a JSON file, including history, buyer database, footnote presets and YoY backfill data. Migration handles older backup versions automatically; older backups without history or YoY data import cleanly, leaving the existing values untouched.
-
-### Theme
-Light / dark / auto (follows OS preference).
-
-## Compliance & standards
-
-- **Format**: ZUGFeRD 2.3 / Factur-X 1.0
-- **Profile**: EN 16931 (Comfort) \`urn:cen.eu:en16931:2017\`
-- **Mandatory fields**: BT-1 (invoice number), BT-2 (date), BT-3 (type 380), BT-5 (currency), BT-9 (due date), BT-10 (buyer reference, optional), seller / buyer addresses, tax breakdown, delivery date (BT-72)
-- **Reverse charge**: encoded as a tax category entry with an ExemptionReason
-- **PDF attachment**: XML is attached as embedded file \`factur-x.xml\`
-- **Validators**: Quba Viewer, Mustang, ELSTER E-Rechnungsviewer, verapdf
-
-## Privacy & offline guarantee
-
-No network calls at runtime. All libraries (pdf-lib, fontkit, pako), all fonts and all UI assets are embedded into the built HTML file. No server component. All input (including the invoice history) is stored in \`localStorage\`. Backup export produces a JSON file you download yourself; nothing is transmitted.
-
-## Notes
-
-This is a vibe-coded tool. No warranty for correctness, completeness or legal compliance of generated documents. Always validate with a certified validator before production use, and consult a tax advisor when in doubt.
-`;
 
 // Render a small subset of Markdown to HTML. Handles: # headings, lists,
 // **bold**, *italic*, \`code\`, [link](url), and paragraphs.
@@ -5963,19 +6511,51 @@ function inlineMD(text) {
 }
 
 
-// -------- Help modal --------
+// -------- Help modal (two-pane: searchable topics + content) --------
+
+let helpTopicId = 'start';
+let helpSearchTerm = '';
+
+function filteredHelpTopics() {
+  const term = helpSearchTerm.trim().toLowerCase();
+  if (!term) return HELP_TOPICS;
+  return HELP_TOPICS.filter(tp =>
+    tp.title.toLowerCase().includes(term) || tp.md.toLowerCase().includes(term));
+}
+
+function renderHelpTopics() {
+  const host = document.getElementById('helpTopics');
+  const noResults = document.getElementById('helpNoResults');
+  if (!host) return;
+  const topics = filteredHelpTopics();
+  // If the active topic fell out of the filter, activate the first match.
+  const active = topics.find(tp => tp.id === helpTopicId) || topics[0] || null;
+  if (active) helpTopicId = active.id;
+  host.innerHTML = topics
+    .map(tp => `<button type="button" class="help-topic${tp.id === helpTopicId ? ' active' : ''}" data-topic="${esc(tp.id)}">${esc(tp.title)}</button>`)
+    .join('');
+  if (noResults) noResults.hidden = topics.length > 0;
+  host.querySelectorAll('.help-topic').forEach(btn => {
+    btn.addEventListener('click', () => {
+      helpTopicId = btn.dataset.topic;
+      renderHelpTopics();
+    });
+  });
+  renderHelpContent(active);
+}
+
+function renderHelpContent(topic) {
+  const title = document.getElementById('helpTopicTitle');
+  const body = document.getElementById('helpBody');
+  if (!title || !body) return;
+  title.textContent = topic ? topic.title : '';
+  body.innerHTML = topic ? renderMarkdown(topic.md) : '';
+}
 
 function openHelpModal() {
   const modal = $('helpModal');
-  const body = $('helpBody');
-  if (!modal || !body) return;
-  // Render once on first open, reuse afterwards. The bundled README is
-  // English-only by design — translating it would multiply the bundle size,
-  // so the help body stays English even when the surrounding UI is de/fr.
-  if (!body.dataset.rendered) {
-    body.innerHTML = renderMarkdown(HELP_README_TEXT);
-    body.dataset.rendered = '1';
-  }
+  if (!modal) return;
+  renderHelpTopics();
   modal.classList.add('open');
   modal.removeAttribute('hidden');
 }
@@ -6061,60 +6641,437 @@ async function runEmbedXML() {
 }
 
 
-// -------- Init --------
-document.getElementById('addItem').addEventListener('click', () => addItem());
-document.getElementById('itemsFreshHintCta').addEventListener('click', duplicateLastInvoice);
-document.getElementById('saveSeller').addEventListener('click', saveSeller);
-$('clearSeller').addEventListener('click', clearSeller);
-$('sellerToggle').addEventListener('click', () => setSellerCollapsed(!sellerCollapsed));
+// -------- Redesign shell: fonts, tabs, menus, seller chip, onboarding --------
 
-// Setup card CTA — jump to seller section, ensure expanded, focus name field.
-$('setupCardCta').addEventListener('click', async () => {
-  if (sellerCollapsed) await setSellerCollapsed(false);
-  const section = $('sellerSection');
-  if (section && section.scrollIntoView) {
-    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+// UI font: IBM Plex Mono, reusing the WOFF data already embedded for the
+// PDF pipeline (FONT_DATA). Injected as @font-face at runtime so the app
+// stays a single offline file with no CDN fetch. Weight 700 comes from the
+// bold cut; intermediate weights fall back to browser synthesis.
+function injectUIFontFaces() {
+  try {
+    const data = FONT_DATA['ibm-plex-mono'];
+    if (!data) return;
+    const style = document.createElement('style');
+    style.textContent = `
+      @font-face {
+        font-family: 'IBM Plex Mono';
+        font-weight: 100 500;
+        font-style: normal;
+        src: url(data:font/woff;base64,${data.reg}) format('woff');
+      }
+      @font-face {
+        font-family: 'IBM Plex Mono';
+        font-weight: 600 900;
+        font-style: normal;
+        src: url(data:font/woff;base64,${data.bold}) format('woff');
+      }`;
+    document.head.appendChild(style);
+  } catch (e) {
+    console.warn('[erechnung] UI font injection failed:', e?.message || e);
   }
-  $('s_name').focus({ preventScroll: true });
-});
-$('setupCardDemo').addEventListener('click', loadDemoData);
+}
 
-// Number setup card: live preview + Apply/Default actions.
-$('numberSetupPattern').addEventListener('input', updateNumberSetupPreview);
-$('numberSetupStart').addEventListener('input', updateNumberSetupPreview);
-$('numberSetupCta').addEventListener('click', async () => {
-  const pattern = ($('numberSetupPattern').value || '').trim() || DEFAULT_NUMBER_PATTERN;
-  const start = parseInt($('numberSetupStart').value, 10);
+// --- Tabs (Buyer / Items / Invoice info) ---
+function setActiveTab(key) {
+  document.querySelectorAll('#tabs .tab').forEach(btn => {
+    const active = btn.dataset.tab === key;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', String(active));
+  });
+  ['buyer', 'items', 'details'].forEach(k => {
+    const panel = document.getElementById('tab-' + k);
+    if (panel) panel.hidden = k !== key;
+  });
+}
+document.querySelectorAll('#tabs .tab').forEach(btn => {
+  btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
+});
+
+// --- Overflow menu (⋯) ---
+function isOverflowMenuOpen() {
+  const m = document.getElementById('overflowMenu');
+  return m && !m.hidden;
+}
+function closeOverflowMenu() {
+  const m = document.getElementById('overflowMenu');
+  if (m) m.hidden = true;
+  document.getElementById('overflowToggle')?.setAttribute('aria-expanded', 'false');
+}
+document.getElementById('overflowToggle').addEventListener('click', () => {
+  const m = document.getElementById('overflowMenu');
+  const open = m.hidden;
+  m.hidden = !open;
+  document.getElementById('overflowToggle').setAttribute('aria-expanded', String(open));
+  if (open) closeSellerMenu();
+});
+
+// --- Seller identity chip + dropdown ---
+function sellerInitials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '–';
+  const first = parts[0][0] || '';
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : (parts[0][1] || '');
+  return (first + last).toUpperCase();
+}
+
+// Refresh the chip label/avatar and the read-mode key/value list from the
+// current s_* field values. Called after load, save, import, onboarding.
+function updateSellerChip() {
+  const s = collectSellerStammdaten();
+  const initials = sellerInitials(s.name);
+  const label = s.name
+    ? [s.name, s.vat].filter(Boolean).join(' · ')
+    : t('seller_chip_empty');
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('sellerAvatar', initials);
+  set('sellerAvatarLg', initials);
+  set('sellerChipLabel', label);
+  set('sellerReadName', s.name || '—');
+  const name2El = document.getElementById('sellerReadName2');
+  if (name2El) {
+    name2El.textContent = s.name2 || '';
+    name2El.hidden = !s.name2;
+  }
+  set('sellerReadVat', s.vat || '—');
+  set('sellerReadCountry', s.country || '—');
+  set('sellerReadEmail', s.email || '—');
+  set('sellerReadPhone', s.phone || '—');
+  set('sellerReadIban', s.iban || '—');
+  set('sellerReadBic', s.bic || '—');
+}
+
+function isSellerMenuOpen() {
+  const m = document.getElementById('sellerMenu');
+  return m && !m.hidden;
+}
+function closeSellerMenu() {
+  const m = document.getElementById('sellerMenu');
+  if (!m || m.hidden) return;
+  // Leaving while editing = cancel (restore the pre-edit snapshot).
+  if (!document.getElementById('sellerEdit').hidden) cancelSellerEdit();
+  m.hidden = true;
+  document.getElementById('sellerChip')?.setAttribute('aria-expanded', 'false');
+}
+document.getElementById('sellerChip').addEventListener('click', () => {
+  const m = document.getElementById('sellerMenu');
+  if (m.hidden) {
+    updateSellerChip();
+    document.getElementById('sellerRead').hidden = false;
+    document.getElementById('sellerEdit').hidden = true;
+    m.hidden = false;
+    document.getElementById('sellerChip').setAttribute('aria-expanded', 'true');
+    closeOverflowMenu();
+  } else {
+    closeSellerMenu();
+  }
+});
+
+// Edit mode keeps the live s_* inputs (the pipeline reads them by id), so
+// Cancel restores a snapshot taken when editing started.
+let _sellerEditSnapshot = null;
+function startSellerEdit() {
+  _sellerEditSnapshot = collectSellerStammdaten();
+  document.getElementById('sellerRead').hidden = true;
+  document.getElementById('sellerEdit').hidden = false;
+  $('s_name').focus();
+}
+function cancelSellerEdit() {
+  if (_sellerEditSnapshot) applySellerStammdaten(_sellerEditSnapshot);
+  _sellerEditSnapshot = null;
+  document.getElementById('sellerEdit').hidden = true;
+  document.getElementById('sellerRead').hidden = false;
+  updateSellerChip();
+}
+document.getElementById('sellerEditBtn').addEventListener('click', startSellerEdit);
+document.getElementById('sellerCancelBtn').addEventListener('click', cancelSellerEdit);
+document.getElementById('saveSeller').addEventListener('click', async () => {
+  await saveSeller();
+  _sellerEditSnapshot = null;
+  document.getElementById('sellerEdit').hidden = true;
+  document.getElementById('sellerRead').hidden = false;
+  updateSellerChip();
+});
+document.getElementById('sellerRerunBtn').addEventListener('click', () => {
+  closeSellerMenu();
+  openOnboarding();
+});
+
+// Close floating layers on outside click.
+document.addEventListener('click', (e) => {
+  if (isOverflowMenuOpen() && !e.target.closest('#overflowMenu') && !e.target.closest('#overflowToggle')) {
+    closeOverflowMenu();
+  }
+  if (isSellerMenuOpen() && !e.target.closest('#sellerMenu') && !e.target.closest('#sellerChip')) {
+    closeSellerMenu();
+  }
+  if (isValidatePopoverOpen() && !e.target.closest('#validatePopover') && !e.target.closest('#btnValidate')) {
+    closeValidatePopover();
+  }
+});
+
+// --- Due-date chips (+14d / +30d / +60d / +90d, single-select) ---
+// The hidden r_due input stays the single source the XML/PDF pipeline
+// reads; it is always issue date + dueDays.
+async function loadDueDays() {
+  try {
+    const v = await store.get(DUE_DAYS_KEY);
+    const n = parseInt(v, 10);
+    if ([14, 30, 60, 90].includes(n)) state.dueDays = n;
+  } catch (_) {}
+}
+
+function applyDueDays() {
+  const baseStr = $('r_date').value || todayLocalISO();
+  const [y, m, d] = baseStr.split('-').map(Number);
+  const base = new Date(y, m - 1, d);
+  base.setDate(base.getDate() + state.dueDays);
+  const pad = (n) => String(n).padStart(2, '0');
+  $('r_due').value = `${base.getFullYear()}-${pad(base.getMonth() + 1)}-${pad(base.getDate())}`;
+  updateDueDateUI();
+  if (typeof schedulePreviewRender === 'function') schedulePreviewRender();
+}
+
+function updateDueDateUI() {
+  document.querySelectorAll('#dueChips button').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.days, 10) === state.dueDays);
+  });
+  const display = document.getElementById('dueDateDisplay');
+  if (display) {
+    const due = $('r_due')?.value;
+    let text = '';
+    if (due) {
+      try { text = '→ ' + parseInvoiceDate(due).toLocaleDateString(CURRENT_LANG); }
+      catch { text = '→ ' + due; }
+    }
+    display.textContent = text;
+  }
+}
+
+document.querySelectorAll('#dueChips button').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    state.dueDays = parseInt(btn.dataset.days, 10);
+    try { await store.set(DUE_DAYS_KEY, String(state.dueDays)); } catch (_) {}
+    applyDueDays();
+  });
+});
+$('r_date').addEventListener('change', applyDueDays);
+
+// --- Delivery date: optional period ("+ Make it a period") ---
+function updateDeliveryPeriodUI() {
+  const hasEnd = Boolean($('r_delivery_end').value);
+  $('r_delivery_end').hidden = !hasEnd;
+  document.getElementById('deliveryArrow').hidden = !hasEnd;
+  $('clearDeliveryEnd').hidden = !hasEnd;
+  document.getElementById('addDeliveryEnd').hidden = hasEnd;
+}
+document.getElementById('addDeliveryEnd').addEventListener('click', () => {
+  $('r_delivery_end').value = $('r_delivery').value || todayLocalISO();
+  updateDeliveryPeriodUI();
+  $('r_delivery_end').focus();
+  if (typeof schedulePreviewRender === 'function') schedulePreviewRender();
+});
+$('clearDeliveryEnd').addEventListener('click', () => {
+  const el = $('r_delivery_end');
+  el.value = '';
+  el.defaultValue = '';
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  updateDeliveryPeriodUI();
+});
+
+// --- Collapsible-section summaries + layout segmented control ---
+function updateSummaryValues() {
+  const cur = document.getElementById('currencySummary');
+  if (cur) cur.textContent = $('r_currency').value;
+  const lay = document.getElementById('layoutSummary');
+  if (lay) {
+    const key = $('invoiceLayoutSelect').value;
+    lay.textContent = (LAYOUTS[key] && LAYOUTS[key].label) || key;
+  }
+}
+
+function renderLayoutSegment() {
+  const host = document.getElementById('layoutSegment');
+  if (!host) return;
+  const current = $('invoiceLayoutSelect').value;
+  host.innerHTML = Object.entries(LAYOUTS)
+    .map(([k, v]) => `<button type="button" data-layout="${esc(k)}"${k === current ? ' class="active"' : ''}>${esc(v.label)}</button>`)
+    .join('');
+  host.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const sel = $('invoiceLayoutSelect');
+      sel.value = btn.dataset.layout;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      renderLayoutSegment();
+      updateSummaryValues();
+      if (typeof schedulePreviewRender === 'function') schedulePreviewRender();
+    });
+  });
+}
+
+// --- Onboarding (two-step first-run setup) ---
+let onboardingStep = 0;
+
+function renderOnboardingStep() {
+  document.getElementById('obStep1').hidden = onboardingStep !== 0;
+  document.getElementById('obStep2').hidden = onboardingStep !== 1;
+  document.getElementById('obDot1').classList.toggle('active', onboardingStep === 0);
+  document.getElementById('obDot2').classList.toggle('active', onboardingStep === 1);
+  document.getElementById('obStepLabel').textContent = t(onboardingStep === 0 ? 'ob_step_1' : 'ob_step_2');
+  if (onboardingStep === 1) updateObNumberPreview();
+}
+
+function openOnboarding() {
+  onboardingStep = 0;
+  // Pre-clear (fresh-eyes preview); an existing profile stays untouched
+  // until "Finish setup" writes the new values.
+  ['ob_company', 'ob_vat', 'ob_country', 'ob_iban'].forEach(id => { $(id).value = ''; });
+  $('ob_pattern').value = DEFAULT_NUMBER_PATTERN;
+  $('ob_start').value = '1';
+  renderOnboardingStep();
+  const modal = $('onboardingModal');
+  modal.classList.add('open');
+  modal.removeAttribute('hidden');
+}
+function closeOnboarding() {
+  const modal = $('onboardingModal');
+  modal.classList.remove('open');
+  modal.setAttribute('hidden', '');
+}
+
+function updateObNumberPreview() {
+  const pattern = ($('ob_pattern').value || '').trim() || DEFAULT_NUMBER_PATTERN;
+  const start = Math.max(1, parseInt($('ob_start').value, 10) || 1);
+  const host = document.getElementById('obNumberPreview');
+  if (!host) return;
+  host.innerHTML = [0, 1, 2]
+    .map(i => `<div>${esc(resolveNumberPattern(pattern, start + i))}</div>`)
+    .join('');
+}
+
+document.getElementById('obLoadDemo').addEventListener('click', () => {
+  $('ob_company').value = 'Demo Beratung GmbH';
+  $('ob_vat').value = 'DE123456789';
+  $('ob_country').value = 'DE';
+  // Placeholder IBAN: all-zero body with mod-97 checksum (36) so it
+  // validates structurally but cannot map to any real account.
+  $('ob_iban').value = 'DE36000000000000000000';
+});
+document.getElementById('obContinue').addEventListener('click', () => {
+  onboardingStep = 1;
+  renderOnboardingStep();
+});
+document.getElementById('obBack').addEventListener('click', () => {
+  onboardingStep = 0;
+  renderOnboardingStep();
+});
+$('ob_pattern').addEventListener('input', updateObNumberPreview);
+$('ob_start').addEventListener('input', updateObNumberPreview);
+document.getElementById('obTokenChips').addEventListener('click', (e) => {
+  const token = e.target.closest('[data-token]')?.dataset.token;
+  if (!token) return;
+  $('ob_pattern').value += token;
+  updateObNumberPreview();
+});
+document.getElementById('obFinish').addEventListener('click', async () => {
+  const start = parseInt($('ob_start').value, 10);
   if (!Number.isFinite(start) || start < 1) {
     toast(t('msg_number_setup_start_invalid'), 'err');
     return;
   }
+  // Step 1 values → seller fields (other master data stays editable via
+  // the seller chip). Only overwrite what the user actually entered.
+  if ($('ob_company').value.trim()) $('s_name').value = $('ob_company').value.trim();
+  if ($('ob_vat').value.trim())     $('s_vat').value = $('ob_vat').value.trim();
+  if ($('ob_country').value.trim()) $('s_country').value = $('ob_country').value.trim().toUpperCase();
+  if ($('ob_iban').value.trim())    $('s_iban').value = $('ob_iban').value.trim();
+  await store.set(STORAGE_KEY, JSON.stringify(collectSellerStammdaten()));
+
+  // Step 2 values → number pattern + counter. Counter stores "last used",
+  // so persist start - 1 to make the very next invoice equal `start`.
+  const pattern = ($('ob_pattern').value || '').trim() || DEFAULT_NUMBER_PATTERN;
   await store.set(NUMBER_PATTERN_KEY, pattern);
-  // Counter is stored as "last used". Next number = counter + 1, so to make
-  // the very next invoice equal `start`, persist start - 1.
   await setCounterValue(start - 1);
-  // Keep the inline pattern editor in sync if it's already rendered.
-  const inlinePattern = document.getElementById('r_number_pattern');
-  if (inlinePattern) inlinePattern.value = pattern;
+  $('r_number_pattern').value = pattern;
+  // Clear the field first so the next number comes from the new pattern +
+  // counter instead of incrementing whatever the init default put there.
+  $('r_number').value = '';
   await applyNextInvoiceNumber();
-  updateSuggestNumberChipPreview && updateSuggestNumberChipPreview();
-  await updateNumberSetupCardVisibility();
-  toast(t('msg_number_setup_done'), 'ok');
+  await updateSuggestNumberChipPreview();
+  updateFilenamePreview();
+  updateSellerChip();
+  refreshInlineValidation();
+  closeOnboarding();
+  toast(t('msg_setup_done'), 'ok');
 });
-$('numberSetupDefault').addEventListener('click', async () => {
-  await store.set(NUMBER_PATTERN_KEY, DEFAULT_NUMBER_PATTERN);
-  const inlinePattern = document.getElementById('r_number_pattern');
-  if (inlinePattern) inlinePattern.value = DEFAULT_NUMBER_PATTERN;
-  await applyNextInvoiceNumber();
-  updateSuggestNumberChipPreview && updateSuggestNumberChipPreview();
-  await updateNumberSetupCardVisibility();
-  toast(t('msg_number_setup_done'), 'ok');
+
+// --- Overflow menu items ---
+document.getElementById('rerunSetup').addEventListener('click', () => {
+  closeOverflowMenu();
+  openOnboarding();
 });
+
+// --- Backup & restore modal ---
+function updateBackupExportSummary() {
+  const el = document.getElementById('backupExportSummary');
+  if (!el) return;
+  el.textContent = t('backup_export_body', {
+    buyers: String(state.buyers.length),
+    history: String(state.history.length),
+  });
+}
+function openBackupModal() {
+  cancelBackupImport();
+  updateBackupExportSummary();
+  const modal = $('backupModal');
+  modal.classList.add('open');
+  modal.removeAttribute('hidden');
+}
+function closeBackupModal() {
+  const modal = $('backupModal');
+  modal.classList.remove('open');
+  modal.setAttribute('hidden', '');
+}
+document.getElementById('openBackup').addEventListener('click', () => {
+  closeOverflowMenu();
+  openBackupModal();
+});
+document.getElementById('backupClose').addEventListener('click', closeBackupModal);
+$('backupModal').addEventListener('click', (e) => {
+  if (e.target === $('backupModal')) closeBackupModal();
+});
+$('btnExport').addEventListener('click', exportData);
+$('importFile').addEventListener('change', (e) => {
+  if (e.target.files[0]) {
+    stageBackupImport(e.target.files[0]);
+    e.target.value = ''; // reset so re-import of same file works
+  }
+});
+document.getElementById('backupCancelImport').addEventListener('click', cancelBackupImport);
+document.getElementById('backupConfirmImport').addEventListener('click', confirmBackupImport);
+
+// --- Help search ---
+document.getElementById('helpSearch').addEventListener('input', (e) => {
+  helpSearchTerm = e.target.value;
+  renderHelpTopics();
+});
+
+// --- Boilerplate autosave (intro / payment note / greeting / signature /
+//     footnote persist per invoice language as the user types) ---
+['r_intro', 'r_payment_note', 'r_greeting', 'r_signature', 'r_footnote'].forEach(id => {
+  $(id).addEventListener('input', scheduleBoilerplateSave);
+});
+
+// -------- Init --------
+document.getElementById('addItem').addEventListener('click', () => addItem());
+document.getElementById('addFirstLine').addEventListener('click', () => addItem());
 
 // Top-bar modal openers
 $('openHistory').addEventListener('click', openHistoryModal);
 $('duplicateLast').addEventListener('click', duplicateLastInvoice);
-$('openHelp').addEventListener('click', openHelpModal);
+$('openHelp').addEventListener('click', () => {
+  closeOverflowMenu();
+  openHelpModal();
+});
 $('historyClose').addEventListener('click', closeHistoryModal);
 $('historyModal').addEventListener('click', (e) => {
   if (e.target === $('historyModal')) closeHistoryModal();
@@ -6133,6 +7090,10 @@ $('embedModal').addEventListener('click', (e) => {
 });
 
 document.getElementById('r_taxmode').addEventListener('change', calcTotals);
+document.getElementById('r_currency').addEventListener('change', () => {
+  calcTotals();
+  updateSummaryValues();
+});
 
 // Buyer picker events
 $('buyerPicker').addEventListener('change', (e) => {
@@ -6142,11 +7103,28 @@ $('buyerPicker').addEventListener('change', (e) => {
   } else if (state.buyers[idx]) {
     applyBuyer(state.buyers[idx]);
   }
+  const confirmRow = document.getElementById('buyerDeleteConfirm');
+  if (confirmRow) confirmRow.hidden = true;
+  renderRecentCustomerChips();
+  updateBuyerActionUI();
   updateFilenamePreview();
   updateBuyerHistoryHint();
 });
 $('saveBuyer').addEventListener('click', saveBuyer);
-$('deleteBuyer').addEventListener('click', deleteBuyer);
+// Delete uses the confirm-arm pattern: first click reveals an inline
+// "Delete this customer? Yes / No" row, only Yes actually deletes.
+$('deleteBuyer').addEventListener('click', () => {
+  $('deleteBuyer').hidden = true;
+  $('buyerDeleteConfirm').hidden = false;
+});
+$('buyerDeleteYes').addEventListener('click', async () => {
+  $('buyerDeleteConfirm').hidden = true;
+  await deleteBuyer();
+});
+$('buyerDeleteNo').addEventListener('click', () => {
+  $('buyerDeleteConfirm').hidden = true;
+  updateBuyerActionUI();
+});
 // Update history hint as the user types in the name field. If the typed
 // (or datalist-picked) value matches a past buyer exactly and the rest of
 // the address block is still empty, autofill the remaining fields from the
@@ -6163,8 +7141,24 @@ $('b_name').addEventListener('input', () => {
   updateBuyerHistoryHint();
 });
 
-// History picker events
-$('historyClearAll').addEventListener('click', clearAllHistory);
+// History picker events. "Clear all" arms an inline confirm row instead
+// of deleting immediately.
+$('historyClearAll').addEventListener('click', () => {
+  if (state.history.length === 0) return;
+  $('historyClearAll').hidden = true;
+  const label = document.getElementById('historyClearConfirmLabel');
+  if (label) label.textContent = t('clear_all_confirm', { count: String(state.history.length) });
+  $('historyClearConfirm').hidden = false;
+});
+$('historyClearYes').addEventListener('click', async () => {
+  $('historyClearConfirm').hidden = true;
+  $('historyClearAll').hidden = false;
+  await clearAllHistory();
+});
+$('historyClearNo').addEventListener('click', () => {
+  $('historyClearConfirm').hidden = true;
+  $('historyClearAll').hidden = false;
+});
 $('historySearch').addEventListener('input', (e) => {
   historyFilter.search = e.target.value;
   renderHistoryPicker();
@@ -6223,67 +7217,65 @@ $('statsBody').addEventListener('click', (e) => {
   const yoyOpen = e.target.closest('#yoyOpenBackfill');
   if (yoyOpen) {
     openYoYBackfillModal();
+    return;
   }
+  // Empty-state CTA: "Create your first invoice" just closes the modal.
+  if (e.target.closest('#statsEmptyCta')) closeStatsModal();
 });
 // Click backdrop or press Esc to close
 $('statsModal').addEventListener('click', (e) => {
   if (e.target === $('statsModal')) closeStatsModal();
 });
+// Global keyboard shortcuts. Esc always works; ⌘/Ctrl combos work anywhere;
+// bare keys (1/2/3, ?) only when focus is not inside a form field. This
+// list is documented in Help → "Keyboard shortcuts" — keep both in sync.
 document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape') return;
-  // Tooltips are the lightest layer — close first if open.
-  if (_tipOwner) { hideTooltip(); return; }
-  // Order: deepest/topmost modals first
-  const ym = $('yoyBackfillModal');
-  const pm = $('pastInvoiceModal');
-  const em = $('embedModal');
-  const hm = $('helpModal');
-  const histm = $('historyModal');
-  const sm = $('statsModal');
-  if (ym && ym.classList.contains('open')) { closeYoYBackfillModal(); return; }
-  if (pm && pm.classList.contains('open')) { closePastInvoiceModal(); return; }
-  if (em && em.classList.contains('open')) { closeEmbedModal(); return; }
-  if (hm && hm.classList.contains('open')) { closeHelpModal(); return; }
-  if (histm && histm.classList.contains('open')) { closeHistoryModal(); return; }
-  if (sm && sm.classList.contains('open')) {
-    if (statsBuyerDrillDown) { setStatsBuyerDrillDown(null); return; }
-    closeStatsModal();
+  const tag = ((e.target && e.target.tagName) || '').toLowerCase();
+  const isTyping = tag === 'input' || tag === 'textarea' || tag === 'select';
+  const mod = e.metaKey || e.ctrlKey;
+
+  if (e.key === 'Escape') {
+    // Tooltips are the lightest layer — close first if open.
+    if (_tipOwner) { hideTooltip(); return; }
+    // Order: deepest/topmost layers first.
+    const isOpen = (id) => { const m = $(id); return m && m.classList.contains('open'); };
+    if (isOpen('embedModal')) { closeEmbedModal(); return; }
+    if (isValidatePopoverOpen()) { closeValidatePopover(); return; }
+    if (typeof isOverflowMenuOpen === 'function' && isOverflowMenuOpen()) { closeOverflowMenu(); return; }
+    if (typeof isSellerMenuOpen === 'function' && isSellerMenuOpen()) { closeSellerMenu(); return; }
+    if (isOpen('onboardingModal')) { closeOnboarding(); return; }
+    if (isOpen('backupModal')) { closeBackupModal(); return; }
+    if (isOpen('yoyBackfillModal')) { closeYoYBackfillModal(); return; }
+    if (isOpen('pastInvoiceModal')) { closePastInvoiceModal(); return; }
+    if (isOpen('helpModal')) { closeHelpModal(); return; }
+    if (isOpen('statsModal')) {
+      if (statsBuyerDrillDown) { setStatsBuyerDrillDown(null); return; }
+      closeStatsModal();
+      return;
+    }
+    if (isOpen('historyModal')) { closeHistoryModal(); return; }
+    // No layer open — Esc clears any pending inline-delete confirmation.
+    if (_removeConfirmBtn) resetRemoveConfirm();
     return;
   }
-  // No modal open — Esc clears any pending inline-delete confirmation.
-  if (_removeConfirmBtn) resetRemoveConfirm();
-});
-
-$('r_delivery_end').addEventListener('change', () => {
-  const start = $('r_delivery').value;
-  const end = $('r_delivery_end').value;
-  if (start && end && start === end) {
-    $('r_delivery_end').value = '';
+  if (mod && e.key === 'Enter') {
+    e.preventDefault();
+    $('btnPDF').click();
+    return;
   }
-});
-
-$('clearDeliveryEnd').addEventListener('click', () => {
-  const el = $('r_delivery_end');
-  el.value = '';
-  el.defaultValue = '';
-  el.dispatchEvent(new Event('change', { bubbles: true }));
-});
-$('clearNote').addEventListener('click', () => { $('r_note').value = ''; });
-$('r_delivery').addEventListener('change', () => {
-  const start = $('r_delivery').value;
-  const end = $('r_delivery_end').value;
-  if (start && end && start === end) {
-    $('r_delivery_end').value = '';
+  if (mod && (e.key === 'd' || e.key === 'D')) {
+    e.preventDefault();
+    duplicateLastInvoice();
+    return;
   }
-});
-
-// Backup events
-$('btnExport').addEventListener('click', exportData);
-$('btnImport').addEventListener('click', () => $('importFile').click());
-$('importFile').addEventListener('change', (e) => {
-  if (e.target.files[0]) {
-    importData(e.target.files[0]);
-    e.target.value = ''; // reset so re-import of same file works
+  if (e.key === '?' && !isTyping) {
+    e.preventDefault();
+    openHelpModal();
+    return;
+  }
+  if (!isTyping && !mod && (e.key === '1' || e.key === '2' || e.key === '3')) {
+    const map = { 1: 'buyer', 2: 'items', 3: 'details' };
+    setActiveTab(map[e.key]);
   }
 });
 
@@ -6323,34 +7315,27 @@ async function updateSuggestNumberChipPreview() {
 // Live-Update: bei jeder Pattern-Änderung
 $('r_number_pattern').addEventListener('input', updateSuggestNumberChipPreview);
 
+// "edit pattern" link toggles the inline pattern editor.
+$('numberPatternToggle').addEventListener('click', () => {
+  const body = $('numberPatternBody');
+  body.hidden = !body.hidden;
+});
+
 // Load pattern into the field on init
 (async () => {
   $('r_number_pattern').value = await getNumberPattern();
 })();
 
-// Footnote preset events. When the picked preset reads like a Reverse-Charge
-// note, automatically prepend the precise legal sentence (in the active
-// invoice language) above it — unless the text already contains the
-// canonical "Art. 196" reference.
-const RC_HEURISTIC = /reverse\s*charge|autoliquidation|steuerschuldnerschaft/i;
-const RC_LEGAL_PRESENT = /art\.\s*196/i;
-$('footnotePicker').addEventListener('change', (e) => {
-  const idx = e.target.value;
-  if (idx === '' || !state.footnotes[idx]) return;
-  let text = state.footnotes[idx].text;
-  if (RC_HEURISTIC.test(text) && !RC_LEGAL_PRESENT.test(text)) {
-    text = tInvoice('rc_legal_text') + '\n\n' + text;
-    $('r_footnote').value = text;
-    toast(t('msg_rc_legal_added'), 'ok');
-  } else {
-    $('r_footnote').value = text;
-  }
-});
-$('saveFootnote').addEventListener('click', saveFootnote);
-$('deleteFootnote').addEventListener('click', deleteFootnote);
-$('clearFootnote').addEventListener('click', clearFootnote);
-
-// Filename pattern: chips insert tokens at cursor, live preview updates on any field change
+// Filename pattern: chips insert tokens at cursor, live preview updates on
+// any field change. The pattern autosaves (debounced) — no explicit button.
+let _filenameSaveTimer = null;
+function scheduleFilenamePatternSave() {
+  if (_filenameSaveTimer) clearTimeout(_filenameSaveTimer);
+  _filenameSaveTimer = setTimeout(() => {
+    _filenameSaveTimer = null;
+    store.set(FILENAME_KEY, $('r_filename').value);
+  }, 600);
+}
 $('filenameChips').addEventListener('click', (e) => {
   const token = e.target.closest('[data-token]')?.dataset.token;
   if (!token) return;
@@ -6362,28 +7347,15 @@ $('filenameChips').addEventListener('click', (e) => {
   input.focus();
   input.setSelectionRange(pos + token.length, pos + token.length);
   updateFilenamePreview();
+  scheduleFilenamePatternSave();
 });
-$('r_filename').addEventListener('input', updateFilenamePreview);
-$('saveFilenamePattern').addEventListener('click', saveFilenamePattern);
+$('r_filename').addEventListener('input', () => {
+  updateFilenamePreview();
+  scheduleFilenamePatternSave();
+});
 // Also update preview when invoice fields change
 ['r_number', 'r_project', 'b_name', 'r_date', 'r_category', 's_name'].forEach(id => {
   $(id).addEventListener('input', updateFilenamePreview);
-});
-
-// Due-date quick-set chips: add N days to invoice date (or today if not set)
-document.querySelectorAll('.due-chips button').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const days = parseInt(btn.dataset.days, 10);
-    const baseStr = $('r_date').value || todayLocalISO();
-    // Parse as local date to avoid timezone shifts
-    const [y, m, d] = baseStr.split('-').map(Number);
-    const base = new Date(y, m - 1, d);
-    base.setDate(base.getDate() + days);
-    const yy = base.getFullYear();
-    const mm = String(base.getMonth() + 1).padStart(2, '0');
-    const dd = String(base.getDate()).padStart(2, '0');
-    $('r_due').value = `${yy}-${mm}-${dd}`;
-  });
 });
 
 // === INVOICE LAYOUT START ===
@@ -6391,34 +7363,43 @@ document.querySelectorAll('.due-chips button').forEach(btn => {
 import { LAYOUTS, DEFAULT_LAYOUT } from './layouts.js';
 // === INVOICE LAYOUT END ===
 
-// Theme toggle: auto → light → dark → auto
+// Theme: Light / Dark / Auto segmented control in the overflow menu.
+// pref: null = auto, 'light', 'dark'. Stored preference stays the same
+// (absence of THEME_KEY = auto) so older backups keep working.
 function applyTheme(pref) {
-  // pref: null = auto, 'light', 'dark'
   const isDark = pref === 'dark' || (pref === null && window.matchMedia('(prefers-color-scheme: dark)').matches);
   if (isDark) document.documentElement.setAttribute('data-theme', 'dark');
   else document.documentElement.removeAttribute('data-theme');
-  const icon = pref === 'light' ? '☀' : pref === 'dark' ? '☾' : 'A';
-  const label = pref === 'dark' ? t('theme_dark') : pref === 'light' ? t('theme_light') : t('theme_auto');
-  $('themeToggle').innerHTML = `<span class="icon">${icon}</span>`;
-  $('themeToggle').title = label;
+  const active = pref === 'dark' ? 'dark' : pref === 'light' ? 'light' : 'auto';
+  document.querySelectorAll('#themeSegment button').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.themePref === active);
+  });
 }
-$('themeToggle').addEventListener('click', () => {
-  const current = localStorage.getItem(THEME_KEY); // null, 'light', 'dark'
-  let next;
-  if (current === null) next = 'light';
-  else if (current === 'light') next = 'dark';
-  else next = null; // back to auto
-  if (next === null) localStorage.removeItem(THEME_KEY);
-  else localStorage.setItem(THEME_KEY, next);
-  applyTheme(next);
+document.querySelectorAll('#themeSegment button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const pref = btn.dataset.themePref === 'auto' ? null : btn.dataset.themePref;
+    if (pref === null) localStorage.removeItem(THEME_KEY);
+    else localStorage.setItem(THEME_KEY, pref);
+    applyTheme(pref);
+  });
 });
 // Listen for system theme changes when in auto mode
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
   if (!localStorage.getItem(THEME_KEY)) applyTheme(null);
 });
 
-// Language switcher
-$('langSelect').addEventListener('change', (e) => setLang(e.target.value));
+// UI language: DE / EN / FR segmented control in the overflow menu.
+function updateLangSegment() {
+  document.querySelectorAll('#langSegment button').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.lang === CURRENT_LANG);
+  });
+}
+document.querySelectorAll('#langSegment button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    setLang(btn.dataset.lang);
+    updateLangSegment();
+  });
+});
 
 // Invoice output language — independent of UI
 $('invoiceLangSelect').addEventListener('change', (e) => setInvoiceLang(e.target.value));
@@ -6440,17 +7421,20 @@ $('invoiceLayoutSelect').addEventListener('change', async (e) => {
 // single error path. Everything that needs to be ready before the user
 // touches the UI happens here.
 async function init() {
-  // 1. Render-blocking visual state (no flash of wrong theme/language).
+  // 1. Render-blocking visual state (no flash of wrong theme/language/font).
+  injectUIFontFaces();
   applyTheme(localStorage.getItem(THEME_KEY));
-  $('langSelect').value = CURRENT_LANG;
+  updateLangSegment();
   $('invoiceLangSelect').value = INVOICE_LANG || '';
   applyTranslations();
 
   // 2. Defaults the user can immediately edit.
   $('r_date').value = todayLocalISO();
   addItem({ desc: '', qty: 1, price: 0 });
+  setActiveTab('buyer');
 
-  // 3. Populate the layout dropdown (its options come from LAYOUTS at runtime).
+  // 3. Populate the (hidden) layout dropdown; the visible segmented control
+  //    renders from it after the persisted value is loaded below.
   const layoutSel = $('invoiceLayoutSelect');
   layoutSel.innerHTML = Object.entries(LAYOUTS)
     .map(([k, v]) => `<option value="${esc(k)}">${esc(v.label)}</option>`)
@@ -6461,9 +7445,10 @@ async function init() {
     loadSeller(),
     loadBuyers(),
     loadFootnotes(),
+    loadTextPresets(),
     loadHistory(),
     loadYoY(),
-    loadSellerCollapsed(),
+    loadDueDays(),
     loadFilenamePattern(),
     updateSuggestNumberChipPreview(),
     (async () => { $('invoiceFontSelect').value = await getCurrentFontKey(); })(),
@@ -6480,20 +7465,28 @@ async function init() {
   await applyNextInvoiceNumber();
   updateFilenamePreview();
 
-  // 7. History UI — populate after translations + load are done so labels are correct.
+  // 7. History + buyer UI — after translations + load so labels are correct.
   $('historyEnable').checked = state.historyEnabled;
   renderHistoryPicker();
+  renderBuyerPicker();
+  updateBuyerHistoryHint();
 
-  // 8. Apply seller-collapse UI based on whether stammdaten exist.
-  applySellerCollapsedUI();
+  // 8. Shell state derived from loaded values: seller chip, due chips,
+  //    delivery period, layout segment, section summaries, preset UI.
+  updateSellerChip();
+  applyDueDays();
+  updateDeliveryPeriodUI();
+  renderLayoutSegment();
+  updateSummaryValues();
+  setupTextPresetUI();
+  applyPresetTextsIfEmpty();
 
   // 9. Wire up inline-validation listeners and run once over current state.
   setupInlineValidation();
   refreshInlineValidation();
 
-  // 10. First-run number-scheme card. Visibility depends on seller + storage.
-  updateNumberSetupPreview();
-  await updateNumberSetupCardVisibility();
+  // 10. First-run gate: no configured seller → open the two-step onboarding.
+  if (!isSellerConfigured()) openOnboarding();
 
   // 11. Live preview pane: load persisted toggle, attach listeners, render.
   await loadPreviewEnabled();

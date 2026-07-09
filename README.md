@@ -105,9 +105,11 @@ so the PDF rendition is always readable.
 
 ### Seller profile
 Master data (address, VAT ID, IBAN, BIC, bank, optional SIRET) is stored
-locally. The seller section collapses to a one-line summary
-(`Company · VAT ID · Country`) once filled in, with save and reset
-buttons appearing in the header row when expanded.
+locally. An optional second name line (e.g. department or trading name)
+prints below the seller name and is stored as BT-28 in the XML. The seller lives behind a persistent identity chip at the top of
+the form (avatar initials + name + VAT ID); clicking it opens a dropdown
+with the profile summary, an edit form, and a "Reset & re-run setup"
+shortcut to the two-step onboarding.
 
 ### Customer database
 Add, select, delete customers. Selecting a saved customer fills all buyer
@@ -204,9 +206,9 @@ On download the filename is generated from a token pattern. Default:
 filename.
 
 ### Invoice history
-A history icon in the top bar opens a modal with all generated invoices
+A **History** button in the header opens a modal with all generated invoices
 (up to 1000 entries, oldest dropped first). Once at least one invoice
-exists, a second icon in the top bar offers **Duplicate last invoice**
+exists, a header button offers **Duplicate last invoice** (⌘/Ctrl+D)
 as a one-click shortcut (same effect as opening the modal and cloning
 the topmost entry).
 
@@ -241,7 +243,7 @@ History is stored in `localStorage` like everything else and is included
 in the JSON backup export.
 
 ### Statistics
-A statistics icon in the top bar opens a modal with everything you need
+A **Stats** button in the header opens a modal with everything you need
 to look back at your billing. For each currency separately
 (EUR / USD / GBP / CHF), the **Overview** tab shows:
 
@@ -295,8 +297,10 @@ untouched.
 Light / dark / auto (follows OS preference).
 
 ### Help
-A `?` icon in the top bar opens a help modal that renders the README
-content directly. No internet required.
+"Help & docs" in the overflow menu (or the `?` key) opens a two-pane help
+modal with a searchable topic sidebar (getting started, profiles,
+numbering, tax modes, PDF/A-3 & Factur-X, filename patterns, history &
+statistics, keyboard shortcuts). No internet required.
 
 ---
 

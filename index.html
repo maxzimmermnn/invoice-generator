@@ -13,8 +13,8 @@
 <script>
   // Instant theme application (before paint) — prevents flash of wrong theme
   (function() {
-    var pref = localStorage.getItem('erechnung:theme');
-    var isDark = pref === 'dark' || (pref === null && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    var pref = localStorage.getItem('erechnung:theme:v1') || localStorage.getItem('erechnung:theme');
+    var isDark = pref === 'dark' || (!pref && window.matchMedia('(prefers-color-scheme: dark)').matches);
     if (isDark) document.documentElement.setAttribute('data-theme', 'dark');
   })();
 </script>
@@ -25,468 +25,543 @@
   This tool requires JavaScript. Please enable it.
 </noscript>
 
-<div class="page-layout">
+<div class="app-shell">
+<div class="app-card" id="appCard">
 
-<div class="wrap">
+<!-- ===== Left column: form ===== -->
+<div class="form-col wrap">
 
-<header class="top">
-  <div>
+  <header class="app-head">
     <h1 data-i18n="title">E-Invoice Generator</h1>
-    <div class="sub" data-i18n="subtitle">ZUGFeRD 2.3 · Factur-X · EN 16931 (Comfort)</div>
-  </div>
-  <div class="top-controls">
-    <button id="duplicateLast" class="tiny-btn top-icon-btn" type="button" hidden data-i18n-title="btn_duplicate_last" aria-label="Duplicate last invoice">
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <rect x="4" y="4" width="8" height="9" rx="1"/>
-        <path d="M2 10 L2 2 L9 2"/>
-      </svg>
-    </button>
-    <button id="openHistory" class="tiny-btn top-icon-btn" type="button" data-i18n-title="btn_open_history" aria-label="History">
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M2.5 4.5 A 5 5 0 1 1 1.8 8.3"/>
-        <polyline points="0.6,3.2 2.5,4.5 4.4,3.2"/>
-        <polyline points="7,4.2 7,7.2 9,8.8"/>
-      </svg>
-    </button>
-    <button id="openStats" class="tiny-btn top-icon-btn" type="button" data-i18n-title="btn_open_stats" aria-label="Statistics">
-      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-        <rect x="1" y="8" width="2.5" height="5" fill="currentColor"/>
-        <rect x="5.75" y="4" width="2.5" height="9" fill="currentColor"/>
-        <rect x="10.5" y="6" width="2.5" height="7" fill="currentColor"/>
-      </svg>
-    </button>
-    <button id="previewToggle" class="tiny-btn top-icon-btn preview-toggle" type="button"
-            aria-pressed="true" data-i18n-title="aria_preview_toggle" data-i18n-aria-label="aria_preview_toggle">
-      <svg class="eye-on" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M1 7 Q 7 1 13 7 Q 7 13 1 7 Z"/>
-        <circle cx="7" cy="7" r="2"/>
-      </svg>
-      <svg class="eye-off" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M1 7 Q 7 1 13 7 Q 7 13 1 7 Z"/>
-        <line x1="2" y1="12" x2="12" y2="2"/>
-      </svg>
-    </button>
-    <select id="langSelect" class="lang-select" aria-label="Language">
-      <option value="en">EN</option>
-      <option value="de">DE</option>
-      <option value="fr">FR</option>
-    </select>
-    <button type="button" id="themeToggle" class="theme-toggle" title="Theme" aria-label="Theme"></button>
-    <button id="openHelp" class="tiny-btn top-icon-btn" type="button" data-i18n-title="btn_open_help" aria-label="Help">
-      <span aria-hidden="true">?</span>
-    </button>
-  </div>
-</header>
+    <div class="head-actions">
+      <button id="duplicateLast" class="btn-sm" type="button" data-i18n-title="btn_duplicate_last">
+        <span data-i18n="btn_duplicate_short"></span> <kbd class="kbd-hint">⌘D</kbd>
+      </button>
+      <button id="openHistory" class="btn-sm" type="button" data-i18n="label_history"></button>
+      <button id="openStats" class="btn-sm" type="button" data-i18n="label_stats"></button>
+      <button id="previewToggle" class="btn-icon preview-toggle" type="button"
+              aria-pressed="true" data-i18n-title="aria_preview_toggle" data-i18n-aria-label="aria_preview_toggle">◎</button>
+      <button id="overflowToggle" class="btn-icon" type="button" aria-haspopup="true" aria-expanded="false" aria-label="More">⋯</button>
 
-<!-- First-run setup card. Shown when the seller profile is empty;
-     hidden as soon as the user has saved their master data. -->
-<section class="setup-card" id="setupCard" hidden>
-  <h2 data-i18n="setup_card_title"></h2>
-  <p data-i18n="setup_card_intro"></p>
-  <div class="setup-card-actions">
-    <button type="button" class="primary" id="setupCardCta" data-i18n="setup_card_cta"></button>
-    <button type="button" class="link-btn" id="setupCardDemo" data-i18n="setup_card_demo_cta"></button>
-  </div>
-</section>
+      <div class="overflow-menu" id="overflowMenu" hidden>
+        <div class="menu-caption" data-i18n="menu_ui_language"></div>
+        <div class="segmented" id="langSegment">
+          <button type="button" data-lang="de">DE</button>
+          <button type="button" data-lang="en">EN</button>
+          <button type="button" data-lang="fr">FR</button>
+        </div>
+        <div class="menu-caption menu-caption-divided" data-i18n="menu_theme"></div>
+        <div class="segmented" id="themeSegment">
+          <button type="button" data-theme-pref="light" data-i18n="seg_light"></button>
+          <button type="button" data-theme-pref="dark" data-i18n="seg_dark"></button>
+          <button type="button" data-theme-pref="auto" data-i18n="seg_auto"></button>
+        </div>
+        <button id="openHelp" class="menu-item menu-item-divided" type="button" data-i18n="menu_help"></button>
+        <button id="openBackup" class="menu-item" type="button" data-i18n="menu_backup"></button>
+        <button id="rerunSetup" class="menu-item" type="button" data-i18n="menu_rerun_setup"></button>
+      </div>
+    </div>
+  </header>
 
-<!-- Second first-run card: invoice-number scheme. Shown after the seller
-     is configured if no pattern has been set yet. -->
-<section class="setup-card" id="numberSetupCard" hidden>
-  <h2 data-i18n="number_setup_title"></h2>
-  <p data-i18n="number_setup_intro"></p>
-  <div class="number-setup-grid">
-    <label>
-      <span data-i18n="number_setup_pattern_label"></span>
-      <input type="text" id="numberSetupPattern" value="{yyyy}-{counter:5}" autocomplete="off">
-    </label>
-    <label>
-      <span data-i18n="number_setup_start_label"></span>
-      <input type="number" id="numberSetupStart" min="1" step="1" value="1">
-    </label>
-    <div class="number-setup-preview">
-      <span data-i18n="number_setup_preview_label"></span>:
-      <strong id="numberSetupPreview">2026-00001</strong>
+  <!-- Seller identity chip + dropdown -->
+  <div class="seller-row">
+    <button id="sellerChip" class="seller-chip" type="button" aria-haspopup="true" aria-expanded="false">
+      <span class="avatar" id="sellerAvatar" aria-hidden="true">–</span>
+      <span class="seller-chip-label" id="sellerChipLabel"></span>
+      <span class="caret" aria-hidden="true">⌄</span>
+    </button>
+
+    <div class="seller-menu" id="sellerMenu" hidden>
+      <!-- Read mode -->
+      <div id="sellerRead">
+        <div class="seller-menu-head">
+          <span class="avatar avatar-lg" id="sellerAvatarLg" aria-hidden="true">–</span>
+          <div>
+            <div class="seller-menu-name" id="sellerReadName"></div>
+            <div class="seller-menu-name2" id="sellerReadName2" hidden></div>
+            <div class="seller-menu-caption" data-i18n="seller_profile_caption"></div>
+          </div>
+        </div>
+        <div class="seller-kv">
+          <div><span data-i18n="f_vat_short"></span><b id="sellerReadVat"></b></div>
+          <div><span data-i18n="f_country"></span><b id="sellerReadCountry"></b></div>
+          <div><span data-i18n="f_email"></span><b id="sellerReadEmail"></b></div>
+          <div><span data-i18n="f_phone"></span><b id="sellerReadPhone"></b></div>
+          <div><span data-i18n="f_iban"></span><b id="sellerReadIban"></b></div>
+          <div><span data-i18n="f_bic"></span><b id="sellerReadBic"></b></div>
+        </div>
+        <div class="seller-menu-actions">
+          <button id="sellerEditBtn" class="btn-accent-soft" type="button" data-i18n="btn_edit"></button>
+          <button id="sellerRerunBtn" class="btn-panel" type="button" data-i18n="btn_rerun_setup"></button>
+        </div>
+      </div>
+
+      <!-- Edit mode: the s_* inputs live here permanently (the PDF/XML
+           pipeline reads them by id, so they must always be in the DOM). -->
+      <div id="sellerEdit" hidden>
+        <div class="seller-menu-name" data-i18n="seller_edit_title"></div>
+        <div class="menu-grid">
+          <label class="full"><span data-i18n="f_company"></span>
+            <input type="text" id="s_name" autocomplete="off">
+          </label>
+          <label class="full"><span data-i18n="f_company2"></span>
+            <input type="text" id="s_name2" autocomplete="off">
+          </label>
+          <label class="half"><span data-i18n="f_vat_short"></span>
+            <input type="text" id="s_vat" autocomplete="off">
+          </label>
+          <label class="half"><span data-i18n="f_country"></span>
+            <input type="text" id="s_country" value="DE" maxlength="3" autocomplete="off">
+          </label>
+          <label class="full"><span data-i18n="f_address"></span>
+            <input type="text" id="s_line1" autocomplete="off">
+          </label>
+          <label class="half"><span data-i18n="f_zip"></span>
+            <input type="text" id="s_zip" autocomplete="off">
+          </label>
+          <label class="half"><span data-i18n="f_city"></span>
+            <input type="text" id="s_city" autocomplete="off">
+          </label>
+          <label class="half"><span data-i18n="f_email"></span>
+            <input type="email" id="s_email" autocomplete="off">
+          </label>
+          <label class="half"><span data-i18n="f_phone"></span>
+            <input type="text" id="s_phone" autocomplete="off">
+          </label>
+          <label class="half wide">
+            <span class="label-with-tip">
+              <span data-i18n="f_iban"></span>
+              <button type="button" class="tooltip-btn" data-tip-key="tip_iban" data-i18n-aria-label="aria_tooltip_open">?</button>
+            </span>
+            <input type="text" id="s_iban" autocomplete="off">
+          </label>
+          <label class="half narrow"><span data-i18n="f_bic"></span>
+            <input type="text" id="s_bic" autocomplete="off">
+          </label>
+          <label class="half"><span data-i18n="f_bank"></span>
+            <input type="text" id="s_bank" autocomplete="off">
+          </label>
+          <label class="half"><span data-i18n="f_siret"></span>
+            <input type="text" id="s_siret" autocomplete="off" data-i18n-placeholder="f_siret_placeholder">
+          </label>
+        </div>
+        <div class="seller-menu-actions right">
+          <button id="sellerCancelBtn" class="btn-outline" type="button" data-i18n="btn_cancel"></button>
+          <button id="saveSeller" class="btn-accent" type="button" data-i18n="btn_save"></button>
+        </div>
+      </div>
     </div>
   </div>
-  <div class="setup-card-actions">
-    <button type="button" class="primary" id="numberSetupCta" data-i18n="number_setup_cta"></button>
-    <button type="button" class="link-btn" id="numberSetupDefault" data-i18n="number_setup_default"></button>
-  </div>
-</section>
 
-<!-- SELLER -->
-<section class="block sub" id="sellerSection">
-  <div class="seller-head">
-    <h2 data-i18n="section_seller"></h2>
-    <button id="sellerToggle" class="seller-toggle" type="button" hidden aria-expanded="true">
-      <span class="seller-toggle-arrow" aria-hidden="true">▾</span>
-      <span class="seller-toggle-summary" id="sellerSummary"></span>
-    </button>
-    <div class="seller-head-actions">
-      <button class="tiny-btn" id="saveSeller" type="button" data-i18n="btn_save_template"></button>
-      <button class="tiny-btn" id="clearSeller" type="button" data-i18n="btn_reset"></button>
-    </div>
-  </div>
-  <div id="sellerBody">
-  <div class="hint"><span data-i18n="section_seller_hint"></span></div>
-  <div class="grid">
-    <label class="full"><span data-i18n="f_company"></span>
-      <input type="text" id="s_name" autocomplete="off">
-    </label>
-    <label class="full"><span data-i18n="f_address"></span>
-      <input type="text" id="s_line1" autocomplete="off">
-    </label>
-    <label><span data-i18n="f_zip"></span>
-      <input type="text" id="s_zip" autocomplete="off">
-    </label>
-    <label><span data-i18n="f_city"></span>
-      <input type="text" id="s_city" autocomplete="off">
-    </label>
-    <label><span data-i18n="f_country_de"></span>
-      <input type="text" id="s_country" value="DE" maxlength="3" autocomplete="off">
-    </label>
-    <label><span data-i18n="f_vat_de"></span>
-      <input type="text" id="s_vat" autocomplete="off">
-    </label>
-    <label><span data-i18n="f_siret"></span>
-      <input type="text" id="s_siret" autocomplete="off" data-i18n-placeholder="f_siret_placeholder">
-    </label>
-    <label><span data-i18n="f_email"></span>
-      <input type="email" id="s_email" autocomplete="off">
-    </label>
-    <label><span data-i18n="f_phone"></span>
-      <input type="text" id="s_phone" autocomplete="off">
-    </label>
-    <label class="half">
-      <span class="label-with-tip">
-        <span data-i18n="f_iban"></span>
-        <button type="button" class="tooltip-btn" data-tip-key="tip_iban" data-i18n-aria-label="aria_tooltip_open">?</button>
-      </span>
-      <input type="text" id="s_iban" autocomplete="off">
-    </label>
-    <label class="half"><span data-i18n="f_bic"></span>
-      <input type="text" id="s_bic" autocomplete="off">
-    </label>
-    <label class="full"><span data-i18n="f_bank"></span>
-      <input type="text" id="s_bank" autocomplete="off">
-    </label>
-  </div>
-  </div>
-</section>
+  <!-- Tabs -->
+  <nav class="tabs" id="tabs" role="tablist">
+    <button class="tab active" type="button" role="tab" aria-selected="true" data-tab="buyer" data-i18n="tab_buyer"></button>
+    <button class="tab" type="button" role="tab" aria-selected="false" data-tab="items" data-i18n="tab_items"></button>
+    <button class="tab" type="button" role="tab" aria-selected="false" data-tab="details" data-i18n="tab_details"></button>
+  </nav>
 
-<!-- BUYER -->
-<section class="block">
-  <h2 data-i18n="section_buyer"></h2>
-  <div class="hint" data-i18n="section_buyer_hint"></div>
-  <div class="picker-row">
-    <select id="buyerPicker" aria-label="Buyer profile">
-      <option value="" data-i18n="f_buyer_picker"></option>
-    </select>
-    <button class="tiny-btn" id="saveBuyer" type="button" data-i18n="btn_save_buyer"></button>
-    <button class="tiny-btn" id="deleteBuyer" type="button" data-i18n="btn_delete_selected"></button>
-  </div>
-  <div class="hint buyer-history-hint" id="buyerHistoryHint"></div>
-  <div class="grid">
-    <label class="full"><span data-i18n="f_company"></span>
-      <input type="text" id="b_name" list="buyerNamesMemory" autocomplete="off">
-      <datalist id="buyerNamesMemory"></datalist>
-    </label>
-    <label class="full"><span data-i18n="f_company2"></span>
-      <input type="text" id="b_name2" autocomplete="off">
-    </label>
-    <label class="full"><span data-i18n="f_address"></span>
-      <input type="text" id="b_line1">
-    </label>
-    <label><span data-i18n="f_zip"></span>
-      <input type="text" id="b_zip">
-    </label>
-    <label><span data-i18n="f_city"></span>
-      <input type="text" id="b_city">
-    </label>
-    <label><span data-i18n="f_country"></span>
-      <input type="text" id="b_country" value="FR" maxlength="3">
-    </label>
-    <label><span data-i18n="f_vat_b2b"></span>
-      <input type="text" id="b_vat">
-    </label>
-    <label><span data-i18n="f_siret"></span>
-      <input type="text" id="b_siret" data-i18n-placeholder="f_siret_placeholder">
-    </label>
-    <label class="full"><span data-i18n="f_buyer_reference"></span>
-      <input type="text" id="b_reference">
-      <span class="note-small" data-i18n="f_buyer_reference_hint"></span>
-    </label>
-  </div>
-</section>
+  <div class="tab-panels">
 
+    <!-- ===== BUYER TAB ===== -->
+    <section class="tab-panel" id="tab-buyer" role="tabpanel">
+      <div class="panel-inner narrow-panel">
+        <div class="field-stack">
+          <label class="mini-label" data-i18n="recent_customers"></label>
+          <div class="chip-row" id="recentCustomers"></div>
+        </div>
 
-<!-- INVOICE -->
-<section class="block">
-  <h2 data-i18n="section_invoice"></h2>
-  <div class="hint" data-i18n="section_invoice_hint"></div>
-  <div class="grid">
-    <label class="full"><span data-i18n="f_number"></span>
-      <input type="text" id="r_number">
-      <div class="number-pattern-row">
-        <button type="button" class="number-chip" id="suggestNumber" data-i18n="chip_next_number"></button>
-        <details class="number-pattern-details">
-          <summary data-i18n="f_number_pattern_summary"></summary>
-          <div class="number-pattern-body">
-            <input type="text" id="r_number_pattern" placeholder="{yyyy}-{counter:5}">
-            <button type="button" class="tiny-btn" id="saveNumberPattern" data-i18n="btn_save_pattern"></button>
-            <div class="due-chips" id="numberPatternChips">
-              <button type="button" data-token="{yyyy}" data-i18n="chip_year4"></button>
-              <button type="button" data-token="{yy}" data-i18n="chip_year2"></button>
-              <button type="button" data-token="{mm}" data-i18n="chip_month"></button>
-              <button type="button" data-token="{dd}" data-i18n="chip_day"></button>
-              <button type="button" data-token="{counter}" data-i18n="chip_counter"></button>
-              <button type="button" data-token="{counter:3}" data-i18n="chip_counter3"></button>
-              <button type="button" data-token="{counter:5}" data-i18n="chip_counter5"></button>
+        <select id="buyerPicker" class="select-box" aria-label="Buyer profile">
+          <option value="" data-i18n="f_buyer_picker"></option>
+        </select>
+
+        <div class="info-banner" id="buyerHistoryHint" hidden></div>
+
+        <label class="u-field"><span data-i18n="f_company"></span>
+          <input type="text" id="b_name" list="buyerNamesMemory" autocomplete="off" data-i18n-placeholder="buyer_name_placeholder">
+          <datalist id="buyerNamesMemory"></datalist>
+        </label>
+        <label class="u-field"><span data-i18n="f_address"></span>
+          <input type="text" id="b_line1">
+        </label>
+        <div class="field-cols">
+          <label class="u-field col-1"><span data-i18n="f_zip"></span>
+            <input type="text" id="b_zip">
+          </label>
+          <label class="u-field col-2"><span data-i18n="f_city"></span>
+            <input type="text" id="b_city">
+          </label>
+        </div>
+        <div class="field-cols">
+          <label class="u-field col-1"><span data-i18n="f_country"></span>
+            <input type="text" id="b_country" value="FR" maxlength="3">
+          </label>
+          <label class="u-field col-2"><span data-i18n="f_vat_b2b"></span>
+            <input type="text" id="b_vat">
+          </label>
+        </div>
+
+        <details class="more-details">
+          <summary data-i18n="buyer_more_summary"></summary>
+          <div class="more-body">
+            <label class="u-field"><span data-i18n="f_company2"></span>
+              <input type="text" id="b_name2" autocomplete="off">
+            </label>
+            <div class="field-cols">
+              <label class="u-field col-1"><span data-i18n="f_siret"></span>
+                <input type="text" id="b_siret" data-i18n-placeholder="f_siret_placeholder">
+              </label>
+              <label class="u-field col-1"><span data-i18n="f_buyer_reference"></span>
+                <input type="text" id="b_reference" data-i18n-placeholder="f_buyer_reference_placeholder">
+              </label>
+            </div>
+          </div>
+        </details>
+
+        <div class="buyer-actions">
+          <button id="saveBuyer" class="btn-accent-soft" type="button" data-i18n="btn_save_customer"></button>
+          <button id="deleteBuyer" class="btn-outline btn-faint" type="button" data-i18n="btn_delete" hidden></button>
+          <div id="buyerDeleteConfirm" class="confirm-inline" hidden>
+            <span data-i18n="confirm_delete_customer"></span>
+            <button id="buyerDeleteYes" class="link-accent" type="button" data-i18n="confirm_yes"></button>
+            <button id="buyerDeleteNo" class="link-muted" type="button" data-i18n="confirm_no"></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== ITEMS TAB ===== -->
+    <section class="tab-panel" id="tab-items" role="tabpanel" hidden>
+      <div class="panel-inner">
+        <div class="items-head" id="itemsHead">
+          <div data-i18n="th_desc"></div>
+          <div data-i18n="th_price"></div>
+          <div data-i18n="th_qty"></div>
+          <div data-i18n="th_vat_pct"></div>
+          <div data-i18n="th_total"></div>
+          <div></div>
+        </div>
+
+        <div class="items-empty" id="itemsEmpty" hidden>
+          <div data-i18n="items_empty_hint"></div>
+          <button type="button" id="addFirstLine" class="btn-accent-soft" data-i18n="btn_add_first_line"></button>
+        </div>
+
+        <div class="items" id="items"></div>
+
+        <div class="totals-block">
+          <div id="vatRows"></div>
+          <div class="totals-row"><span id="t_tax_label">VAT</span><span id="t_tax">0,00</span></div>
+          <div class="totals-row grand"><span data-i18n="total_grand"></span><span id="t_total">0,00</span></div>
+        </div>
+
+        <div class="warn-banner" id="taxNoteBox" hidden><span id="taxNote"></span></div>
+
+        <button type="button" class="btn-accent-soft add-line" id="addItem" data-i18n="btn_add_item"></button>
+      </div>
+    </section>
+
+    <!-- ===== INVOICE INFO TAB ===== -->
+    <section class="tab-panel" id="tab-details" role="tabpanel" hidden>
+      <div class="panel-inner narrow-panel">
+
+        <!-- 1. Numbering & dates (always open) -->
+        <div class="info-section">
+          <div class="section-caption" data-i18n="sec_numbering"></div>
+          <div class="field-cols">
+            <label class="u-field col-1"><span data-i18n="f_number"></span>
+              <input type="text" id="r_number">
+            </label>
+            <label class="u-field col-1"><span data-i18n="f_date"></span>
+              <input type="date" id="r_date">
+            </label>
+          </div>
+          <div class="number-pattern-row">
+            <button type="button" class="chip-btn" id="suggestNumber"></button>
+            <button type="button" class="link-muted" id="numberPatternToggle" data-i18n="f_number_pattern_summary"></button>
+          </div>
+          <div class="number-pattern-body" id="numberPatternBody" hidden>
+            <div class="inline-row">
+              <input type="text" id="r_number_pattern" placeholder="{yyyy}-{counter:5}">
+              <button type="button" class="btn-sm" id="saveNumberPattern" data-i18n="btn_save_pattern"></button>
+            </div>
+            <div class="token-chips" id="numberPatternChips">
+              <button type="button" data-token="{yyyy}">{yyyy}</button>
+              <button type="button" data-token="{yy}">{yy}</button>
+              <button type="button" data-token="{mm}">{mm}</button>
+              <button type="button" data-token="{dd}">{dd}</button>
+              <button type="button" data-token="{counter}">{counter}</button>
+              <button type="button" data-token="{counter:3}">{counter:3}</button>
+              <button type="button" data-token="{counter:5}">{counter:5}</button>
             </div>
             <p class="note-small" data-i18n="f_number_pattern_hint"></p>
           </div>
+
+          <div class="field-stack">
+            <label class="mini-label" data-i18n="f_due"></label>
+            <div class="due-row">
+              <div class="due-chips" id="dueChips">
+                <button type="button" data-days="14">+14d</button>
+                <button type="button" data-days="30">+30d</button>
+                <button type="button" data-days="60">+60d</button>
+                <button type="button" data-days="90">+90d</button>
+              </div>
+              <span class="due-display" id="dueDateDisplay"></span>
+            </div>
+            <input type="date" id="r_due" class="visually-hidden" tabindex="-1" aria-hidden="true">
+          </div>
+
+          <div class="field-stack">
+            <label class="mini-label">
+              <span class="label-with-tip">
+                <span data-i18n="f_delivery"></span>
+                <button type="button" class="tooltip-btn" data-tip-key="tip_delivery" data-i18n-aria-label="aria_tooltip_open">?</button>
+              </span>
+            </label>
+            <div class="delivery-row">
+              <input type="date" id="r_delivery" class="u-input">
+              <span class="delivery-arrow" id="deliveryArrow" hidden>→</span>
+              <input type="date" id="r_delivery_end" class="u-input" hidden>
+              <button type="button" class="link-faint" id="clearDeliveryEnd" data-i18n-title="btn_remove_period" hidden>✕</button>
+              <button type="button" class="link-accent" id="addDeliveryEnd" data-i18n="btn_make_period"></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Project & Category -->
+        <details class="info-details" open>
+          <summary class="section-caption" data-i18n="sec_project_category"></summary>
+          <div class="details-body">
+            <div class="field-cols">
+              <label class="u-field col-1"><span data-i18n="f_project"></span>
+                <input type="text" id="r_project" data-i18n-placeholder="f_project_placeholder">
+              </label>
+              <label class="u-field col-1"><span data-i18n="f_category"></span>
+                <input type="text" id="r_category" data-i18n-placeholder="f_category_placeholder">
+              </label>
+            </div>
+          </div>
         </details>
+
+        <!-- 3. Text blocks (preset system) -->
+        <details class="info-details" open>
+          <summary class="section-caption" data-i18n="sec_text_blocks"></summary>
+          <div class="details-body text-blocks">
+
+            <div class="text-block" data-block="intro">
+              <div class="text-block-head">
+                <label class="mini-label" data-i18n="f_intro"></label>
+                <div class="text-block-preset">
+                  <select id="presetSelect_intro" class="select-sm"></select>
+                  <button type="button" class="link-faint preset-delete" id="presetDelete_intro" data-i18n-title="preset_delete_title">✕</button>
+                </div>
+              </div>
+              <textarea id="r_intro" rows="2" data-i18n-placeholder="f_intro_placeholder"></textarea>
+              <div class="preset-save-row" id="presetSaveRow_intro" hidden>
+                <button type="button" class="link-accent preset-save-link" id="presetSaveLink_intro" data-i18n="preset_save_as"></button>
+                <div class="preset-naming" id="presetNaming_intro" hidden>
+                  <input type="text" id="presetName_intro" data-i18n-placeholder="preset_name_placeholder">
+                  <button type="button" class="btn-accent btn-xs" id="presetNameSave_intro" data-i18n="btn_save"></button>
+                  <button type="button" class="link-muted" id="presetNameCancel_intro" data-i18n="btn_cancel"></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="text-block" data-block="paymentNote">
+              <div class="text-block-head">
+                <label class="mini-label" data-i18n="f_payment_note"></label>
+                <div class="text-block-preset">
+                  <select id="presetSelect_paymentNote" class="select-sm"></select>
+                  <button type="button" class="link-faint preset-delete" id="presetDelete_paymentNote" data-i18n-title="preset_delete_title">✕</button>
+                </div>
+              </div>
+              <textarea id="r_payment_note" rows="2" data-i18n-placeholder="f_payment_note_placeholder"></textarea>
+              <div class="preset-save-row" id="presetSaveRow_paymentNote" hidden>
+                <button type="button" class="link-accent preset-save-link" id="presetSaveLink_paymentNote" data-i18n="preset_save_as"></button>
+                <div class="preset-naming" id="presetNaming_paymentNote" hidden>
+                  <input type="text" id="presetName_paymentNote" data-i18n-placeholder="preset_name_placeholder">
+                  <button type="button" class="btn-accent btn-xs" id="presetNameSave_paymentNote" data-i18n="btn_save"></button>
+                  <button type="button" class="link-muted" id="presetNameCancel_paymentNote" data-i18n="btn_cancel"></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="text-block" data-block="footnote">
+              <div class="text-block-head">
+                <label class="mini-label" data-i18n="f_footnote"></label>
+                <div class="text-block-preset">
+                  <select id="presetSelect_footnote" class="select-sm"></select>
+                  <button type="button" class="link-faint preset-delete" id="presetDelete_footnote" data-i18n-title="preset_delete_title">✕</button>
+                </div>
+              </div>
+              <textarea id="r_footnote" rows="2" data-i18n-placeholder="f_footnote_placeholder"></textarea>
+              <div class="preset-save-row" id="presetSaveRow_footnote" hidden>
+                <button type="button" class="link-accent preset-save-link" id="presetSaveLink_footnote" data-i18n="preset_save_as"></button>
+                <div class="preset-naming" id="presetNaming_footnote" hidden>
+                  <input type="text" id="presetName_footnote" data-i18n-placeholder="preset_name_placeholder">
+                  <button type="button" class="btn-accent btn-xs" id="presetNameSave_footnote" data-i18n="btn_save"></button>
+                  <button type="button" class="link-muted" id="presetNameCancel_footnote" data-i18n="btn_cancel"></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="field-cols">
+              <label class="u-field col-1"><span data-i18n="f_greeting"></span>
+                <input type="text" id="r_greeting" data-i18n-placeholder="f_greeting_placeholder">
+              </label>
+              <label class="u-field col-1"><span data-i18n="f_signature"></span>
+                <input type="text" id="r_signature" data-i18n-placeholder="f_signature_placeholder">
+              </label>
+            </div>
+            <div class="text-block">
+              <label class="mini-label" data-i18n="f_note"></label>
+              <textarea id="r_note" rows="2"></textarea>
+            </div>
+          </div>
+        </details>
+
+        <!-- 4. Currency & Tax -->
+        <details class="info-details">
+          <summary class="section-caption"><span data-i18n="sec_currency_tax"></span><span class="summary-value" id="currencySummary"></span></summary>
+          <div class="details-body">
+            <div class="field-cols">
+              <label class="s-field col-1"><span data-i18n="f_currency"></span>
+                <select id="r_currency" class="select-box">
+                  <option value="EUR">EUR €</option>
+                  <option value="USD">USD $</option>
+                  <option value="GBP">GBP £</option>
+                  <option value="CHF">CHF</option>
+                </select>
+              </label>
+              <label class="s-field col-1"><span data-i18n="f_invoice_lang"></span>
+                <select id="invoiceLangSelect" class="select-box">
+                  <option value="" data-i18n="invoice_lang_auto"></option>
+                  <option value="en">English</option>
+                  <option value="de">Deutsch</option>
+                  <option value="fr">Français</option>
+                </select>
+              </label>
+            </div>
+            <label class="s-field">
+              <span class="label-with-tip">
+                <span data-i18n="f_taxmode"></span>
+                <button type="button" class="tooltip-btn" data-tip-key="tip_taxmode" data-i18n-aria-label="aria_tooltip_open">?</button>
+              </span>
+              <select id="r_taxmode" class="select-box">
+                <option value="S" data-i18n="tax_S"></option>
+                <option value="AE" selected data-i18n="tax_AE"></option>
+                <option value="Z" data-i18n="tax_Z"></option>
+                <option value="E" data-i18n="tax_E"></option>
+                <option value="O" data-i18n="tax_O"></option>
+              </select>
+            </label>
+          </div>
+        </details>
+
+        <!-- 5. Layout -->
+        <details class="info-details">
+          <summary class="section-caption"><span data-i18n="sec_layout"></span><span class="summary-value" id="layoutSummary"></span></summary>
+          <div class="details-body">
+            <div class="layout-segment" id="layoutSegment"></div>
+            <select id="invoiceLayoutSelect" class="visually-hidden" tabindex="-1" aria-hidden="true"></select>
+            <label class="s-field"><span data-i18n="f_invoice_font"></span>
+              <select id="invoiceFontSelect" class="select-box">
+                <option value="courier-prime">Courier Prime</option>
+                <option value="ibm-plex-mono">IBM Plex Mono</option>
+                <option value="jetbrains-mono">JetBrains Mono</option>
+                <option value="inconsolata">Inconsolata</option>
+                <option value="space-mono">Space Mono</option>
+              </select>
+            </label>
+          </div>
+        </details>
+
+        <!-- 6. Filename pattern -->
+        <details class="info-details">
+          <summary class="section-caption" data-i18n="sec_filename"></summary>
+          <div class="details-body">
+            <label class="s-field"><span data-i18n="f_filename_pattern"></span>
+              <input type="text" id="r_filename" class="input-box" placeholder="{nr}_{buyer}_{project}" value="{nr}_{buyer}_{project}">
+            </label>
+            <div class="token-chip-row">
+              <span class="note-small" data-i18n="filename_insert_label"></span>
+              <div class="token-chips" id="filenameChips">
+                <button type="button" data-token="{nr}">{nr}</button>
+                <button type="button" data-token="{buyer}">{buyer}</button>
+                <button type="button" data-token="{project}">{project}</button>
+                <button type="button" data-token="{date}">{date}</button>
+                <button type="button" data-token="{category}">{category}</button>
+                <button type="button" data-token="{seller}">{seller}</button>
+                <button type="button" data-token="{layout}">{layout}</button>
+              </div>
+            </div>
+            <div class="filename-preview" id="filenamePreview"></div>
+          </div>
+        </details>
+
       </div>
-    </label>
-    <label><span data-i18n="f_date"></span>
-      <input type="date" id="r_date">
-    </label>
-    <label><span data-i18n="f_due"></span>
-      <input type="date" id="r_due">
-      <span class="due-chips">
-        <button type="button" data-days="14">+14 <span data-i18n="chip_days"></span></button>
-        <button type="button" data-days="30">+30 <span data-i18n="chip_days"></span></button>
-        <button type="button" data-days="60">+60 <span data-i18n="chip_days"></span></button>
-        <button type="button" data-days="90">+90 <span data-i18n="chip_days"></span></button>
-      </span>
-    </label>
-    <label>
-      <span class="label-with-tip">
-        <span data-i18n="f_delivery"></span>
-        <button type="button" class="tooltip-btn" data-tip-key="tip_delivery" data-i18n-aria-label="aria_tooltip_open">?</button>
-      </span>
-      <input type="date" id="r_delivery">
-    </label>
-    <label><span data-i18n="f_delivery_end"></span>
-      <span class="input-with-action">
-        <input type="date" id="r_delivery_end">
-        <button type="button" class="tiny-btn" id="clearDeliveryEnd" data-i18n="btn_clear"></button>
-      </span>
-    </label>
-    <label><span data-i18n="f_currency"></span>
-      <select id="r_currency">
-        <option value="EUR">EUR</option>
-        <option value="USD">USD</option>
-        <option value="GBP">GBP</option>
-        <option value="CHF">CHF</option>
-      </select>
-    </label>
-    <label>
-      <span class="label-with-tip">
-        <span data-i18n="f_taxmode"></span>
-        <button type="button" class="tooltip-btn" data-tip-key="tip_taxmode" data-i18n-aria-label="aria_tooltip_open">?</button>
-      </span>
-      <select id="r_taxmode">
-        <option value="AE" selected data-i18n="tax_AE"></option>
-        <option value="S" data-i18n="tax_S"></option>
-        <option value="Z" data-i18n="tax_Z"></option>
-        <option value="E" data-i18n="tax_E"></option>
-        <option value="O" data-i18n="tax_O"></option>
-      </select>
-    </label>
-    <label><span data-i18n="f_invoice_lang"></span>
-      <select id="invoiceLangSelect">
-        <option value="" data-i18n="invoice_lang_auto"></option>
-        <option value="en">English</option>
-        <option value="de">Deutsch</option>
-        <option value="fr">Français</option>
-      </select>
-      <span class="note-small" data-i18n="f_invoice_lang_hint"></span>
-    </label>
-    <label><span data-i18n="f_invoice_font"></span>
-      <select id="invoiceFontSelect">
-        <option value="courier-prime">Courier Prime</option>
-        <option value="ibm-plex-mono">IBM Plex Mono</option>
-        <option value="jetbrains-mono">JetBrains Mono</option>
-        <option value="inconsolata">Inconsolata</option>
-        <option value="space-mono">Space Mono</option>
-      </select>
-      <span class="note-small" data-i18n="f_invoice_font_hint"></span>
-    </label>
-    <label><span data-i18n="f_invoice_layout"></span>
-      <select id="invoiceLayoutSelect"></select>
-      <span class="note-small" data-i18n="f_invoice_layout_hint"></span>
-    </label>
-    <label class="full"><span data-i18n="f_project"></span>
-      <input type="text" id="r_project" data-i18n-placeholder="f_project_placeholder">
-    </label>
-    <label class="full"><span data-i18n="f_category"></span>
-      <input type="text" id="r_category" data-i18n-placeholder="f_category_placeholder">
-    </label>
-    <label class="full"><span data-i18n="f_intro"></span>
-      <textarea id="r_intro" rows="2" data-i18n-placeholder="f_intro_placeholder"></textarea>
-    </label>
-    <label class="full"><span data-i18n="f_payment_note"></span>
-      <textarea id="r_payment_note" rows="2" data-i18n-placeholder="f_payment_note_placeholder"></textarea>
-    </label>
-    <label><span data-i18n="f_greeting"></span>
-      <input type="text" id="r_greeting" data-i18n-placeholder="f_greeting_placeholder">
-    </label>
-    <label><span data-i18n="f_signature"></span>
-      <input type="text" id="r_signature" data-i18n-placeholder="f_signature_placeholder">
-    </label>
-    <label class="full">
-      <span class="label-row">
-        <span data-i18n="f_note"></span>
-        <button class="tiny-btn" id="clearNote" type="button" data-i18n="btn_clear"></button>
-      </span>
-      <textarea id="r_note" rows="2"></textarea>
-      <span class="note-small" id="taxNote"></span>
-    </label>
-    <label class="full"><span data-i18n="f_footnote"></span>
-      <div class="picker-row">
-        <select id="footnotePicker">
-          <option value="" data-i18n="f_footnote_picker"></option>
-        </select>
-        <button class="tiny-btn" id="saveFootnote" type="button" data-i18n="btn_save_footnote"></button>
-        <button class="tiny-btn" id="deleteFootnote" type="button" data-i18n="btn_delete_footnote"></button>
-        <button class="tiny-btn" id="clearFootnote" type="button" data-i18n="btn_clear"></button>
-      </div>
-      <textarea id="r_footnote" rows="3" data-i18n-placeholder="f_footnote_placeholder"></textarea>
-      <span class="note-small" data-i18n="f_footnote_hint"></span>
-    </label>
+    </section>
   </div>
-</section>
 
-<!-- LINE ITEMS -->
-<section class="block">
-  <h2 data-i18n="section_items"></h2>
-  <div class="hint" data-i18n="section_items_hint"></div>
-  <div class="items-fresh-hint" id="itemsFreshHint" hidden>
-    <span data-i18n="fresh_form_hint"></span>
-    <button type="button" class="link-btn" id="itemsFreshHintCta" data-i18n="fresh_form_cta"></button>
+  <!-- Sticky action bar -->
+  <div class="action-bar">
+    <button type="button" class="btn-primary" id="btnPDF"><span data-i18n="btn_create_pdf"></span> <kbd class="kbd-hint">⌘↵</kbd></button>
+    <button type="button" class="btn-outline" id="btnXML" data-i18n="btn_xml_only"></button>
+    <button type="button" class="btn-outline" id="btnValidate" data-i18n="btn_validate"></button>
+    <button type="button" class="btn-outline" id="btnEmbed" data-i18n="btn_embed_xml"></button>
+
+    <div class="validate-popover" id="validatePopover" hidden></div>
   </div>
-  <div class="items" id="items">
-    <div class="row head">
-      <div data-i18n="th_desc"></div>
-      <div class="num" data-i18n="th_qty"></div>
-      <div class="num" data-i18n="th_price"></div>
-      <div class="num" data-i18n="th_vat_pct"></div>
-      <div></div>
-    </div>
-  </div>
-  <button type="button" class="add-row" id="addItem" data-i18n="btn_add_item"></button>
 
-  <div class="totals">
-    <div class="label" data-i18n="total_net"></div>
-    <div class="val" id="t_net">0,00</div>
-    <div class="label" id="t_tax_label">VAT</div>
-    <div class="val" id="t_tax">0,00</div>
-    <div class="label grand" data-i18n="total_grand"></div>
-    <div class="val grand" id="t_total">0,00</div>
-  </div>
-</section>
+</div><!-- /.form-col -->
 
-<!-- FILENAME -->
-<section class="block sub">
-  <h2 data-i18n="section_filename"></h2>
-  <div class="hint"><span data-i18n="section_filename_hint"></span> <button class="tiny-btn" id="saveFilenamePattern" type="button" data-i18n="btn_save_filename"></button></div>
-<div class="due-chips filename-chips" id="filenameChips">
-  <button type="button" data-token="{nr}" data-i18n="chip_nr"></button>
-  <button type="button" data-token="{project}" data-i18n="chip_project"></button>
-  <button type="button" data-token="{buyer}" data-i18n="chip_buyer"></button>
-  <button type="button" data-token="{date}" data-i18n="chip_date"></button>
-  <button type="button" data-token="{category}" data-i18n="chip_category"></button>
-  <button type="button" data-token="{seller}" data-i18n="chip_seller"></button>
-  <button type="button" data-token="{layout}" data-i18n="chip_layout"></button>
-</div>
-    <label class="full"><span data-i18n="f_filename_pattern"></span>
-    <input type="text" id="r_filename" placeholder="{nr}_{buyer}_{project}" value="{nr}_{buyer}_{project}">
-  </label>
-  <div class="note-small filename-preview" id="filenamePreview"></div>
-</section>
-
-<details class="format-info">
-  <summary data-i18n="format_info_title"></summary>
-  <p data-i18n="format_info_body"></p>
-  <p>
-    <a href="https://fnfe-mpe.org/factur-x/factur-x_en/" target="_blank" rel="noopener noreferrer" data-i18n="format_info_link_label"></a>
-  </p>
-</details>
-
-<footer>
-  <p class="footer-disclaimer" data-i18n="footer_disclaimer"></p>
-  <p class="footer-backup">
-    <span data-i18n="footer_backup"></span>
-    <button type="button" class="footer-link-btn" id="btnExport" data-i18n="btn_export_data"></button>
-    ·
-    <button type="button" class="footer-link-btn" id="btnImport" data-i18n="btn_import_data"></button>
-    <input type="file" id="importFile" accept="application/json,.json" class="visually-hidden">
-  </p>
-</footer>
-
-</div><!-- /.wrap -->
-
-<!-- Live preview pane (≥ 1024px). Theme-agnostic light background so the
-     PDF rendition doesn't dissolve into a dark page. -->
-<aside class="preview-pane" id="previewPane">
-  <div class="preview-pane-head">
+<!-- ===== Right column: live PDF preview ===== -->
+<aside class="preview-col" id="previewPane">
+  <div class="preview-head">
     <span data-i18n="preview_title"></span>
-    <span class="preview-pane-status" id="previewStatus" hidden data-i18n="preview_updating"></span>
+    <span class="preview-status" id="previewStatus" hidden data-i18n="preview_updating"></span>
   </div>
-  <div class="preview-empty" id="previewEmpty" data-i18n="preview_empty"></div>
-  <iframe class="preview-frame" id="previewFrame" title="Invoice preview" hidden></iframe>
+  <div class="preview-card">
+    <div class="preview-empty" id="previewEmpty" data-i18n="preview_empty"></div>
+    <iframe class="preview-frame" id="previewFrame" title="Invoice preview" hidden></iframe>
+  </div>
 </aside>
 
-</div><!-- /.page-layout -->
+</div><!-- /.app-card -->
+</div><!-- /.app-shell -->
 
-<!-- Sticky bottom action bar — sits outside .page-layout so it can span the
-     full viewport. Body has padding-bottom matching the bar's height. -->
-<div class="action-bar">
-  <div class="action-bar-inner">
-    <div class="actions">
-      <button type="button" class="primary" id="btnPDF" data-i18n="btn_create_pdf"></button>
-      <button type="button" class="secondary" id="btnXML" data-i18n="btn_xml_only"></button>
-      <button type="button" class="secondary" id="btnValidate" data-i18n="btn_validate"></button>
-      <button type="button" class="secondary" id="btnEmbed" data-i18n="btn_embed_xml"></button>
-    </div>
-  </div>
-</div>
-
-<!-- Stats modal -->
+<!-- ===== Stats modal ===== -->
 <div class="modal" id="statsModal" hidden>
   <div class="modal-content stats-modal-content">
     <div class="modal-head">
       <h2 data-i18n="stats_title"></h2>
-      <div class="modal-head-actions">
-        <button id="statsYoYToggle" class="tiny-btn" type="button" data-i18n="btn_yoy_toggle" aria-pressed="false"></button>
-        <button id="yoyBackfillOpen" class="tiny-btn" type="button" data-i18n="yoy_set_reference"></button>
-        <button id="statsExportCsv" class="tiny-btn" type="button" data-i18n="btn_export_csv"></button>
-        <button id="statsClose" class="tiny-btn" type="button" data-i18n="stats_close"></button>
-      </div>
+      <button id="statsClose" class="modal-x" type="button" aria-label="Close">✕</button>
     </div>
 
     <div class="modal-controls stats-controls">
       <div class="stats-tabs">
-        <button id="statsTabOverview" class="tiny-btn active" type="button" data-i18n="stats_tab_overview"></button>
-        <button id="statsTabQuarters" class="tiny-btn" type="button" data-i18n="stats_tab_quarters"></button>
+        <button id="statsTabOverview" class="stats-tab active" type="button" data-i18n="stats_tab_overview"></button>
+        <button id="statsTabQuarters" class="stats-tab" type="button" data-i18n="stats_tab_quarters"></button>
       </div>
-      <label class="inline" id="statsPeriodWrap">
-        <span data-i18n="stats_period_label"></span>
-        <select id="statsPeriod">
-          <option value="ytd" selected data-i18n="stats_period_ytd"></option>
-          <option value="last12" data-i18n="stats_period_last12"></option>
-          <option value="last6" data-i18n="stats_period_last6"></option>
-          <option value="last3" data-i18n="stats_period_last3"></option>
-          <option value="last_month" data-i18n="stats_period_last_month"></option>
-          <option value="all" data-i18n="stats_period_all"></option>
-          <option value="last_year" data-i18n="stats_period_last_year"></option>
-        </select>
-      </label>
-      <label class="inline" id="statsYearWrap" style="display: none;">
-        <span data-i18n="stats_year_label"></span>
-        <select id="statsYear"></select>
-      </label>
+      <div class="stats-controls-right">
+        <label class="inline" id="statsPeriodWrap">
+          <select id="statsPeriod" class="select-sm">
+            <option value="ytd" selected data-i18n="stats_period_ytd"></option>
+            <option value="last12" data-i18n="stats_period_last12"></option>
+            <option value="last6" data-i18n="stats_period_last6"></option>
+            <option value="last3" data-i18n="stats_period_last3"></option>
+            <option value="last_month" data-i18n="stats_period_last_month"></option>
+            <option value="all" data-i18n="stats_period_all"></option>
+            <option value="last_year" data-i18n="stats_period_last_year"></option>
+          </select>
+        </label>
+        <label class="inline" id="statsYearWrap" style="display: none;">
+          <span data-i18n="stats_year_label"></span>
+          <select id="statsYear" class="select-sm"></select>
+        </label>
+        <button id="statsYoYToggle" class="btn-sm" type="button" data-i18n="btn_yoy_toggle" aria-pressed="false"></button>
+        <button id="yoyBackfillOpen" class="btn-sm" type="button" data-i18n="yoy_set_reference"></button>
+        <button id="statsExportCsv" class="btn-sm" type="button" data-i18n="btn_export_csv"></button>
+      </div>
     </div>
 
     <div id="statsBody" class="stats-body">
@@ -495,19 +570,29 @@
   </div>
 </div>
 
-<!-- History modal -->
+<!-- ===== History modal ===== -->
 <div class="modal" id="historyModal" hidden>
   <div class="modal-content history-modal-content">
     <div class="modal-head">
-      <h2 data-i18n="section_history"></h2>
-      <button id="historyClose" class="tiny-btn" type="button" data-i18n="stats_close"></button>
+      <div>
+        <h2 data-i18n="section_history"></h2>
+        <div class="modal-subcaption" id="historyCount"></div>
+      </div>
+      <div class="modal-head-actions">
+        <label class="switch-label">
+          <span data-i18n="history_autosave"></span>
+          <span class="switch">
+            <input type="checkbox" id="historyEnable">
+            <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
+          </span>
+        </label>
+        <button id="historyClose" class="modal-x" type="button" aria-label="Close">✕</button>
+      </div>
     </div>
-
-    <p class="modal-intro" data-i18n="section_history_hint"></p>
 
     <div class="history-filter-row">
       <input type="search" id="historySearch" data-i18n-placeholder="history_search_placeholder" autocomplete="off">
-      <select id="historyPeriod" aria-label="Period">
+      <select id="historyPeriod" class="select-sm" aria-label="Period">
         <option value="all" selected data-i18n="stats_period_all"></option>
         <option value="ytd" data-i18n="stats_period_ytd"></option>
         <option value="last12" data-i18n="stats_period_last12"></option>
@@ -518,40 +603,158 @@
       </select>
     </div>
 
-    <ul id="historyList" class="history-list" role="list"></ul>
+    <div class="history-table">
+      <div class="history-table-head">
+        <div data-i18n="th_number"></div>
+        <div data-i18n="th_buyer"></div>
+        <div data-i18n="th_date"></div>
+        <div data-i18n="th_total_col"></div>
+        <div></div>
+      </div>
+      <ul id="historyList" class="history-list" role="list"></ul>
+    </div>
 
     <div class="history-bottom-row">
-      <label class="inline">
-        <input type="checkbox" id="historyEnable">
-        <span data-i18n="history_enable_label"></span>
-      </label>
-      <div class="history-bottom-actions">
-        <button class="tiny-btn" id="historyAddPast" type="button" data-i18n="btn_history_add_past"></button>
-        <button class="tiny-btn" id="historyClearAll" type="button" data-i18n="btn_history_clear_all"></button>
+      <button class="btn-outline" id="historyAddPast" type="button" data-i18n="btn_history_add_past"></button>
+      <div class="history-clear-wrap">
+        <button class="link-faint" id="historyClearAll" type="button" data-i18n="btn_history_clear_all"></button>
+        <div class="confirm-inline" id="historyClearConfirm" hidden>
+          <span id="historyClearConfirmLabel"></span>
+          <button id="historyClearYes" class="link-accent" type="button" data-i18n="btn_yes_clear"></button>
+          <button id="historyClearNo" class="link-muted" type="button" data-i18n="btn_cancel"></button>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Help modal -->
+<!-- ===== Help modal (two-pane) ===== -->
 <div class="modal" id="helpModal" hidden>
   <div class="modal-content help-modal-content">
-    <div class="modal-head">
-      <h2 data-i18n="help_title"></h2>
-      <button id="helpClose" class="tiny-btn" type="button" data-i18n="stats_close"></button>
+    <div class="help-sidebar">
+      <div class="help-sidebar-title" data-i18n="help_title"></div>
+      <input type="search" id="helpSearch" data-i18n-placeholder="help_search_placeholder" autocomplete="off">
+      <div id="helpTopics" class="help-topics"></div>
+      <div id="helpNoResults" class="help-no-results" data-i18n="help_no_results" hidden></div>
     </div>
-    <div id="helpBody" class="help-body">
-      <!-- Filled by openHelpModal() with rendered README -->
+    <div class="help-content">
+      <div class="help-content-head">
+        <h2 id="helpTopicTitle"></h2>
+        <button id="helpClose" class="modal-x" type="button" aria-label="Close">✕</button>
+      </div>
+      <div id="helpBody" class="help-body"></div>
     </div>
   </div>
 </div>
 
-<!-- Embed-XML modal -->
+<!-- ===== Backup & restore modal ===== -->
+<div class="modal" id="backupModal" hidden>
+  <div class="modal-content backup-modal-content">
+    <div class="modal-head">
+      <h2 data-i18n="backup_title"></h2>
+      <button id="backupClose" class="modal-x" type="button" aria-label="Close">✕</button>
+    </div>
+
+    <div class="backup-section">
+      <div class="backup-section-title" data-i18n="backup_export_head"></div>
+      <p class="backup-section-body" id="backupExportSummary"></p>
+      <button type="button" class="btn-accent" id="btnExport" data-i18n="btn_download_backup"></button>
+    </div>
+
+    <div class="backup-section">
+      <div class="backup-section-title" data-i18n="backup_import_head"></div>
+      <p class="backup-section-body" data-i18n="backup_import_body"></p>
+
+      <label class="backup-drop" id="backupDropLabel">
+        <span data-i18n="backup_choose_file"></span>
+        <input type="file" id="importFile" accept="application/json,.json" class="visually-hidden">
+      </label>
+      <button type="button" id="btnImport" class="visually-hidden" tabindex="-1" aria-hidden="true"></button>
+
+      <div class="warn-banner" id="backupImportError" hidden></div>
+
+      <div class="backup-pending" id="backupPending" hidden>
+        <div class="backup-pending-title" data-i18n="backup_ready"></div>
+        <div id="backupPendingSummary"></div>
+        <div class="backup-pending-warnings" id="backupPendingWarnings" hidden></div>
+        <div class="backup-pending-actions">
+          <button type="button" class="btn-outline" id="backupCancelImport" data-i18n="btn_cancel"></button>
+          <button type="button" class="btn-accent" id="backupConfirmImport" data-i18n="backup_restore"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Onboarding modal (first-run setup) ===== -->
+<div class="modal onboarding-modal" id="onboardingModal" hidden>
+  <div class="modal-content onboarding-content">
+    <div class="ob-stepper">
+      <span class="ob-dot" id="obDot1"></span>
+      <span class="ob-dot" id="obDot2"></span>
+      <span class="ob-step-label" id="obStepLabel"></span>
+    </div>
+
+    <div id="obStep1">
+      <h2 data-i18n="ob_title_seller"></h2>
+      <p class="ob-intro" data-i18n="ob_body_seller"></p>
+      <div class="menu-grid">
+        <label class="full"><span data-i18n="f_company"></span>
+          <input type="text" id="ob_company" autocomplete="off" data-i18n-placeholder="ob_company_placeholder">
+        </label>
+        <label class="half"><span data-i18n="f_vat_short"></span>
+          <input type="text" id="ob_vat" autocomplete="off" placeholder="DE123456789">
+        </label>
+        <label class="half"><span data-i18n="f_country"></span>
+          <input type="text" id="ob_country" maxlength="3" autocomplete="off" placeholder="DE">
+        </label>
+        <label class="full"><span data-i18n="f_iban"></span>
+          <input type="text" id="ob_iban" autocomplete="off" placeholder="DE00 0000 0000 0000 0000 00">
+        </label>
+      </div>
+      <div class="ob-actions">
+        <button type="button" class="btn-panel" id="obLoadDemo" data-i18n="ob_load_demo"></button>
+        <button type="button" class="btn-accent" id="obContinue" data-i18n="ob_continue"></button>
+      </div>
+    </div>
+
+    <div id="obStep2" hidden>
+      <h2 data-i18n="ob_title_number"></h2>
+      <p class="ob-intro" data-i18n="ob_body_number"></p>
+      <div class="menu-grid">
+        <label class="half wide"><span data-i18n="number_setup_pattern_label"></span>
+          <input type="text" id="ob_pattern" value="{yyyy}-{counter:5}" autocomplete="off">
+        </label>
+        <label class="half narrow"><span data-i18n="number_setup_start_label"></span>
+          <input type="number" id="ob_start" min="1" step="1" value="1">
+        </label>
+      </div>
+      <div class="token-chip-row">
+        <span class="note-small" data-i18n="ob_tokens_label"></span>
+        <div class="token-chips" id="obTokenChips">
+          <button type="button" data-token="{yyyy}">{yyyy}</button>
+          <button type="button" data-token="{mm}">{mm}</button>
+          <button type="button" data-token="{counter:5}">{counter:5}</button>
+        </div>
+      </div>
+      <div class="ob-preview">
+        <div class="mini-label" data-i18n="ob_next_numbers"></div>
+        <div id="obNumberPreview"></div>
+      </div>
+      <div class="ob-actions">
+        <button type="button" class="link-muted" id="obBack" data-i18n="ob_back"></button>
+        <button type="button" class="btn-accent" id="obFinish" data-i18n="ob_finish"></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Embed-XML modal ===== -->
 <div class="modal" id="embedModal" hidden>
   <div class="modal-content embed-modal-content">
     <div class="modal-head">
       <h2 data-i18n="embed_title"></h2>
-      <button id="embedClose" class="tiny-btn" type="button" data-i18n="stats_close"></button>
+      <button id="embedClose" class="modal-x" type="button" aria-label="Close">✕</button>
     </div>
     <p class="modal-intro" data-i18n="embed_intro"></p>
     <div class="drop" id="drop">
@@ -560,20 +763,20 @@
     </div>
     <input type="file" id="file" accept="application/pdf,.pdf" class="visually-hidden">
     <div class="embed-actions">
-      <button type="button" class="primary" id="btnEmbedRun" data-i18n="btn_embed_run"></button>
+      <button type="button" class="btn-accent" id="btnEmbedRun" data-i18n="btn_embed_run"></button>
     </div>
   </div>
 </div>
 
-<!-- Past-invoice modal -->
+<!-- ===== Past-invoice modal ===== -->
 <div class="modal" id="pastInvoiceModal" hidden>
   <div class="modal-content past-invoice-content">
     <div class="modal-head">
       <h2 data-i18n="past_modal_title"></h2>
-      <button id="pastCancel" class="tiny-btn" type="button" data-i18n="past_cancel"></button>
+      <button id="pastCancel" class="modal-x" type="button" aria-label="Close">✕</button>
     </div>
     <p class="modal-intro" data-i18n="past_modal_hint"></p>
-    <div class="grid">
+    <div class="modal-grid">
       <label><span data-i18n="past_field_date"></span>
         <input type="date" id="past_date">
       </label>
@@ -581,7 +784,7 @@
         <input type="text" id="past_number" autocomplete="off">
       </label>
       <label class="full"><span data-i18n="past_field_buyer_select"></span>
-        <select id="past_buyer_select"></select>
+        <select id="past_buyer_select" class="select-box"></select>
       </label>
       <label class="full"><span data-i18n="past_field_buyer"></span>
         <input type="text" id="past_buyer_text" autocomplete="off">
@@ -593,7 +796,7 @@
         <input type="number" id="past_total" step="0.01" min="0">
       </label>
       <label><span data-i18n="past_field_taxmode"></span>
-        <select id="past_taxmode">
+        <select id="past_taxmode" class="select-box">
           <option value="S" data-i18n="tax_S"></option>
           <option value="AE" data-i18n="tax_AE"></option>
           <option value="Z" data-i18n="tax_Z"></option>
@@ -611,29 +814,29 @@
         <input type="text" id="past_category" autocomplete="off">
       </label>
     </div>
-    <div class="past-modal-actions">
-      <button id="pastSave" class="primary" type="button" data-i18n="past_save"></button>
+    <div class="modal-actions">
+      <button id="pastSave" class="btn-accent" type="button" data-i18n="past_save"></button>
     </div>
   </div>
 </div>
 
-<!-- YoY backfill modal -->
+<!-- ===== YoY backfill modal ===== -->
 <div class="modal" id="yoyBackfillModal" hidden>
   <div class="modal-content yoy-backfill-content">
     <div class="modal-head">
       <h2 data-i18n="yoy_modal_title"></h2>
-      <button id="yoyBackfillCancel" class="tiny-btn" type="button" data-i18n="yoy_cancel"></button>
+      <button id="yoyBackfillCancel" class="modal-x" type="button" aria-label="Close">✕</button>
     </div>
     <p class="modal-intro" data-i18n="yoy_modal_intro"></p>
 
     <div class="yoy-modal-fields">
       <label class="inline">
         <span data-i18n="yoy_field_year"></span>
-        <select id="yoyBackfillYear"></select>
+        <select id="yoyBackfillYear" class="select-sm"></select>
       </label>
       <label class="inline">
         <span data-i18n="yoy_field_currency"></span>
-        <select id="yoyBackfillCurrency"></select>
+        <select id="yoyBackfillCurrency" class="select-sm"></select>
       </label>
     </div>
 
@@ -652,8 +855,8 @@
       <label><span data-i18n="yoy_month_dec"></span><input type="number" id="yoyMonth_11" step="0.01" min="0"></label>
     </div>
 
-    <div class="yoy-modal-actions">
-      <button id="yoyBackfillSave" class="primary" type="button" data-i18n="yoy_save"></button>
+    <div class="modal-actions">
+      <button id="yoyBackfillSave" class="btn-accent" type="button" data-i18n="yoy_save"></button>
     </div>
   </div>
 </div>
@@ -661,8 +864,7 @@
 <!-- Toast host — transient feedback messages stack here, top-right. -->
 <div id="toastHost" class="toast-host" aria-live="polite" aria-atomic="false"></div>
 
-<!-- Shared tooltip popover — positioned dynamically next to the
-     triggering .tooltip-btn. Closes on Esc, outside click, or re-click. -->
+<!-- Shared tooltip popover -->
 <div id="tooltipPopover" class="tooltip-popover" role="tooltip" hidden></div>
 
 <script type="module" src="/src/main.js"></script>
