@@ -747,22 +747,35 @@ textarea {
 .info-section { display: flex; flex-direction: column; gap: 12px; }
 
 .section-caption {
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 700;
-  color: var(--text-muted);
+  color: var(--text);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
 }
+summary.section-caption::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  opacity: 0.55;
+  flex-shrink: 0;
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+.info-details[open] > summary.section-caption::after { transform: rotate(-135deg); }
 .summary-value { color: var(--text-faint); font-weight: 600; text-transform: none; }
 
 .info-details {
   border-top: 1px solid var(--border);
   padding-top: 14px;
 }
-.info-details > summary:hover { color: var(--text); }
+.info-details > summary:hover { color: var(--accent); }
 .details-body {
   display: flex;
   flex-direction: column;
@@ -1257,7 +1270,6 @@ textarea {
   pointer-events: none;
   white-space: nowrap;
   z-index: 5;
-  transform: translate(-50%, -110%);
 }
 
 .stats-tops ol { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
@@ -1737,6 +1749,12 @@ input.invalid, textarea.invalid { border-color: var(--accent) !important; }
 @media (max-width: 1023px) {
   .preview-col { display: none; }
   .form-col { border-right: none; border-radius: 14px; }
+  /* The 1100px min-width only makes sense with the preview column present
+     (handoff's two-column layout); once it's hidden the form column alone
+     can shrink to fit narrower windows, e.g. split-screen at half a laptop
+     display's width. */
+  .app-card { min-width: 0; }
+  .app-head { flex-wrap: wrap; }
 }
 
 @media (max-width: 720px) {

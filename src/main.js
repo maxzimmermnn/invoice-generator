@@ -278,6 +278,7 @@ const I18N = {
     label_history: 'Verlauf',
     label_stats: 'Statistik',
     btn_duplicate_short: 'Letzte duplizieren',
+    btn_new_invoice_short: 'Neue Rechnung',
     menu_ui_language: 'UI-Sprache',
     menu_theme: 'Design',
     seg_light: 'Hell',
@@ -285,7 +286,7 @@ const I18N = {
     seg_auto: 'Auto',
     menu_help: 'Hilfe & Doku',
     menu_backup: 'Backup / Wiederherstellen…',
-    menu_rerun_setup: 'Ersteinrichtung ansehen…',
+    menu_rerun_setup: 'Ersteinrichtung erneut ausführen…',
     seller_profile_caption: 'Verkäuferprofil',
     seller_edit_title: 'Verkäuferprofil bearbeiten',
     seller_chip_empty: 'Verkäufer einrichten…',
@@ -767,6 +768,8 @@ const I18N = {
     btn_open_history: 'Historie',
     btn_duplicate_last: 'Letzte Rechnung duplizieren',
     msg_duplicated_last: 'Letzte Rechnung dupliziert · Nummer & Datum aktualisiert',
+    btn_new_invoice: 'Neue Rechnung beginnen',
+    msg_new_invoice: 'Neue Rechnung begonnen · Formular geleert, Nummer erhöht',
     msg_duplicate_no_history: 'Noch keine Rechnung im Verlauf zum Duplizieren.',
     btn_open_help: 'Hilfe',
     help_title: 'Hilfe & Dokumentation',
@@ -808,6 +811,7 @@ const I18N = {
     label_history: 'History',
     label_stats: 'Stats',
     btn_duplicate_short: 'Duplicate last',
+    btn_new_invoice_short: 'New invoice',
     menu_ui_language: 'UI language',
     menu_theme: 'Theme',
     seg_light: 'Light',
@@ -815,7 +819,7 @@ const I18N = {
     seg_auto: 'Auto',
     menu_help: 'Help & docs',
     menu_backup: 'Backup / restore data…',
-    menu_rerun_setup: 'Preview first-run setup…',
+    menu_rerun_setup: 'Rerun setup…',
     seller_profile_caption: 'Seller profile',
     seller_edit_title: 'Edit seller profile',
     seller_chip_empty: 'Set up seller…',
@@ -1281,6 +1285,8 @@ const I18N = {
     btn_open_history: 'History',
     btn_duplicate_last: 'Duplicate last invoice',
     msg_duplicated_last: 'Last invoice duplicated · number & date refreshed',
+    btn_new_invoice: 'Start a new invoice',
+    msg_new_invoice: 'New invoice started · form cleared, number advanced',
     msg_duplicate_no_history: 'No history entry yet to duplicate.',
     btn_open_help: 'Help',
     help_title: 'Help & documentation',
@@ -1322,6 +1328,7 @@ const I18N = {
     label_history: 'Historique',
     label_stats: 'Stats',
     btn_duplicate_short: 'Dupliquer la dernière',
+    btn_new_invoice_short: 'Nouvelle facture',
     menu_ui_language: 'Langue de l\'interface',
     menu_theme: 'Thème',
     seg_light: 'Clair',
@@ -1329,7 +1336,7 @@ const I18N = {
     seg_auto: 'Auto',
     menu_help: 'Aide & docs',
     menu_backup: 'Sauvegarde / restauration…',
-    menu_rerun_setup: 'Revoir la configuration initiale…',
+    menu_rerun_setup: 'Relancer la configuration initiale…',
     seller_profile_caption: 'Profil vendeur',
     seller_edit_title: 'Modifier le profil vendeur',
     seller_chip_empty: 'Configurer le vendeur…',
@@ -1795,6 +1802,8 @@ const I18N = {
     btn_open_history: 'Historique',
     btn_duplicate_last: 'Dupliquer la dernière facture',
     msg_duplicated_last: 'Dernière facture dupliquée · numéro et date mis à jour',
+    btn_new_invoice: 'Démarrer une nouvelle facture',
+    msg_new_invoice: 'Nouvelle facture démarrée · formulaire vidé, numéro incrémenté',
     msg_duplicate_no_history: 'Aucune facture dans l\'historique à dupliquer.',
     btn_open_help: 'Aide',
     help_title: 'Aide et documentation',
@@ -3184,6 +3193,44 @@ async function cloneFromHistory(idx) {
   // Auto-close the history modal so the user is back at the form, ready to edit.
   closeHistoryModal();
   toast(snap.imported ? t('msg_history_clone_partial') : t('msg_history_cloned'), 'ok');
+}
+
+// Start a fresh invoice in the same session: clears buyer + items + the
+// invoice-specific fields (project/category/note/dates), keeps seller
+// identity and boilerplate texts untouched, and advances the number.
+// The number field is deliberately left as-is before the bump — that way
+// applyNextInvoiceNumber() continues counting from whatever was last shown,
+// so repeated clicks in one session keep advancing even though nothing has
+// been generated yet (recordInvoiceNumber only persists the counter on a
+// successful PDF).
+async function newInvoice() {
+  clearBuyer();
+  $('buyerPicker').value = '';
+
+  state.items = [];
+  addItem({ desc: '', qty: 1, price: 0 });
+
+  $('r_project').value = '';
+  $('r_category').value = '';
+  $('r_note').value = '';
+  $('r_date').value = todayLocalISO();
+  $('r_delivery').value = '';
+  $('r_delivery_end').value = '';
+
+  await applyNextInvoiceNumber();
+
+  calcTotals();
+  updateFilenamePreview();
+  updateBuyerHistoryHint();
+  if (typeof applyDueDays === 'function') applyDueDays();
+  if (typeof updateDeliveryPeriodUI === 'function') updateDeliveryPeriodUI();
+  if (typeof updateBuyerActionUI === 'function') updateBuyerActionUI();
+  if (typeof renderRecentCustomerChips === 'function') renderRecentCustomerChips();
+  if (typeof updateSummaryValues === 'function') updateSummaryValues();
+  if (typeof refreshInlineValidation === 'function') refreshInlineValidation();
+  if (typeof setActiveTab === 'function') setActiveTab('buyer');
+  if (typeof schedulePreviewRender === 'function') schedulePreviewRender();
+  toast(t('msg_new_invoice'), 'ok');
 }
 
 // One-click duplicate of the most recent history entry. No modal involvement.
@@ -4638,6 +4685,15 @@ function armRemoveConfirm(btn) {
 // extra option is added for it so the select still shows the truth.
 const VAT_SELECT_RATES = [0, 7, 19, 20, 21];
 
+// The price field is type=text (not type=number) so it accepts a comma as
+// the decimal separator regardless of the browser's locale — a type=number
+// input silently rejects whichever separator it doesn't expect, which is
+// what made typing "12,50" appear to "break the math".
+function parseDecimal(raw) {
+  const s = String(raw).trim().replace(',', '.');
+  return s === '' ? NaN : Number(s);
+}
+
 function renderItems() {
   const container = $('items');
   if (!container) return;
@@ -4667,8 +4723,8 @@ function renderItems() {
       .join('');
     row.innerHTML = `
       <input type="text" class="cell-desc" data-k="desc" value="${esc(it.desc)}" placeholder="${esc(t('item_placeholder'))}">
-      <input type="number" class="num" step="0.01" data-k="price" value="${it.price}">
-      <input type="number" class="num" step="0.01" data-k="qty" value="${it.qty}">
+      <input type="text" inputmode="decimal" class="num" data-k="price" value="${it.price}">
+      <input type="number" class="num" step="1" min="0" data-k="qty" value="${it.qty}">
       <select data-k="vat">${vatOptions}</select>
       <div class="line-total" data-line-total></div>
       <button class="remove" data-remove aria-label="${esc(t('aria_remove_item'))}">✕</button>
@@ -4680,10 +4736,15 @@ function renderItems() {
       // On every keystroke, update from a finite number — skip mid-edit
       // invalid states (empty / lone minus / trailing dot) so the on-screen
       // totals don't flicker to 0 between digits.
+      const parseField = (k) => {
+        if (el.tagName === 'SELECT') return Number(el.value);
+        if (k === 'price') return parseDecimal(el.value);
+        return el.valueAsNumber;
+      };
       el.addEventListener('input', () => {
         const k = el.dataset.k;
         if (isNumeric(k)) {
-          const n = el.tagName === 'SELECT' ? Number(el.value) : el.valueAsNumber;
+          const n = parseField(k);
           if (!Number.isFinite(n)) return;
           it[k] = n;
         } else {
@@ -4697,8 +4758,11 @@ function renderItems() {
       el.addEventListener('change', () => {
         const k = el.dataset.k;
         if (!isNumeric(k)) return;
-        const n = el.tagName === 'SELECT' ? Number(el.value) : el.valueAsNumber;
+        const n = parseField(k);
         it[k] = Number.isFinite(n) ? n : 0;
+        // Normalize the displayed text so a typed "12,50" reads back as
+        // "12.5" — the text field won't self-correct like type=number does.
+        if (k === 'price') el.value = String(it[k]);
         calcTotals();
       });
       // Enter on the VAT select inserts a new row right after and jumps
@@ -7067,6 +7131,7 @@ document.getElementById('addFirstLine').addEventListener('click', () => addItem(
 
 // Top-bar modal openers
 $('openHistory').addEventListener('click', openHistoryModal);
+$('newInvoice').addEventListener('click', newInvoice);
 $('duplicateLast').addEventListener('click', duplicateLastInvoice);
 $('openHelp').addEventListener('click', () => {
   closeOverflowMenu();
