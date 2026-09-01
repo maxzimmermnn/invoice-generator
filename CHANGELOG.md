@@ -1,3 +1,37 @@
+## [2.0.1] - 2026-09-01
+
+Small UX fixes on top of the 2.0.0 redesign: a way to start a fresh
+invoice mid-session, a layout fix for narrow/split-screen windows, and
+two item-entry papercuts.
+
+### Added
+
+- **"New invoice" button** in the header. Clears buyer, items, and the
+  invoice-specific fields (project/category/note/dates) while leaving
+  the seller profile and boilerplate texts untouched, and advances the
+  invoice number — repeated clicks in the same session keep advancing
+  even before a PDF is actually generated.
+
+### Fixed
+
+- **Split-screen / narrow windows.** The app card kept a 1100px
+  `min-width` left over from the two-column layout even after the
+  preview pane hides below 1024px, forcing horizontal scrolling on
+  half-width windows. The card now shrinks to fit once the preview is
+  hidden.
+- **Item quantity** now steps by whole numbers (was 0.01) — more useful
+  for invoice line counts.
+- **Item unit price** accepts a comma as the decimal separator. It was
+  a `type=number` input, which silently rejects whichever decimal
+  separator the browser's locale doesn't expect.
+- **Stats chart tooltip** no longer drifts off-screen for bars near the
+  left edge — a leftover CSS `transform` was double-counting the
+  centering the tooltip's own positioning logic already did.
+- Reworded the overflow menu's onboarding entry from "Preview
+  first-run setup" to "Rerun setup" (de/en/fr) — it opens the live
+  setup wizard, not a read-only view; finishing it does overwrite the
+  seller profile.
+
 ## [1.9.0] - 2026-07-05
 
 Buyer name line 2 and alpha-3 country input on the form side, plus a
