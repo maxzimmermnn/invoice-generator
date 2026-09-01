@@ -32,6 +32,48 @@ two item-entry papercuts.
   setup wizard, not a read-only view; finishing it does overwrite the
   seller profile.
 
+## [2.0.0] - 2026-07-09
+
+Rebuild of the whole UI per the "1a" design handoff, keeping the PDF/A-3
++ Factur-X generation pipeline untouched underneath.
+
+### Added
+
+- **Two-column card layout**: form column (header row, seller identity
+  chip, Buyer/Items/Invoice-info tabs, sticky action bar) next to the
+  live PDF preview column.
+- **Seller identity chip** with a read/edit dropdown, replacing the old
+  always-visible seller fields; first run is now a two-step onboarding
+  modal (profile, then invoice-number pattern).
+- **Buyer tab**: recent-customer chips (last 4), save/update label,
+  confirm-arm delete.
+- **Items tab**: per-line VAT select, line totals, per-rate net rows,
+  an empty state, and an amber tax-mode note.
+- **Invoice info tab**: due-date chips (issue date + N days), a
+  delivery-period toggle, a three-block text-preset system
+  (`erechnung:textpresets:v1`, with legacy footnotes migrated in),
+  a layout segmented control, and an auto-saving filename pattern.
+- **Modals**: history (auto-save switch, entry count, reload/delete
+  with inline confirm), a two-pane searchable help browser, a backup
+  modal with staged import confirmation (format bumped to v7: adds
+  `text_presets`, `due_days`), and a validate-checklist popover.
+- **Global keyboard shortcuts** (Esc, ⌘/Ctrl+Enter, ⌘/Ctrl+D, 1/2/3, ?).
+- IBM Plex Mono is now the UI font, injected at runtime from the
+  existing embedded WOFF data; new oklch-based theme tokens with a
+  wired Light/Dark/Auto toggle.
+- Full-viewport fluid sizing (100vh shell, 1100–2000px card), full-width
+  tabs, 4-chip recent customers, and `scrollbar-gutter: stable` so tab
+  switches don't nudge the layout sideways.
+
+### Internal
+
+- Seller-collapse feature and `erechnung:seller_collapsed:v1` removed;
+  v6 backups importing that flag now just ignore it.
+- Reload from history no longer offers the prototype's "Clone" (data
+  integrity — history feeds statistics); due dates are chip-driven only,
+  `r_due` is now a hidden input always derived from issue date + due
+  days.
+
 ## [1.9.0] - 2026-07-05
 
 Buyer name line 2 and alpha-3 country input on the form side, plus a
