@@ -652,7 +652,7 @@ textarea {
 
 .items-head, .item-row {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) 90px 60px 80px minmax(90px, 1fr) 28px;
+  grid-template-columns: minmax(0, 2fr) 90px 72px 80px minmax(90px, 1fr) 28px;
   gap: 10px;
   align-items: center;
 }
@@ -685,11 +685,19 @@ textarea {
 .item-row input.num, .item-row select { text-align: center; }
 
 /* Quantity stepper: the field is type=text (for comma decimals), so the
-   native number spinner is replaced by these two buttons. The space they
-   need is reserved permanently — only their visibility toggles — so the
-   number never shifts when the row is hovered. */
+   native number spinner is replaced by these two buttons. They appear only
+   while the field has focus, never on hover alone — otherwise a click aimed
+   at the right end of the number, to place the caret, would land on an arrow
+   and step the value instead. The gutter they sit in is reserved
+   permanently — only their visibility toggles — so the number never shifts
+   when they appear, and it is mirrored on the left so the value stays
+   centered under its column header. */
 .qty-field { position: relative; display: block; min-width: 0; }
-.item-row .qty-field input.num { width: 100%; padding-right: 13px; }
+.item-row .qty-field input.num {
+  width: 100%;
+  padding-left: 13px;
+  padding-right: 13px;
+}
 
 .qty-step {
   position: absolute;
@@ -702,7 +710,6 @@ textarea {
   pointer-events: none;
   transition: opacity 0.12s ease;
 }
-.qty-field:hover .qty-step,
 .qty-field:focus-within .qty-step { opacity: 1; pointer-events: auto; }
 
 .qty-step button {
@@ -721,9 +728,12 @@ textarea {
 }
 .qty-step button:hover { color: var(--accent); }
 
-/* Touch devices have no hover state — keep the arrows visible there. */
+/* Touch devices: same focus rule, but a target big enough to hit with a
+   fingertip (the gutter widens to match, so the arrows still never overlap
+   the number). */
 @media (hover: none) {
-  .qty-step { opacity: 1; pointer-events: auto; }
+  .qty-step button { width: 18px; height: 13px; font-size: 9px; }
+  .item-row .qty-field input.num { padding-left: 18px; padding-right: 18px; }
 }
 .item-row select { font-size: 13px; }
 .item-row .line-total { font-weight: 600; text-align: center; }

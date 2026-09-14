@@ -324,7 +324,7 @@ const I18N = {
     preset_name_short: 'Kurz',
     preset_name_net30: '30 Tage netto',
     preset_name_none: 'Ohne',
-    preset_name_smallbiz: 'Kleinunternehmer (§19 UStG)',
+    preset_name_smallbiz: 'Kleinunternehmer §19 UStG (deutsche Rechnungen)',
     preset_text_intro_standard: 'Vielen Dank für die gute Zusammenarbeit. Wie vereinbart stelle ich Ihnen folgende Leistungen in Rechnung:',
     preset_text_intro_short: 'Anbei die Rechnung für die unten aufgeführten Leistungen.',
     preset_text_payment_standard: 'Zahlbar bis {due} per Überweisung auf das unten genannte Konto.',
@@ -857,7 +857,7 @@ const I18N = {
     preset_name_short: 'Short',
     preset_name_net30: 'Net 30',
     preset_name_none: 'None',
-    preset_name_smallbiz: 'Small business note (§19 UStG)',
+    preset_name_smallbiz: 'Small business §19 UStG (German invoices)',
     preset_text_intro_standard: 'Thank you for the good cooperation and, as agreed, I will invoice you for the following services:',
     preset_text_intro_short: 'Please find the invoice for the services below.',
     preset_text_payment_standard: 'Payment due until {due} by money transfer only to the account found at the bottom of the invoice.',
@@ -1374,7 +1374,7 @@ const I18N = {
     preset_name_short: 'Court',
     preset_name_net30: '30 jours nets',
     preset_name_none: 'Aucune',
-    preset_name_smallbiz: 'Franchise en base (§19 UStG)',
+    preset_name_smallbiz: 'Micro-entreprise §19 UStG (factures allemandes)',
     preset_text_intro_standard: 'Merci pour la bonne collaboration. Comme convenu, je vous facture les prestations suivantes :',
     preset_text_intro_short: 'Veuillez trouver ci-dessous la facture des prestations.',
     preset_text_payment_standard: 'Paiement attendu pour le {due} par virement sur le compte indiqué en bas de la facture.',
@@ -2546,6 +2546,29 @@ function presetSlug(name) {
     + '-' + Date.now().toString(36).slice(-4);
 }
 
+// The shipped "small business" footnote cites §19 UStG — German law — but
+// the old preset labels left that implicit, and the French one ("Franchise
+// en base") even read as the French regime. Installs that seeded an old
+// label get it relabelled once, in the language it was seeded in. The match
+// is on the exact string we shipped, so a preset the user renamed themselves
+// is left alone.
+const LEGACY_SMALLBIZ_NAMES = {
+  'Kleinunternehmer (§19 UStG)': 'de',
+  'Small business note (§19 UStG)': 'en',
+  'Franchise en base (§19 UStG)': 'fr',
+};
+
+function relabelSmallbizPreset(presets) {
+  let changed = false;
+  for (const p of presets.footnote) {
+    const lang = LEGACY_SMALLBIZ_NAMES[p.name];
+    if (!lang) continue;
+    const next = I18N[lang] && I18N[lang].preset_name_smallbiz;
+    if (next && next !== p.name) { p.name = next; changed = true; }
+  }
+  return changed;
+}
+
 function defaultTextPresets() {
   return {
     intro: [
@@ -2615,6 +2638,7 @@ async function loadTextPresets() {
     await persistTextPresets();
   } else {
     state.textPresets = loaded;
+    if (relabelSmallbizPreset(loaded)) await persistTextPresets();
   }
   // Clamp selections to existing presets.
   for (const key of TEXT_BLOCKS) {
@@ -3123,9 +3147,9 @@ async function applyHistorySnapshot(snap) {
   state.items = (f.items || []).map(it => ({
     id: crypto.randomUUID(),
     desc: it.desc || '',
-    qty: it.qty ?? 1,
+    qty: itemAmount(it.qty, 1),
     unit: it.unit || 'C62',
-    price: it.price ?? 0,
+    price: itemAmount(it.price, 0),
     vat: it.vat ?? 20,
   }));
   renderItems();
@@ -4612,13 +4636,25 @@ function closeStatsModal() {
 }
 
 // -------- Items --------
+// Quantity and unit price are held at two decimals — the precision the PDF
+// prints and the only precision the XML can carry (BilledQuantity and
+// ChargeAmount are both written with toFixed(2)). Keeping more in state
+// would desynchronize them from LineTotalAmount, which is computed from the
+// stored value: qty 1.555 x 10.00 would print/emit 1.56 x 10.00 against a
+// line total of 15.55, and EN 16931's line cross-check would reject it.
+// Every path that puts a number into an item funnels through here.
+function itemAmount(v, fallback) {
+  const n = Number(v);
+  return round2(Number.isFinite(n) ? n : fallback);
+}
+
 function addItem(data = {}) {
   const item = {
     id: crypto.randomUUID(),
     desc: data.desc || '',
-    qty: data.qty ?? 1,
+    qty: itemAmount(data.qty, 1),
     unit: data.unit || 'C62',
-    price: data.price ?? 0,
+    price: itemAmount(data.price, 0),
     vat: data.vat ?? defaultVatForCountry($('s_country')?.value),
   };
   state.items.push(item);
@@ -4631,9 +4667,9 @@ function addItemAfter(idx, data = {}) {
   const item = {
     id: crypto.randomUUID(),
     desc: data.desc || '',
-    qty: data.qty ?? 1,
+    qty: itemAmount(data.qty, 1),
     unit: data.unit || 'C62',
-    price: data.price ?? 0,
+    price: itemAmount(data.price, 0),
     vat: data.vat ?? defaultVatForCountry($('s_country')?.value),
   };
   state.items.splice(idx + 1, 0, item);
@@ -4740,9 +4776,9 @@ function renderItems() {
       .join('');
     row.innerHTML = `
       <input type="text" class="cell-desc" data-k="desc" value="${esc(it.desc)}" placeholder="${esc(t('item_placeholder'))}">
-      <input type="text" inputmode="decimal" class="num" data-k="price" value="${it.price}">
+      <input type="text" inputmode="decimal" class="num" data-k="price" value="${esc(it.price)}">
       <span class="qty-field">
-        <input type="text" inputmode="decimal" class="num" data-k="qty" value="${it.qty}">
+        <input type="text" inputmode="decimal" class="num" data-k="qty" value="${esc(it.qty)}">
         <span class="qty-step" aria-hidden="true">
           <button type="button" data-qty-step="1" tabindex="-1">&#9650;</button>
           <button type="button" data-qty-step="-1" tabindex="-1">&#9660;</button>
@@ -4756,19 +4792,19 @@ function renderItems() {
 
     row.querySelectorAll('[data-k]').forEach(el => {
       const isNumeric = (k) => k === 'qty' || k === 'price' || k === 'vat';
+      const isAmount = (k) => k === 'qty' || k === 'price';
       // On every keystroke, update from a finite number — skip mid-edit
       // invalid states (empty / lone minus / trailing dot) so the on-screen
       // totals don't flicker to 0 between digits.
-      const parseField = (k) => {
-        if (el.tagName === 'SELECT') return Number(el.value);
-        return parseDecimal(el.value);
-      };
+      const parseField = () => (el.tagName === 'SELECT'
+        ? Number(el.value)
+        : parseDecimal(el.value));
       el.addEventListener('input', () => {
         const k = el.dataset.k;
         if (isNumeric(k)) {
-          const n = parseField(k);
+          const n = parseField();
           if (!Number.isFinite(n)) return;
-          it[k] = n;
+          it[k] = isAmount(k) ? round2(n) : n;
         } else {
           it[k] = el.value;
         }
@@ -4780,8 +4816,9 @@ function renderItems() {
       el.addEventListener('change', () => {
         const k = el.dataset.k;
         if (!isNumeric(k)) return;
-        const n = parseField(k);
-        it[k] = Number.isFinite(n) ? n : 0;
+        const n = parseField();
+        const v = Number.isFinite(n) ? n : 0;
+        it[k] = isAmount(k) ? round2(v) : v;
         // Normalize the displayed text so a typed "12,50" reads back as
         // "12.5" — the text field won't self-correct like type=number does.
         if (k === 'price' || k === 'qty') el.value = String(it[k]);

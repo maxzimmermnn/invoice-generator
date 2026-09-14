@@ -1,3 +1,43 @@
+## [2.0.3] - 2026-09-14
+
+Code-review follow-up to 2.0.2.
+
+### Fixed
+
+- **Quantity and unit price are now held at two decimals.** The XML
+  writes `BilledQuantity` and `ChargeAmount` with two decimals while
+  `LineTotalAmount` was computed from the unrounded value, so a quantity
+  like `1.555` at `10.00` emitted 1.56 x 10.00 against a line total of
+  15.55 — EN 16931's line cross-check (BT-129 x BT-146) rejects that.
+  The PDF showed the same mismatch, printing a 2-decimal quantity beside
+  a total derived from the full value. Every path that puts a number
+  into a line item (typing, stepping, history clone, backup import)
+  rounds to two decimals now, so the form, the PDF and the XML always
+  agree. Pre-existing, but reachable by hand since 2.0.2 made decimal
+  quantities a feature.
+- **Quantity and price fields escape their value** when a row is
+  rendered. A hand-edited or corrupted backup carrying a string
+  quantity could otherwise break out of the `value` attribute.
+- **Quantity value is centered under its column header again** — the
+  arrow gutter is mirrored on the left instead of pushing the number
+  6.5px off-center, and the column widened by 12px to pay for it.
+- **Quantity stepper arrows now appear on focus only**, not on hover. A
+  click aimed at the right end of the number, to place the caret, could
+  land on an arrow and step the value instead. They are also larger on
+  touch devices, where there is no cursor to aim with.
+
+### Changed
+
+- **The small-business footnote preset says which country it applies
+  to.** It cites §19 UStG — German law — but the label left that
+  implicit, and the French one ("Franchise en base") read as the French
+  regime. Now "Kleinunternehmer §19 UStG (deutsche Rechnungen)" /
+  "Small business §19 UStG (German invoices)" / "Micro-entreprise §19
+  UStG (factures allemandes)". Existing installs are relabelled on
+  load, in the language the preset was seeded in, and only when the
+  name is still verbatim what the tool shipped — a preset you renamed
+  yourself is left alone. The footnote text itself is unchanged.
+
 ## [2.0.2] - 2026-09-14
 
 Follow-up to the 2.0.1 item-entry fixes: whole-number stepping no longer
