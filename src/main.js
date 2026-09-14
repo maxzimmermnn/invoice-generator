@@ -4685,13 +4685,30 @@ function armRemoveConfirm(btn) {
 // extra option is added for it so the select still shows the truth.
 const VAT_SELECT_RATES = [0, 7, 19, 20, 21];
 
-// The price field is type=text (not type=number) so it accepts a comma as
-// the decimal separator regardless of the browser's locale — a type=number
-// input silently rejects whichever separator it doesn't expect, which is
-// what made typing "12,50" appear to "break the math".
+// The price and quantity fields are type=text (not type=number) so they
+// accept a comma as the decimal separator regardless of the browser's locale
+// — a type=number input silently rejects whichever separator it doesn't
+// expect, which is what made typing "12,50" appear to "break the math".
 function parseDecimal(raw) {
   const s = String(raw).trim().replace(',', '.');
   return s === '' ? NaN : Number(s);
+}
+
+// Quantity is a text field so it accepts a comma decimal separator, which
+// means the native number-input spinner is gone — this reimplements it for
+// both the keyboard (Up/Down) and the hover-revealed arrow buttons. A step
+// moves in whole units and snaps a fractional value to the next whole one,
+// exactly like a type=number with step=1 would, while typing still allows
+// any decimal.
+function stepQty(input, dir) {
+  const cur = parseDecimal(input.value);
+  const base = Number.isFinite(cur) ? cur : 0;
+  const next = dir > 0 ? Math.floor(base) + 1 : Math.ceil(base) - 1;
+  input.value = String(Math.max(0, next));
+  // Programmatic value changes fire no input event, so raise one: it carries
+  // the new quantity into state, the totals and the live preview through the
+  // same path a keystroke takes.
+  input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 function renderItems() {
@@ -4724,7 +4741,13 @@ function renderItems() {
     row.innerHTML = `
       <input type="text" class="cell-desc" data-k="desc" value="${esc(it.desc)}" placeholder="${esc(t('item_placeholder'))}">
       <input type="text" inputmode="decimal" class="num" data-k="price" value="${it.price}">
-      <input type="number" class="num" step="1" min="0" data-k="qty" value="${it.qty}">
+      <span class="qty-field">
+        <input type="text" inputmode="decimal" class="num" data-k="qty" value="${it.qty}">
+        <span class="qty-step" aria-hidden="true">
+          <button type="button" data-qty-step="1" tabindex="-1">&#9650;</button>
+          <button type="button" data-qty-step="-1" tabindex="-1">&#9660;</button>
+        </span>
+      </span>
       <select data-k="vat">${vatOptions}</select>
       <div class="line-total" data-line-total></div>
       <button class="remove" data-remove aria-label="${esc(t('aria_remove_item'))}">✕</button>
@@ -4738,8 +4761,7 @@ function renderItems() {
       // totals don't flicker to 0 between digits.
       const parseField = (k) => {
         if (el.tagName === 'SELECT') return Number(el.value);
-        if (k === 'price') return parseDecimal(el.value);
-        return el.valueAsNumber;
+        return parseDecimal(el.value);
       };
       el.addEventListener('input', () => {
         const k = el.dataset.k;
@@ -4762,8 +4784,15 @@ function renderItems() {
         it[k] = Number.isFinite(n) ? n : 0;
         // Normalize the displayed text so a typed "12,50" reads back as
         // "12.5" — the text field won't self-correct like type=number does.
-        if (k === 'price') el.value = String(it[k]);
+        if (k === 'price' || k === 'qty') el.value = String(it[k]);
         calcTotals();
+      });
+      // Up/Down on the quantity field steps in whole units (see stepQty).
+      el.addEventListener('keydown', (ev) => {
+        if (el.dataset.k !== 'qty') return;
+        if (ev.key !== 'ArrowUp' && ev.key !== 'ArrowDown') return;
+        ev.preventDefault();
+        stepQty(el, ev.key === 'ArrowUp' ? 1 : -1);
       });
       // Enter on the VAT select inserts a new row right after and jumps
       // focus to its description input.
@@ -4778,6 +4807,17 @@ function renderItems() {
         if (target) target.focus();
       });
     });
+    // The stepper buttons mirror the keyboard arrows. mousedown is swallowed
+    // so clicking one keeps the caret in the quantity field instead of moving
+    // focus to the button.
+    const qtyInput = row.querySelector('input[data-k="qty"]');
+    row.querySelectorAll('[data-qty-step]').forEach(btn => {
+      btn.addEventListener('mousedown', ev => ev.preventDefault());
+      btn.addEventListener('click', () => {
+        stepQty(qtyInput, Number(btn.dataset.qtyStep));
+      });
+    });
+
     const removeBtn = row.querySelector('[data-remove]');
     removeBtn.addEventListener('click', () => {
       if (removeBtn.classList.contains('confirming')) {

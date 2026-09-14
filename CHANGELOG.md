@@ -1,3 +1,21 @@
+## [2.0.2] - 2026-09-14
+
+Follow-up to the 2.0.1 item-entry fixes: whole-number stepping no longer
+costs you fractional quantities.
+
+### Fixed
+
+- **Item quantity accepts decimals again.** Stepping by whole numbers in
+  2.0.1 was done with `step="1"` on a `type=number` input, which also
+  made half steps like `1.5` invalid. The field is now a text input (the
+  same treatment the unit price got in 2.0.1), so any decimal can be
+  typed and both `,` and `.` work as the decimal separator.
+- **Quantity stepper arrows.** A text input has no native spinner, so
+  the up/down arrows are now drawn by the app: they appear on hover or
+  focus at the right edge of the quantity field and step in whole units,
+  snapping a fractional value to the next whole one (`1.5` up → `2`,
+  down → `1`), never below zero. The keyboard ↑/↓ arrows do the same.
+
 ## [2.0.1] - 2026-09-01
 
 Small UX fixes on top of the 2.0.0 redesign: a way to start a fresh

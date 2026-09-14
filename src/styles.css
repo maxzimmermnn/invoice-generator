@@ -683,6 +683,48 @@ textarea {
   color: var(--text);
 }
 .item-row input.num, .item-row select { text-align: center; }
+
+/* Quantity stepper: the field is type=text (for comma decimals), so the
+   native number spinner is replaced by these two buttons. The space they
+   need is reserved permanently — only their visibility toggles — so the
+   number never shifts when the row is hovered. */
+.qty-field { position: relative; display: block; min-width: 0; }
+.item-row .qty-field input.num { width: 100%; padding-right: 13px; }
+
+.qty-step {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.qty-field:hover .qty-step,
+.qty-field:focus-within .qty-step { opacity: 1; pointer-events: auto; }
+
+.qty-step button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 8px;
+  line-height: 1;
+  cursor: pointer;
+}
+.qty-step button:hover { color: var(--accent); }
+
+/* Touch devices have no hover state — keep the arrows visible there. */
+@media (hover: none) {
+  .qty-step { opacity: 1; pointer-events: auto; }
+}
 .item-row select { font-size: 13px; }
 .item-row .line-total { font-weight: 600; text-align: center; }
 
