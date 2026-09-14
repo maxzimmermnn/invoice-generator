@@ -168,7 +168,15 @@ export drafts.
 ### Line items
 Description (wraps if long), quantity, unit price, VAT rate. As many rows
 as you need. Pressing Enter on the VAT field inserts a new row directly
-below and jumps focus to its description. The remove button uses a
+below and jumps focus to its description.
+
+Quantity and unit price take any decimal, with either `,` or `.` as the
+separator, and are held at two decimals — the precision the PDF prints
+and the XML carries. Focusing a quantity field reveals stepper arrows at
+its right edge; those and the ↑/↓ keys move in whole units, snapping a
+fractional value to the next whole one (`2.5` up becomes `3`).
+
+The remove button uses a
 two-step inline confirm (first click turns into "delete?", second click
 removes, Esc or 3 s timeout cancels) so an accidental click never wipes
 a row.

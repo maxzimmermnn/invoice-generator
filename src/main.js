@@ -6567,7 +6567,12 @@ Already have a designed PDF (e.g. from InDesign)? Embed XML… retrofits it with
 - ⌘/Ctrl + D — Duplicate last invoice
 - 1 / 2 / 3 — Jump to Buyer / Items / Invoice info
 - ? — Open this Help panel
-- Esc — Close the current menu, modal, or panel` },
+- Esc — Close the current menu, modal, or panel
+
+These keys work *inside* a line item, where the ones above stay out of the way:
+
+- ↑ / ↓ in a quantity field — step by whole units (\`2.5\` up becomes \`3\`). The same two arrows appear at the right edge of the field while it has focus.
+- Enter on the VAT field — insert a row below and jump to its description` },
 ];
 
 
