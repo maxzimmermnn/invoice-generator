@@ -298,7 +298,7 @@ const I18N = {
     recent_customers: 'Letzte Kunden',
     recent_customers_empty: 'Noch keine gespeicherten Kunden.',
     buyer_name_placeholder: 'Tippen — ergänzt aus früheren Käufern',
-    buyer_more_summary: 'Mehr: Namenszeile 2, SIRET, Leitweg-ID',
+    buyer_more_summary: 'Mehr: SIRET, Leitweg-ID',
     btn_save_customer: 'Als Kunde speichern',
     btn_update_customer: 'Kunde aktualisieren',
     btn_delete: 'Löschen',
@@ -449,6 +449,7 @@ const I18N = {
     // Field labels — seller
     f_company: 'Firmenname / Name',
     f_company2: 'Firmenname Zeile 2 (optional)',
+    f_optional_placeholder: 'optional',
     f_address: 'Adresszeile',
     f_zip: 'Postleitzahl',
     f_city: 'Stadt',
@@ -831,7 +832,7 @@ const I18N = {
     recent_customers: 'Recent customers',
     recent_customers_empty: 'No saved customers yet.',
     buyer_name_placeholder: 'Start typing — autocompletes from past buyers',
-    buyer_more_summary: 'More: name line 2, SIRET, buyer reference / Leitweg-ID',
+    buyer_more_summary: 'More: SIRET, buyer reference / Leitweg-ID',
     btn_save_customer: 'Save as customer',
     btn_update_customer: 'Update customer',
     btn_delete: 'Delete',
@@ -975,6 +976,7 @@ const I18N = {
     drop_pdf: 'Drop PDF here or click to select',
     f_company: 'Company / Name',
     f_company2: 'Company name line 2 (optional)',
+    f_optional_placeholder: 'optional',
     f_address: 'Address line',
     f_zip: 'ZIP / Postal code',
     f_city: 'City',
@@ -1348,7 +1350,7 @@ const I18N = {
     recent_customers: 'Clients récents',
     recent_customers_empty: 'Aucun client enregistré pour l\'instant.',
     buyer_name_placeholder: 'Saisir — complété depuis les clients passés',
-    buyer_more_summary: 'Plus : 2e ligne de nom, SIRET, référence acheteur / Leitweg-ID',
+    buyer_more_summary: 'Plus : SIRET, référence acheteur / Leitweg-ID',
     btn_save_customer: 'Enregistrer comme client',
     btn_update_customer: 'Mettre à jour le client',
     btn_delete: 'Supprimer',
@@ -1492,6 +1494,7 @@ const I18N = {
     drop_pdf: 'Déposez la PDF ici ou cliquez pour la sélectionner',
     f_company: 'Société / Nom',
     f_company2: 'Société ligne 2 (optionnel)',
+    f_optional_placeholder: 'facultatif',
     f_address: 'Adresse',
     f_zip: 'Code postal',
     f_city: 'Ville',
@@ -4636,6 +4639,9 @@ function closeStatsModal() {
 }
 
 // -------- Items --------
+// Fields where Enter commits the row and starts the next one.
+const ENTER_ADDS_ROW_FIELDS = ['desc', 'price', 'vat'];
+
 // Quantity and unit price are held at two decimals — the precision the PDF
 // prints and the only precision the XML can carry (BilledQuantity and
 // ChargeAmount are both written with toFixed(2)). Keeping more in state
@@ -4831,10 +4837,13 @@ function renderItems() {
         ev.preventDefault();
         stepQty(el, ev.key === 'ArrowUp' ? 1 : -1);
       });
-      // Enter on the VAT select inserts a new row right after and jumps
-      // focus to its description input.
+      // Enter on the description, unit price or VAT field inserts a new row
+      // right after and jumps focus to its description input. Quantity is
+      // left out on purpose — Up/Down already act there. Cmd/Ctrl+Enter is
+      // the global "create PDF" shortcut, so it must pass through.
       el.addEventListener('keydown', (ev) => {
-        if (ev.key !== 'Enter' || el.dataset.k !== 'vat') return;
+        if (ev.key !== 'Enter' || ev.metaKey || ev.ctrlKey) return;
+        if (!ENTER_ADDS_ROW_FIELDS.includes(el.dataset.k)) return;
         ev.preventDefault();
         const idx = state.items.findIndex(x => x.id === it.id);
         if (idx < 0) return;
@@ -6572,7 +6581,7 @@ Already have a designed PDF (e.g. from InDesign)? Embed XML… retrofits it with
 These keys work *inside* a line item, where the ones above stay out of the way:
 
 - ↑ / ↓ in a quantity field — step by whole units (\`2.5\` up becomes \`3\`). The same two arrows appear at the right edge of the field while it has focus.
-- Enter on the VAT field — insert a row below and jump to its description` },
+- Enter in the description, unit price or VAT field — insert a row below and jump to its description` },
 ];
 
 

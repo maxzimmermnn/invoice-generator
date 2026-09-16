@@ -167,8 +167,8 @@ export drafts.
 
 ### Line items
 Description (wraps if long), quantity, unit price, VAT rate. As many rows
-as you need. Pressing Enter on the VAT field inserts a new row directly
-below and jumps focus to its description.
+as you need. Pressing Enter in the description, unit price or VAT field
+inserts a new row directly below and jumps focus to its description.
 
 Quantity and unit price take any decimal, with either `,` or `.` as the
 separator, and are held at two decimals — the precision the PDF prints
