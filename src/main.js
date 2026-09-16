@@ -164,9 +164,13 @@ function setFieldError(input, msgKey) {
       input.insertAdjacentElement('afterend', span);
     }
     span.textContent = t(msgKey);
+    // aria-invalid alone only announces *that* the field is wrong. Pointing
+    // at the message is what makes a screen reader say why.
+    input.setAttribute('aria-describedby', id);
   } else {
     input.classList.remove('invalid');
     input.removeAttribute('aria-invalid');
+    input.removeAttribute('aria-describedby');
     if (span) span.remove();
   }
 }
@@ -303,6 +307,7 @@ const I18N = {
     btn_update_customer: 'Kunde aktualisieren',
     btn_delete: 'Löschen',
     confirm_delete_customer: 'Diesen Kunden löschen?',
+    confirm_discard_invoice: 'Diese Rechnung verwerfen?',
     confirm_yes: 'Ja',
     confirm_no: 'Nein',
     th_total: 'Summe',
@@ -338,6 +343,8 @@ const I18N = {
     validate_pass_fields: 'Pflichtfelder vorhanden',
     validate_pass_iban: 'IBAN-Prüfsumme gültig',
     validate_footer: 'Nicht blockierend — Export ist trotzdem möglich.',
+    validate_footer_blocking: 'Diese Punkte verhindern den Export. Auf einen Punkt klicken, um zum Feld zu springen.',
+    msg_export_blocked: 'Export nicht möglich: {n} Pflichtangabe(n) fehlen.',
     history_autosave: 'Auto-Speichern',
     history_count_label: '{n} / {limit} gespeichert',
     th_number: 'Nr.',
@@ -420,8 +427,14 @@ const I18N = {
     preview_title: 'Vorschau',
     preview_empty: 'Vorschau erscheint nach Eingabe.',
     preview_updating: 'Aktualisiere…',
+    preview_failed: 'Vorschau fehlgeschlagen — zeigt einen älteren Stand',
     preview_toggle_label: 'Vorschau',
     aria_preview_toggle: 'Live-Vorschau umschalten',
+    aria_close: 'Schließen',
+    aria_more_menu: 'Weitere Optionen',
+    aria_buyer_select: 'Kundenprofil wählen',
+    aria_history_period: 'Zeitraum',
+    aria_preview_frame: 'Rechnungsvorschau',
     format_info_body: 'ZUGFeRD und Factur-X bezeichnen dasselbe hybride Format: eine PDF/A-3-Datei mit zusätzlich eingebettetem strukturierten XML nach EN 16931. Das PDF bleibt lesbar wie gewohnt, das XML erlaubt automatische Buchungsläufe beim Empfänger. Für B2B-Rechnungen in Deutschland ab 2025 (Empfang) bzw. 2027 (Versand) Pflicht.',
     format_info_link_label: 'Factur-X-Spezifikation (FNFE-MPE)',
     // Buttons
@@ -653,6 +666,7 @@ const I18N = {
     pdf_doc_subject: 'Factur-X / ZUGFeRD EN 16931 E-Rechnung',
     pdf_doc_producer: 'E-Rechnung Browser-Tool',
     aria_remove_item: 'Position entfernen',
+    aria_item_line: 'Position {n}',
     aria_remove_confirm: 'Löschen bestätigen',
     item_remove_confirm_text: 'löschen?',
     // --- History feature ---
@@ -838,6 +852,7 @@ const I18N = {
     btn_update_customer: 'Update customer',
     btn_delete: 'Delete',
     confirm_delete_customer: 'Delete this customer?',
+    confirm_discard_invoice: 'Discard this invoice?',
     confirm_yes: 'Yes',
     confirm_no: 'No',
     th_total: 'Total',
@@ -873,6 +888,8 @@ const I18N = {
     validate_pass_fields: 'Required fields present',
     validate_pass_iban: 'IBAN checksum valid',
     validate_footer: 'Non-blocking — you can still export.',
+    validate_footer_blocking: 'These stop the export. Click one to jump to its field.',
+    msg_export_blocked: 'Cannot export: {n} required field(s) missing.',
     history_autosave: 'Auto-save',
     history_count_label: '{n} / {limit} saved',
     th_number: 'No.',
@@ -951,8 +968,14 @@ const I18N = {
     preview_title: 'Preview',
     preview_empty: 'Preview shows up once you start filling the form.',
     preview_updating: 'Updating…',
+    preview_failed: 'Preview failed — showing an older render',
     preview_toggle_label: 'Preview',
     aria_preview_toggle: 'Toggle live preview',
+    aria_close: 'Close',
+    aria_more_menu: 'More options',
+    aria_buyer_select: 'Select customer profile',
+    aria_history_period: 'Period',
+    aria_preview_frame: 'Invoice preview',
     format_info_body: 'ZUGFeRD and Factur-X are the same hybrid format: a PDF/A-3 file with structured XML (EN 16931) embedded inside. The PDF stays readable for humans; the XML lets the recipient post the invoice automatically. Mandatory for German B2B from 2025 (receiving) and 2027 (sending).',
     format_info_link_label: 'Factur-X specification (FNFE-MPE)',
     btn_save_template: 'save as template',
@@ -1172,6 +1195,7 @@ const I18N = {
     pdf_doc_subject: 'Factur-X / ZUGFeRD EN 16931 e-invoice',
     pdf_doc_producer: 'E-Invoice Browser Tool',
     aria_remove_item: 'Remove line item',
+    aria_item_line: 'Line {n}',
     aria_remove_confirm: 'Confirm delete',
     item_remove_confirm_text: 'delete?',
     // --- History feature ---
@@ -1357,6 +1381,7 @@ const I18N = {
     btn_update_customer: 'Mettre à jour le client',
     btn_delete: 'Supprimer',
     confirm_delete_customer: 'Supprimer ce client ?',
+    confirm_discard_invoice: 'Abandonner cette facture ?',
     confirm_yes: 'Oui',
     confirm_no: 'Non',
     th_total: 'Total',
@@ -1392,6 +1417,8 @@ const I18N = {
     validate_pass_fields: 'Champs obligatoires présents',
     validate_pass_iban: 'Somme de contrôle IBAN valide',
     validate_footer: 'Non bloquant — l\'export reste possible.',
+    validate_footer_blocking: 'Ces points bloquent l\'export. Cliquez sur un point pour aller au champ.',
+    msg_export_blocked: 'Export impossible : {n} champ(s) obligatoire(s) manquant(s).',
     history_autosave: 'Sauvegarde auto',
     history_count_label: '{n} / {limit} enregistrées',
     th_number: 'N°',
@@ -1470,8 +1497,14 @@ const I18N = {
     preview_title: 'Aperçu',
     preview_empty: 'L\'aperçu apparaîtra dès que vous remplirez le formulaire.',
     preview_updating: 'Mise à jour…',
+    preview_failed: 'Échec de l\'aperçu — rendu plus ancien affiché',
     preview_toggle_label: 'Aperçu',
     aria_preview_toggle: 'Basculer l\'aperçu en direct',
+    aria_close: 'Fermer',
+    aria_more_menu: 'Plus d\'options',
+    aria_buyer_select: 'Choisir un profil client',
+    aria_history_period: 'Période',
+    aria_preview_frame: 'Aperçu de la facture',
     format_info_body: 'ZUGFeRD et Factur-X désignent le même format hybride : un PDF/A-3 avec un XML structuré (EN 16931) intégré. Le PDF reste lisible normalement ; le XML permet le traitement automatique chez le destinataire. Obligatoire pour le B2B allemand à partir de 2025 (réception) et 2027 (émission).',
     format_info_link_label: 'Spécification Factur-X (FNFE-MPE)',
     btn_save_template: 'enregistrer comme modèle',
@@ -1691,6 +1724,7 @@ const I18N = {
     pdf_doc_subject: 'Facture électronique Factur-X / ZUGFeRD EN 16931',
     pdf_doc_producer: 'Outil de facturation électronique (navigateur)',
     aria_remove_item: 'Supprimer la ligne',
+    aria_item_line: 'Ligne {n}',
     aria_remove_confirm: 'Confirmer la suppression',
     item_remove_confirm_text: 'supprimer ?',
     // --- History feature ---
@@ -3353,15 +3387,13 @@ function openPastInvoiceModal() {
 
   togglePastVatRateVisibility();
 
-  modal.classList.add('open');
-  modal.removeAttribute('hidden');
+  openModal(modal);
 }
 
 function closePastInvoiceModal() {
   const modal = $('pastInvoiceModal');
   if (!modal) return;
-  modal.classList.remove('open');
-  modal.setAttribute('hidden', '');
+  closeModal(modal);
 }
 
 // Show/hide the VAT rate field based on tax mode (only relevant for 'S').
@@ -4430,15 +4462,13 @@ function openYoYBackfillModal() {
   yearSel.onchange = repopulate;
   repopulate();
 
-  modal.classList.add('open');
-  modal.removeAttribute('hidden');
+  openModal(modal);
 }
 
 function closeYoYBackfillModal() {
   const modal = $('yoyBackfillModal');
   if (!modal) return;
-  modal.classList.remove('open');
-  modal.setAttribute('hidden', '');
+  closeModal(modal);
 }
 
 async function saveYoYBackfill() {
@@ -4637,16 +4667,14 @@ function openStatsModal() {
   // Always start at overview, no drill-down
   statsBuyerDrillDown = null;
   statsView = 'overview';
-  modal.classList.add('open');
-  modal.removeAttribute('hidden');
+  openModal(modal);
   updateYoYToggleButton();
   renderStatistics();
 }
 function closeStatsModal() {
   const modal = $('statsModal');
   if (!modal) return;
-  modal.classList.remove('open');
-  modal.setAttribute('hidden', '');
+  closeModal(modal);
 }
 
 // -------- Items --------
@@ -4713,6 +4741,12 @@ function applyCountryDefaultVat() {
 const REMOVE_CONFIRM_TIMEOUT_MS = 3000;
 let _removeConfirmBtn = null;
 let _removeConfirmTimer = null;
+// The remove button swaps its own aria-label between "remove" and "confirm",
+// so both spellings have to re-append the row number rendered into data-line.
+function _removeLabel(btn, key) {
+  const line = btn.dataset.line;
+  return t(key) + (line ? ' · ' + line : '');
+}
 function resetRemoveConfirm() {
   if (_removeConfirmTimer) { clearTimeout(_removeConfirmTimer); _removeConfirmTimer = null; }
   const btn = _removeConfirmBtn;
@@ -4720,7 +4754,7 @@ function resetRemoveConfirm() {
   if (btn && btn.isConnected) {
     btn.classList.remove('confirming');
     btn.textContent = '✕';
-    btn.setAttribute('aria-label', t('aria_remove_item'));
+    btn.setAttribute('aria-label', _removeLabel(btn, 'aria_remove_item'));
   }
 }
 function armRemoveConfirm(btn) {
@@ -4728,7 +4762,7 @@ function armRemoveConfirm(btn) {
   _removeConfirmBtn = btn;
   btn.classList.add('confirming');
   btn.textContent = t('item_remove_confirm_text');
-  btn.setAttribute('aria-label', t('aria_remove_confirm'));
+  btn.setAttribute('aria-label', _removeLabel(btn, 'aria_remove_confirm'));
   if (_removeConfirmTimer) clearTimeout(_removeConfirmTimer);
   _removeConfirmTimer = setTimeout(resetRemoveConfirm, REMOVE_CONFIRM_TIMEOUT_MS);
 }
@@ -4791,19 +4825,43 @@ function renderItems() {
     const vatOptions = rates
       .map(r => `<option value="${r}"${Number(it.vat) === r ? ' selected' : ''}>${r}%</option>`)
       .join('');
+    // Every control is wrapped in its own <label>. The visible caption is
+    // hidden on desktop (the .items-head row already names the columns) but
+    // shows on narrow screens, where .items-head is display:none and the
+    // fields would otherwise be three unlabelled numbers. The appended line
+    // number is screen-reader-only, so identical columns stay tellable apart
+    // without repeating "Line 2" five times on screen.
+    const line = esc(t('aria_item_line', { n: state.items.indexOf(it) + 1 }));
+    const cap = (key) => `<span class="cell-label">${esc(t(key))}</span>`
+      + `<span class="visually-hidden"> · ${line}</span>`;
     row.innerHTML = `
-      <input type="text" class="cell-desc" data-k="desc" value="${esc(it.desc)}" placeholder="${esc(t('item_placeholder'))}">
-      <input type="text" inputmode="decimal" class="num" data-k="price" value="${esc(it.price)}">
-      <span class="qty-field">
-        <input type="text" inputmode="decimal" class="num" data-k="qty" value="${esc(it.qty)}">
-        <span class="qty-step" aria-hidden="true">
-          <button type="button" data-qty-step="1" tabindex="-1">&#9650;</button>
-          <button type="button" data-qty-step="-1" tabindex="-1">&#9660;</button>
+      <label class="item-cell cell-desc-wrap">
+        ${cap('th_desc')}
+        <input type="text" class="cell-desc" data-k="desc" value="${esc(it.desc)}" placeholder="${esc(t('item_placeholder'))}">
+      </label>
+      <label class="item-cell">
+        ${cap('th_price')}
+        <input type="text" inputmode="decimal" class="num" data-k="price" value="${esc(it.price)}">
+      </label>
+      <label class="item-cell">
+        ${cap('th_qty')}
+        <span class="qty-field">
+          <input type="text" inputmode="decimal" class="num" data-k="qty" value="${esc(it.qty)}">
+          <span class="qty-step" aria-hidden="true">
+            <button type="button" data-qty-step="1" tabindex="-1">&#9650;</button>
+            <button type="button" data-qty-step="-1" tabindex="-1">&#9660;</button>
+          </span>
         </span>
-      </span>
-      <select data-k="vat">${vatOptions}</select>
-      <div class="line-total" data-line-total></div>
-      <button class="remove" data-remove aria-label="${esc(t('aria_remove_item'))}">✕</button>
+      </label>
+      <label class="item-cell">
+        ${cap('th_vat_pct')}
+        <select data-k="vat">${vatOptions}</select>
+      </label>
+      <div class="item-cell">
+        ${cap('th_total')}
+        <div class="line-total" data-line-total></div>
+      </div>
+      <button class="remove" data-remove data-line="${line}" aria-label="${esc(t('aria_remove_item'))} · ${line}">✕</button>
     `;
     container.appendChild(row);
 
@@ -5490,7 +5548,9 @@ async function renderPreviewNow() {
   previewInFlight = true;
   previewPending = false;
   const statusEl = document.getElementById('previewStatus');
+  const errEl = document.getElementById('previewError');
   if (statusEl) statusEl.hidden = false;
+  let failed = false;
   try {
     const bytes = await generatePreviewPDFBytes();
     // If the user toggled the preview off while the render was in flight,
@@ -5509,10 +5569,16 @@ async function renderPreviewNow() {
     }
     if (empty) empty.hidden = true;
   } catch (e) {
+    // A failed render leaves the previous PDF on screen, which looks current
+    // and is not. Say so rather than only logging it — the export path has
+    // its own validation, so this is about the preview lying, not about the
+    // invoice being wrong.
+    failed = true;
     console.warn('[preview] render failed:', e?.message || e);
   } finally {
     previewInFlight = false;
     if (statusEl) statusEl.hidden = true;
+    if (errEl) errEl.hidden = !failed;
     // If a change came in during the in-flight render, run again.
     if (previewPending && !previewHovering) schedulePreviewRender();
   }
@@ -5564,6 +5630,8 @@ async function setPreviewEnabled(v) {
     if (iframe) { iframe.src = 'about:blank'; iframe.hidden = true; }
     const empty = document.getElementById('previewEmpty');
     if (empty) empty.hidden = false;
+    const errEl = document.getElementById('previewError');
+    if (errEl) errEl.hidden = true;
     if (previewBlobUrl) { URL.revokeObjectURL(previewBlobUrl); previewBlobUrl = null; }
   }
 }
@@ -5594,75 +5662,168 @@ $('btnXML').addEventListener('click', () => {
   }
 });
 
-// Validate popover: a checklist above the button showing ✓ passes and
-// ⚠ warnings. Non-blocking — export always stays possible.
+// Validate popover: a checklist above the action bar showing ✓ passes and
+// ⚠ problems. It is also what the export pre-flight renders into, so there
+// is exactly one surface in the UI that answers "what is wrong with this
+// invoice" — the checklist and the export must never disagree.
 function closeValidatePopover() {
   const pop = document.getElementById('validatePopover');
-  if (pop) pop.hidden = true;
+  if (!pop || pop.hidden) return;
+  const hadFocus = pop.contains(document.activeElement);
+  pop.hidden = true;
+  // Only reclaim focus if it was actually inside — closing on an outside
+  // click must not yank the caret out of whatever the user just clicked.
+  if (hadFocus) document.getElementById('btnValidate')?.focus();
 }
 function isValidatePopoverOpen() {
   const pop = document.getElementById('validatePopover');
   return pop && !pop.hidden;
 }
 
+// Where each field lives, so a problem can point at something reachable.
+// The seller inputs are the awkward case: they sit inside the seller-chip
+// dropdown's edit form and are not in the tab order until it is open.
+const PROBLEM_FIELD_TAB = { b: 'buyer', r: 'details' };
+
+function openSellerMenu() {
+  const m = document.getElementById('sellerMenu');
+  if (!m || !m.hidden) return;
+  updateSellerChip();
+  document.getElementById('sellerRead').hidden = false;
+  document.getElementById('sellerEdit').hidden = true;
+  m.hidden = false;
+  document.getElementById('sellerChip').setAttribute('aria-expanded', 'true');
+  closeOverflowMenu();
+}
+
+// Bring a field on screen and put the caret in it: switch tabs, open the
+// seller dropdown into edit mode, expand a collapsed <details> — whatever it
+// takes for the field named in a warning to actually be there.
+function revealField(id) {
+  if (!id) return false;
+  const el = document.getElementById(id);
+  if (!el) return false;
+  if (id.startsWith('s_')) {
+    openSellerMenu();
+    if (document.getElementById('sellerEdit').hidden) startSellerEdit();
+  } else {
+    const tab = PROBLEM_FIELD_TAB[id.charAt(0)];
+    if (tab) setActiveTab(tab);
+  }
+  let d = el.closest('details');
+  while (d) { d.open = true; d = d.parentElement && d.parentElement.closest('details'); }
+  el.focus();
+  if (typeof el.scrollIntoView === 'function') {
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+  return true;
+}
+
+// The single source of truth for invoice problems. `blocking` mirrors the
+// throws in buildXML() — those stop the export; the rest is advice. Each
+// entry carries the field it is about so the export can jump straight to it.
+function collectInvoiceProblems() {
+  const mode = $('r_taxmode').value;
+  const nums = state.items.map(it => (Number(it.qty) || 0) * (Number(it.price) || 0));
+  const iban = $('s_iban').value.trim();
+  return [
+    { bad: !$('r_number').value.trim(), key: 'validate_missing_number', field: 'r_number', blocking: true },
+    { bad: !$('r_date').value, key: 'validate_missing_date', field: 'r_date', blocking: true },
+    { bad: !$('s_name').value.trim(), key: 'validate_missing_seller_name', field: 's_name', blocking: true },
+    { bad: !$('b_name').value.trim(), key: 'validate_missing_buyer_name', field: 'b_name', blocking: true },
+    { bad: !$('s_country').value.trim(), key: 'validate_missing_seller_country', field: 's_country', blocking: true },
+    { bad: !$('b_country').value.trim(), key: 'validate_missing_buyer_country', field: 'b_country', blocking: true },
+    { bad: mode === 'AE' && !$('s_vat').value.trim(), key: 'validate_rc_seller_vat', field: 's_vat', blocking: true },
+    { bad: mode === 'AE' && !$('b_vat').value.trim(), key: 'validate_rc_buyer_vat', field: 'b_vat', blocking: true },
+    { bad: state.items.length === 0, key: 'validate_missing_items', tab: 'items', blocking: true },
+    { bad: mode === 'S' && !$('s_vat').value.trim(), key: 'validate_recommend_seller_vat', field: 's_vat' },
+    // BR-O-2/-3/-4: an invoice that is entirely out of scope must not carry
+    // seller or buyer VAT identifiers. Advisory — emission isn't blocked.
+    { bad: mode === 'O' && !!($('s_vat').value.trim() || $('b_vat').value.trim()), key: 'validate_o_vat_ids', field: 's_vat' },
+    { bad: !nums.every(x => x >= 0), key: 'validate_negative_amounts', tab: 'items' },
+    { bad: !!iban && !isValidIBAN(iban), key: 'validate_invalid_iban', field: 's_iban' },
+  ].filter(p => p.bad);
+}
+
+// Render a checklist into the popover. `problems` are the entries above;
+// `passes` are the reassuring ✓ lines the manual Validate run adds.
+// Problems with a field become buttons that take the user there.
+function renderValidatePopover(problems, passes, footKey) {
+  const pop = document.getElementById('validatePopover');
+  if (!pop) return;
+  const rows = passes.map(msg => `<div class="v-ok">✓ ${esc(msg)}</div>`);
+  for (const p of problems) {
+    const cls = p.blocking ? 'v-warn v-blocking' : 'v-warn';
+    const label = esc(t(p.key));
+    rows.push(p.field || p.tab
+      ? `<button type="button" class="${cls} v-jump" data-field="${esc(p.field || '')}"`
+        + ` data-tab="${esc(p.tab || '')}">⚠ ${label}</button>`
+      : `<div class="${cls}">⚠ ${label}</div>`);
+  }
+  pop.innerHTML = `<div class="v-title">${esc(t('validate_title'))}</div>`
+    + rows.join('')
+    + `<div class="v-foot">${esc(t(footKey))}</div>`;
+  pop.hidden = false;
+}
+
+// Clicking a problem jumps to the field it is about.
+document.getElementById('validatePopover').addEventListener('click', (e) => {
+  const jump = e.target.closest('.v-jump');
+  if (!jump) return;
+  closeValidatePopover();
+  if (jump.dataset.field) {
+    revealField(jump.dataset.field);
+  } else if (jump.dataset.tab) {
+    setActiveTab(jump.dataset.tab);
+    if (jump.dataset.tab === 'items') {
+      document.querySelector('#items input[data-k="desc"], #addFirstLine')?.focus();
+    }
+  }
+});
+
 $('btnValidate').addEventListener('click', () => {
   const pop = document.getElementById('validatePopover');
   if (!pop) return;
-  if (!pop.hidden) { pop.hidden = true; return; }
+  if (!pop.hidden) { closeValidatePopover(); return; }
 
-  const lines = [];
-  const okLine = (msg) => lines.push(`<div class="v-ok">✓ ${esc(msg)}</div>`);
-  const warnLine = (msg) => lines.push(`<div class="v-warn">⚠ ${esc(msg)}</div>`);
+  // The checklist reports three groups, each of which contributes either its
+  // problems or one reassuring ✓ line: XML well-formedness, the field rules,
+  // and the IBAN. The field and IBAN rules come from collectInvoiceProblems()
+  // so this and the export pre-flight can never drift apart.
+  const found = collectInvoiceProblems();
+  const ibanProblems = found.filter(p => p.key === 'validate_invalid_iban');
+  const fieldProblems = found.filter(p => p.key !== 'validate_invalid_iban');
 
-  // 1. XML well-formedness
+  const xmlProblems = [];
+  const passes = [];
   try {
     const xml = buildXML();
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(xml, 'application/xml');
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
     // Firefox emits <parsererror> in a non-default namespace; querySelector
     // without explicit namespace syntax won't match it. getElementsByTagName
     // is namespace-agnostic and catches all engines.
     const errNode = doc.getElementsByTagName('parsererror')[0]
       || (doc.documentElement && doc.documentElement.tagName === 'parsererror' ? doc.documentElement : null);
-    if (errNode) warnLine(t('validate_xml_syntax_error') + ' ' + errNode.textContent);
-    else okLine(t('validate_pass_xml'));
+    if (errNode) xmlProblems.push({ key: 'validate_xml_syntax_error', blocking: true });
+    else passes.push(t('validate_pass_xml'));
   } catch (e) {
-    warnLine(t('msg_error') + ' ' + e.message);
+    // buildXML() throws on the same conditions fieldProblems already spells
+    // out, field by field — only an unexplained throw is worth its own line.
+    if (!fieldProblems.some(p => p.blocking)) {
+      xmlProblems.push({ key: 'msg_error', blocking: true });
+    }
   }
 
-  // 2. Required / recommended field checks (same rules as before, now
-  //    rendered as individual checklist entries).
-  const nums = state.items.map(it => (Number(it.qty)||0) * (Number(it.price)||0));
-  const mode = $('r_taxmode').value;
-  const fieldProblems = [
-    $('r_number').value.trim() ? null : t('validate_missing_number'),
-    $('r_date').value ? null : t('validate_missing_date'),
-    $('s_name').value.trim() ? null : t('validate_missing_seller_name'),
-    $('b_name').value.trim() ? null : t('validate_missing_buyer_name'),
-    $('s_country').value.trim() ? null : t('validate_missing_seller_country'),
-    $('b_country').value.trim() ? null : t('validate_missing_buyer_country'),
-    mode === 'AE' && !$('s_vat').value.trim() ? t('validate_rc_seller_vat') : null,
-    mode === 'AE' && !$('b_vat').value.trim() ? t('validate_rc_buyer_vat') : null,
-    mode === 'S' && !$('s_vat').value.trim() ? t('validate_recommend_seller_vat') : null,
-    // BR-O-2/-3/-4: an invoice that is entirely out of scope must not carry
-    // seller or buyer VAT identifiers. Soft warning — emission isn't blocked.
-    mode === 'O' && ($('s_vat').value.trim() || $('b_vat').value.trim()) ? t('validate_o_vat_ids') : null,
-    state.items.length > 0 ? null : t('validate_missing_items'),
-    nums.every(x => x >= 0) ? null : t('validate_negative_amounts'),
-  ].filter(Boolean);
-  if (fieldProblems.length === 0) okLine(t('validate_pass_fields'));
-  else fieldProblems.forEach(warnLine);
-
-  // 3. IBAN: only flag when present-but-malformed — leaving it blank is fine
-  //    (the XML then emits payment-means type 1 instead of SEPA).
+  if (fieldProblems.length === 0) passes.push(t('validate_pass_fields'));
   const iban = $('s_iban').value.trim();
-  if (iban && !isValidIBAN(iban)) warnLine(t('validate_invalid_iban'));
-  else if (iban) okLine(t('validate_pass_iban'));
+  if (iban && ibanProblems.length === 0) passes.push(t('validate_pass_iban'));
 
-  pop.innerHTML = `<div class="v-title">${esc(t('validate_title'))}</div>`
-    + lines.join('')
-    + `<div class="v-foot">${esc(t('validate_footer'))}</div>`;
-  pop.hidden = false;
+  renderValidatePopover([...xmlProblems, ...fieldProblems, ...ibanProblems],
+    passes, 'validate_footer');
+  // Move into the checklist so a screen reader reads it out and Tab carries
+  // on into the jump buttons. The export path deliberately does not do this:
+  // there, focus belongs on the offending field.
+  pop.focus();
 });
 
 // -------- Font loader: 5 monospace options embedded as base64 --------
@@ -6035,6 +6196,23 @@ async function embedFacturXIntoPDF(pdfDoc, xml) {
 
 $('btnPDF').addEventListener('click', async () => {
   const btn = $('btnPDF');
+
+  // Pre-flight. buildXML() throws on the first thing it finds, which used to
+  // surface as a single vanishing toast naming a field that might be on
+  // another tab or inside the closed seller dropdown. Run the shared
+  // checklist first instead: show every blocking problem at once in the same
+  // popover the Validate button uses, and take the user to the first one.
+  const blocking = collectInvoiceProblems().filter(p => p.blocking);
+  if (blocking.length > 0) {
+    renderValidatePopover(blocking, [], 'validate_footer_blocking');
+    const first = blocking[0];
+    if (first.field) revealField(first.field);
+    else if (first.tab) setActiveTab(first.tab);
+    toast(t('msg_export_blocked', { n: blocking.length }), 'err');
+    return;
+  }
+  closeValidatePopover();
+
   try {
     btn.disabled = true;
     btn.textContent = t('btn_create_pdf_progress');
@@ -6593,7 +6771,8 @@ Already have a designed PDF (e.g. from InDesign)? Embed XML… retrofits it with
 - ⌘/Ctrl + D — Duplicate last invoice
 - 1 / 2 / 3 — Jump to Buyer / Items / Invoice info
 - ? — Open this Help panel
-- Esc — Close the current menu, modal, or panel
+- Esc — Close the current menu, modal, or panel, or cancel a pending confirmation
+- Tab — Inside a modal, cycles within it; the form behind stays out of reach until it closes
 
 These keys work *inside* a line item, where the ones above stay out of the way:
 
@@ -6683,6 +6862,122 @@ function inlineMD(text) {
 }
 
 
+// -------- Modal focus management --------
+// Every modal is a `.modal` backdrop wrapping one `.modal-content` dialog
+// box. openModal/closeModal are the only supported way to toggle one: they
+// own the ARIA wiring, the focus move in, the Tab trap and the focus
+// restore. Toggling `.open`/`hidden` by hand skips all of that and leaves
+// keyboard users tabbing through the form behind the overlay.
+//
+// Modals stack (stats -> YoY backfill, history -> past invoice), so the open
+// ones are kept on a stack and only the topmost one stays interactive.
+const _modalStack = [];
+
+function _dialogBoxOf(modal) {
+  return modal.querySelector('.modal-content') || modal;
+}
+
+// Focusable *and* actually on screen. The offscreen helpers this app relies
+// on — the .visually-hidden file inputs, the mirrored #r_due and layout
+// selects — are 1x1px clipped boxes, so a plain size test is not enough to
+// keep focus from landing somewhere invisible.
+function _visibleFocusables(root) {
+  const sel = 'a[href], button:not([disabled]), input:not([disabled]),'
+    + ' select:not([disabled]), textarea:not([disabled]), summary,'
+    + ' [tabindex]:not([tabindex="-1"])';
+  return Array.from(root.querySelectorAll(sel)).filter(el => {
+    if (el.tabIndex < 0) return false;
+    if (el.closest('[hidden]') || el.closest('.visually-hidden')) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width <= 1 || r.height <= 1) return false;
+    return getComputedStyle(el).visibility !== 'hidden';
+  });
+}
+
+// `inert` removes a subtree from the tab order, from the accessibility tree
+// and from pointer events in one attribute — everything below the topmost
+// modal gets it. #toastHost stays outside .app-shell on purpose so an error
+// raised while a modal is open is still announced.
+function _applyInertLayers() {
+  const top = _modalStack.length ? _modalStack[_modalStack.length - 1].modal : null;
+  const shell = document.querySelector('.app-shell');
+  if (shell) shell.toggleAttribute('inert', !!top);
+  document.querySelectorAll('.modal').forEach(m => {
+    m.toggleAttribute('inert', !!top && m !== top);
+  });
+}
+
+function openModal(modal) {
+  if (!modal || _modalStack.some(e => e.modal === modal)) return;
+  const box = _dialogBoxOf(modal);
+  box.setAttribute('role', 'dialog');
+  box.setAttribute('aria-modal', 'true');
+  // Name the dialog from its own heading, so a screen reader announces what
+  // opened instead of a bare "dialog".
+  const h = box.querySelector('h2, .help-sidebar-title');
+  if (h && !box.hasAttribute('aria-labelledby')) {
+    if (!h.id) h.id = (modal.id || 'modal') + 'Title';
+    box.setAttribute('aria-labelledby', h.id);
+  }
+  if (!box.hasAttribute('tabindex')) box.setAttribute('tabindex', '-1');
+
+  _modalStack.push({ modal, box, opener: document.activeElement });
+
+  modal.classList.add('open');
+  modal.removeAttribute('hidden');
+  _applyInertLayers();
+
+  // Focus the dialog box itself rather than guessing at a first control.
+  // A screen reader then announces the dialog's name and contents, and focus
+  // can never land somewhere invisible — #historyEnable, for one, is an
+  // opacity:0 checkbox stretched over its switch track, so "first focusable"
+  // would silently swallow the focus with nothing on screen to show for it.
+  box.focus();
+}
+
+function closeModal(modal) {
+  if (!modal) return;
+  const i = _modalStack.findIndex(e => e.modal === modal);
+  const entry = i >= 0 ? _modalStack[i] : null;
+  if (i >= 0) _modalStack.splice(i, 1);
+
+  modal.classList.remove('open');
+  modal.setAttribute('hidden', '');
+  _applyInertLayers();
+
+  // Hand focus back to whatever opened the modal, so closing does not dump
+  // the user at the top of the document.
+  const opener = entry && entry.opener;
+  if (opener && opener.isConnected && typeof opener.focus === 'function'
+      && !opener.closest('[inert]')) {
+    opener.focus();
+  }
+}
+
+// Tab containment. `inert` already takes the page behind out of the tab order
+// in current browsers; this closes the cycle explicitly so Tab wraps inside
+// the dialog instead of stepping out into the browser chrome.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Tab' || _modalStack.length === 0) return;
+  const box = _modalStack[_modalStack.length - 1].box;
+  const items = _visibleFocusables(box);
+  if (items.length === 0) { e.preventDefault(); box.focus(); return; }
+  const first = items[0];
+  const last = items[items.length - 1];
+  const active = document.activeElement;
+  if (!box.contains(active)) {
+    e.preventDefault();
+    (e.shiftKey ? last : first).focus();
+  } else if (!e.shiftKey && active === last) {
+    e.preventDefault();
+    first.focus();
+  } else if (e.shiftKey && active === first) {
+    e.preventDefault();
+    last.focus();
+  }
+}, true);
+
+
 // -------- Help modal (two-pane: searchable topics + content) --------
 
 let helpTopicId = 'start';
@@ -6728,14 +7023,12 @@ function openHelpModal() {
   const modal = $('helpModal');
   if (!modal) return;
   renderHelpTopics();
-  modal.classList.add('open');
-  modal.removeAttribute('hidden');
+  openModal(modal);
 }
 function closeHelpModal() {
   const modal = $('helpModal');
   if (!modal) return;
-  modal.classList.remove('open');
-  modal.setAttribute('hidden', '');
+  closeModal(modal);
 }
 
 
@@ -6744,15 +7037,13 @@ function closeHelpModal() {
 function openHistoryModal() {
   const modal = $('historyModal');
   if (!modal) return;
-  modal.classList.add('open');
-  modal.removeAttribute('hidden');
+  openModal(modal);
   renderHistoryPicker();
 }
 function closeHistoryModal() {
   const modal = $('historyModal');
   if (!modal) return;
-  modal.classList.remove('open');
-  modal.setAttribute('hidden', '');
+  closeModal(modal);
 }
 
 
@@ -6761,8 +7052,7 @@ function closeHistoryModal() {
 function openEmbedModal() {
   const modal = $('embedModal');
   if (!modal) return;
-  modal.classList.add('open');
-  modal.removeAttribute('hidden');
+  openModal(modal);
   // Reset previous selection
   state.pdfFile = null;
   $('fname').textContent = '';
@@ -6770,8 +7060,7 @@ function openEmbedModal() {
 function closeEmbedModal() {
   const modal = $('embedModal');
   if (!modal) return;
-  modal.classList.remove('open');
-  modal.setAttribute('hidden', '');
+  closeModal(modal);
 }
 
 // Run the embed-XML-into-existing-PDF action. Used by the modal's
@@ -6926,16 +7215,8 @@ function closeSellerMenu() {
 }
 document.getElementById('sellerChip').addEventListener('click', () => {
   const m = document.getElementById('sellerMenu');
-  if (m.hidden) {
-    updateSellerChip();
-    document.getElementById('sellerRead').hidden = false;
-    document.getElementById('sellerEdit').hidden = true;
-    m.hidden = false;
-    document.getElementById('sellerChip').setAttribute('aria-expanded', 'true');
-    closeOverflowMenu();
-  } else {
-    closeSellerMenu();
-  }
+  if (m.hidden) openSellerMenu();
+  else closeSellerMenu();
 });
 
 // Edit mode keeps the live s_* inputs (the pipeline reads them by id), so
@@ -6976,7 +7257,11 @@ document.addEventListener('click', (e) => {
   if (isSellerMenuOpen() && !e.target.closest('#sellerMenu') && !e.target.closest('#sellerChip')) {
     closeSellerMenu();
   }
-  if (isValidatePopoverOpen() && !e.target.closest('#validatePopover') && !e.target.closest('#btnValidate')) {
+  // #btnPDF is excluded too: a blocked export renders its pre-flight into
+  // this same popover, and that click is still bubbling when this runs —
+  // without the exclusion the popover would open and shut in one gesture.
+  if (isValidatePopoverOpen() && !e.target.closest('#validatePopover')
+      && !e.target.closest('#btnValidate') && !e.target.closest('#btnPDF')) {
     closeValidatePopover();
   }
 });
@@ -7101,13 +7386,11 @@ function openOnboarding() {
   $('ob_start').value = '1';
   renderOnboardingStep();
   const modal = $('onboardingModal');
-  modal.classList.add('open');
-  modal.removeAttribute('hidden');
+  openModal(modal);
 }
 function closeOnboarding() {
   const modal = $('onboardingModal');
-  modal.classList.remove('open');
-  modal.setAttribute('hidden', '');
+  closeModal(modal);
 }
 
 function updateObNumberPreview() {
@@ -7195,13 +7478,11 @@ function openBackupModal() {
   cancelBackupImport();
   updateBackupExportSummary();
   const modal = $('backupModal');
-  modal.classList.add('open');
-  modal.removeAttribute('hidden');
+  openModal(modal);
 }
 function closeBackupModal() {
   const modal = $('backupModal');
-  modal.classList.remove('open');
-  modal.setAttribute('hidden', '');
+  closeModal(modal);
 }
 document.getElementById('openBackup').addEventListener('click', () => {
   closeOverflowMenu();
@@ -7239,7 +7520,40 @@ document.getElementById('addFirstLine').addEventListener('click', () => addItem(
 
 // Top-bar modal openers
 $('openHistory').addEventListener('click', openHistoryModal);
-$('newInvoice').addEventListener('click', newInvoice);
+// "New invoice" throws away the buyer, every line item and the free-text
+// fields, and there is nothing to undo it with — so it arms an inline
+// confirmation first, the same pattern Delete customer and Clear history
+// use. A form that is already pristine skips the prompt: there is nothing
+// to lose and nagging about it would just be friction.
+function isInvoiceDirty() {
+  if ($('b_name').value.trim() || $('b_line1').value.trim()) return true;
+  if (['r_project', 'r_category', 'r_note'].some(id => $(id).value.trim())) return true;
+  return !(state.items.length === 0 || (state.items.length === 1
+    && !(state.items[0].desc || '').trim()
+    && (Number(state.items[0].price) || 0) === 0));
+}
+function resetNewInvoiceConfirm() {
+  const row = document.getElementById('newInvoiceConfirm');
+  if (!row || row.hidden) return false;
+  row.hidden = true;
+  $('newInvoice').hidden = false;
+  return true;
+}
+$('newInvoice').addEventListener('click', () => {
+  if (!isInvoiceDirty()) { newInvoice(); return; }
+  $('newInvoice').hidden = true;
+  $('newInvoiceConfirm').hidden = false;
+  $('newInvoiceYes').focus();
+});
+$('newInvoiceYes').addEventListener('click', async () => {
+  resetNewInvoiceConfirm();
+  await newInvoice();
+  $('newInvoice').focus();
+});
+$('newInvoiceNo').addEventListener('click', () => {
+  resetNewInvoiceConfirm();
+  $('newInvoice').focus();
+});
 $('duplicateLast').addEventListener('click', duplicateLastInvoice);
 $('openHelp').addEventListener('click', () => {
   closeOverflowMenu();
@@ -7427,7 +7741,8 @@ document.addEventListener('keydown', (e) => {
       return;
     }
     if (isOpen('historyModal')) { closeHistoryModal(); return; }
-    // No layer open — Esc clears any pending inline-delete confirmation.
+    // No layer open — Esc clears any pending inline confirmation.
+    if (resetNewInvoiceConfirm()) { $('newInvoice').focus(); return; }
     if (_removeConfirmBtn) resetRemoveConfirm();
     return;
   }

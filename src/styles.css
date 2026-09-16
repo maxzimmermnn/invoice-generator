@@ -33,15 +33,27 @@
   --border-strong: oklch(88% 0.005 90);
   --text:          oklch(20% 0.01 90);
   --text-muted:    oklch(45% 0.01 90);
-  --text-faint:    oklch(58% 0.01 90);
+  /* Lightest step that still clears 4.5:1 on --bg, the lightest surface it
+     lands on (4.90:1). It is body text — placeholders, .note-small, inactive
+     tab labels — so the old 58% was an AA failure, not a style choice. */
+  --text-faint:    oklch(52% 0.01 90);
+  /* --accent fills surfaces that carry #fff text (buttons, avatar, active
+     chips) and must stay dark enough for that. --accent-fg is the same red
+     used *on* a surface — link text, borders, focus rings, .field-error —
+     and is lifted in dark mode, where the fill colour would be unreadable. */
   --accent:        #9b2a22;
+  --accent-fg:     #9b2a22;
+  /* --accent-hover darkens the fill; --accent-fg-hover is its on-surface
+     counterpart. In dark mode the two move in opposite directions: the fill
+     still darkens, the text still has to get brighter. */
   --accent-hover:  #7c211b;
+  --accent-fg-hover: #7c211b;
   --accent-soft:   oklch(94% 0.03 25);
   --chart-bar:     oklch(85% 0.02 25);
   --success-bg:    oklch(95% 0.04 145);
-  --success-text:  #3a7d44;
+  --success-text:  #2b6233;
   --warn-bg:       oklch(97% 0.03 45);
-  --warn-text:     oklch(60% 0.08 70);
+  --warn-text:     oklch(46% 0.08 70);
   --yoy-up:        #2e8540;
   --yoy-down:      #c0392b;
   --btn-primary-bg: oklch(20% 0.01 90);
@@ -62,7 +74,12 @@
   --border-strong: oklch(40% 0.008 90);
   --text:          oklch(93% 0.004 90);
   --text-muted:    oklch(72% 0.006 90);
-  --text-faint:    oklch(58% 0.006 90);
+  --text-faint:    oklch(66% 0.006 90);
+  /* --accent is NOT overridden: it stays the dark fill that #fff text sits
+     on. Only the on-surface variant is lifted, so links, focus rings and
+     error text clear AA against --card/--panel/--bg/--accent-soft. */
+  --accent-fg:     oklch(72% 0.13 25);
+  --accent-fg-hover: oklch(82% 0.11 25);
   --accent-soft:   oklch(30% 0.06 25);
   --chart-bar:     oklch(38% 0.05 25);
   --success-bg:    oklch(28% 0.06 145);
@@ -97,8 +114,8 @@ body {
   line-height: 1.45;
 }
 
-a { color: var(--accent); }
-a:hover { color: var(--accent-hover); }
+a { color: var(--accent-fg); }
+a:hover { color: var(--accent-fg-hover); }
 
 ::placeholder { color: var(--text-faint); opacity: 1; }
 
@@ -107,8 +124,15 @@ input, select, textarea, button {
   font-size: inherit;
   color: var(--text);
 }
-input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent) !important; }
-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* A colour-change border alone is not a sufficient focus indicator — pair it
+   with a real ring so focus survives both themes and forced-colours modes.
+   :focus-visible keeps the ring off mouse clicks into a text field. */
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent-fg) !important; }
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 1px;
+}
+button:focus-visible { outline: 2px solid var(--accent-fg); outline-offset: 2px; }
 
 kbd.kbd-hint {
   font-family: inherit;
@@ -218,8 +242,8 @@ details > summary::-webkit-details-marker { display: none; }
 }
 .btn-sm:hover { border-color: var(--text-faint); }
 .btn-sm.active, .btn-sm[aria-pressed="true"] {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent-fg);
   background: var(--accent-soft);
 }
 .btn-sm[aria-disabled="true"] {
@@ -243,8 +267,8 @@ details > summary::-webkit-details-marker { display: none; }
 }
 .btn-icon:hover { border-color: var(--text-faint); }
 .btn-icon.preview-toggle[aria-pressed="true"] {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent-fg);
   background: var(--accent-soft);
 }
 
@@ -464,7 +488,7 @@ details > summary::-webkit-details-marker { display: none; }
 }
 .tab:hover { color: var(--text-muted); }
 .tab.active {
-  border-bottom-color: var(--accent);
+  border-bottom-color: var(--accent-fg);
   color: var(--text);
 }
 
@@ -624,8 +648,8 @@ textarea {
 }
 .buyer-chip:hover { border-color: var(--text-faint); }
 .buyer-chip.active {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--accent-fg);
+  color: var(--accent-fg);
   background: var(--accent-soft);
 }
 .chip-row-empty { font-size: 12px; color: var(--text-faint); }
@@ -667,6 +691,14 @@ textarea {
 
 .items { display: flex; flex-direction: column; }
 
+/* Each control sits in its own <label> so it has a real programmatic name.
+   The caption duplicates the .items-head column title and is hidden while
+   that header row is on screen; the narrow-screen block below turns it on
+   when .items-head goes away. */
+.item-cell { display: block; min-width: 0; }
+.cell-label { display: none; }
+
+
 .item-row {
   padding: 8px 0;
   border-top: 1px solid var(--border);
@@ -683,6 +715,7 @@ textarea {
   color: var(--text);
 }
 .item-row input.num, .item-row select { text-align: center; }
+.item-row .item-cell > input, .item-row .item-cell > select { width: 100%; }
 
 /* Quantity stepper: the field is type=text (for comma decimals), so the
    native number spinner is replaced by these two buttons. They appear only
@@ -726,7 +759,7 @@ textarea {
   line-height: 1;
   cursor: pointer;
 }
-.qty-step button:hover { color: var(--accent); }
+.qty-step button:hover { color: var(--accent-fg); }
 
 /* Touch devices: same focus rule, but a target big enough to hit with a
    fingertip (the gutter widens to match, so the arrows still never overlap
@@ -747,8 +780,8 @@ textarea {
   padding: 4px;
   white-space: nowrap;
 }
-.item-row .remove:hover { color: var(--accent); }
-.item-row .remove.confirming { color: var(--accent); font-weight: 600; }
+.item-row .remove:hover { color: var(--accent-fg); }
+.item-row .remove.confirming { color: var(--accent-fg); font-weight: 600; }
 
 .items-empty {
   display: flex;
@@ -827,7 +860,7 @@ summary.section-caption::after {
   border-top: 1px solid var(--border);
   padding-top: 14px;
 }
-.info-details > summary:hover { color: var(--accent); }
+.info-details > summary:hover { color: var(--accent-fg); }
 .details-body {
   display: flex;
   flex-direction: column;
@@ -924,8 +957,8 @@ summary.section-caption::after {
   background: var(--card);
 }
 .layout-segment button.active {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--accent-fg);
+  color: var(--accent-fg);
   background: var(--accent-soft);
 }
 
@@ -967,10 +1000,30 @@ summary.section-caption::after {
   z-index: 40;
   font-size: 12px;
 }
+.validate-popover:focus { outline: none; }
 .validate-popover .v-title { font-weight: 700; color: var(--text); }
 .validate-popover .v-ok    { color: var(--text-muted); }
 .validate-popover .v-warn  { color: var(--warn-text); }
 .validate-popover .v-foot  { font-size: 11px; color: var(--text-faint); margin-top: 4px; }
+
+/* A problem that names a field is a button that jumps to it — it has to look
+   actionable without turning the checklist into a row of buttons. */
+.validate-popover .v-jump {
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+.validate-popover .v-jump:hover { color: var(--accent-fg); }
+/* Blocking problems stop the export; advisory ones do not. Weight carries
+   the difference as well as colour, so it survives a greyscale display. */
+.validate-popover .v-blocking { color: var(--accent-fg); font-weight: 600; }
 
 
 /* === 12. Buttons + links ================================================== */
@@ -1007,7 +1060,7 @@ summary.section-caption::after {
 .btn-accent-soft {
   font-size: 12px;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-fg);
   background: var(--accent-soft);
   border: none;
   padding: 9px 14px;
@@ -1040,8 +1093,8 @@ summary.section-caption::after {
 .btn-outline:hover, .tiny-btn:hover { border-color: var(--text-faint); }
 .tiny-btn { padding: 7px 10px; font-size: 11px; }
 .tiny-btn.active, .tiny-btn[aria-pressed="true"] {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent-fg);
   background: var(--accent-soft);
 }
 .btn-faint { color: var(--text-faint); }
@@ -1050,14 +1103,14 @@ summary.section-caption::after {
 .link-accent {
   font-size: 12px;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-fg);
   background: transparent;
   border: none;
   cursor: pointer;
   padding: 0;
   white-space: nowrap;
 }
-.link-accent:hover { color: var(--accent-hover); }
+.link-accent:hover { color: var(--accent-fg-hover); }
 .link-muted {
   font-size: 12px;
   color: var(--text-muted);
@@ -1077,7 +1130,7 @@ summary.section-caption::after {
   padding: 0;
   white-space: nowrap;
 }
-.link-faint:hover { color: var(--accent); }
+.link-faint:hover { color: var(--accent-fg); }
 
 
 /* === 13. Preview column =================================================== */
@@ -1104,6 +1157,9 @@ summary.section-caption::after {
   align-items: baseline;
 }
 .preview-status { color: var(--text-faint); text-transform: none; letter-spacing: 0; }
+/* A failed render leaves a stale PDF on screen, so this one is a warning,
+   not a passing status — it stays up until the next successful render. */
+.preview-status-error { color: var(--warn-text); font-weight: 600; }
 
 /* The preview fills whatever height the (now constant-height) form column
    gives the card; the embedded PDF viewer scrolls internally rather than
@@ -1243,7 +1299,7 @@ summary.section-caption::after {
   border-bottom: 2px solid transparent;
   color: var(--text-faint);
 }
-.stats-tab.active { border-bottom-color: var(--accent); color: var(--text); }
+.stats-tab.active { border-bottom-color: var(--accent-fg); color: var(--text); }
 .stats-controls-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .stats-controls-right .inline { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
 
@@ -1310,7 +1366,7 @@ summary.section-caption::after {
 }
 .stats-chart-wrap { display: flex; flex-direction: column; gap: 8px; }
 .stats-chart-wrap-inner { position: relative; }
-.stats-chart { width: 100%; height: auto; display: block; color: var(--accent); }
+.stats-chart { width: 100%; height: auto; display: block; color: var(--accent-fg); }
 .stats-chart text { color: var(--text-muted); fill: currentColor; }
 .stats-chart-tooltip {
   position: absolute;
@@ -1339,7 +1395,7 @@ summary.section-caption::after {
   text-align: left;
   color: var(--text);
 }
-.stats-buyer-btn:hover .stats-buyer-name { color: var(--accent); }
+.stats-buyer-btn:hover .stats-buyer-name { color: var(--accent-fg); }
 .stats-buyer-meta { color: var(--text-muted); }
 
 .stats-empty {
@@ -1437,7 +1493,13 @@ summary.section-caption::after {
   box-shadow: 0 1px 2px rgba(0,0,0,0.2);
   transition: transform 0.15s ease;
 }
-.switch input:checked + .switch-track { background: var(--accent); }
+/* The real checkbox is opacity:0 and stretched over the track, so it can
+   never show a ring of its own — put the focus ring on the track instead. */
+.switch input:focus-visible + .switch-track {
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 2px;
+}
+.switch input:checked + .switch-track { background: var(--accent-fg); }
 .switch input:checked + .switch-track .switch-knob { transform: translateX(14px); }
 
 .history-table {
@@ -1567,7 +1629,7 @@ summary.section-caption::after {
 .help-topic:hover { color: var(--text); }
 .help-topic.active {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-fg);
   font-weight: 600;
 }
 .help-no-results { font-size: 12px; color: var(--text-faint); padding: 6px 18px; }
@@ -1680,7 +1742,7 @@ summary.section-caption::after {
   border-radius: 50%;
   background: var(--border-strong);
 }
-.ob-dot.active { background: var(--accent); }
+.ob-dot.active { background: var(--accent-fg); }
 .ob-step-label { margin-left: auto; font-size: 11px; color: var(--text-faint); }
 
 .ob-actions {
@@ -1712,7 +1774,7 @@ summary.section-caption::after {
   color: var(--text-faint);
   cursor: pointer;
 }
-.drop.dragover, .drop:hover { border-color: var(--accent); color: var(--text-muted); }
+.drop.dragover, .drop:hover { border-color: var(--accent-fg); color: var(--text-muted); }
 .drop.has-file { border-style: solid; border-color: var(--success-text); color: var(--text); }
 .drop .fname { margin-top: 6px; font-weight: 600; color: var(--success-text); }
 .embed-actions { display: flex; justify-content: flex-end; }
@@ -1786,11 +1848,11 @@ summary.section-caption::after {
   box-shadow: var(--shadow-menu);
 }
 
-input.invalid, textarea.invalid { border-color: var(--accent) !important; }
+input.invalid, textarea.invalid { border-color: var(--accent-fg) !important; }
 .field-error {
   display: block;
   font-size: 11px;
-  color: var(--accent);
+  color: var(--accent-fg);
   margin-top: 3px;
 }
 
@@ -1824,7 +1886,18 @@ input.invalid, textarea.invalid { border-color: var(--accent) !important; }
     grid-template-columns: 1fr 1fr;
     grid-auto-rows: auto;
   }
-  .item-row .cell-desc { grid-column: 1 / -1; }
+  .item-row .cell-desc-wrap { grid-column: 1 / -1; }
+  /* With .items-head hidden these captions are the only labels on screen. */
+  .cell-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .item-row .remove { align-self: end; }
   .seller-menu { width: calc(100vw - 32px); left: 8px; }
   .modal { padding: 8px; }
   .help-modal-content { flex-direction: column; }

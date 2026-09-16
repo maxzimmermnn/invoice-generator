@@ -290,7 +290,17 @@ honest with no offline FX guesswork.
 
 ### XML validation
 The "Validate XML" button checks whether all EN 16931 mandatory fields
-are populated. "Download XML only" produces just the XML file, without a PDF.
+are populated and opens a checklist above the action bar. Each problem
+that names a field is clickable and takes you straight to it — switching
+tabs, or opening the seller dropdown into edit mode, as needed.
+
+"Create PDF" runs the same checklist before it exports. If anything
+mandatory is missing it lists every problem at once instead of stopping
+at the first, puts the cursor in the first offending field, and leaves
+the export untouched. Advisory items (a recommended VAT ID, a malformed
+IBAN) are shown but never block.
+
+"Download XML only" produces just the XML file, without a PDF.
 
 ### Embed XML into existing PDF
 If you already have a finished invoice PDF (e.g. designed in InDesign or
@@ -307,7 +317,8 @@ history or YoY data import cleanly, leaving the existing values
 untouched.
 
 ### Theme
-Light / dark / auto (follows OS preference).
+Light / dark / auto (follows OS preference). Both themes meet WCAG 2.1 AA
+contrast for text, focus rings and status colours.
 
 ### Help
 "Help & docs" in the overflow menu (or the `?` key) opens a two-pane help

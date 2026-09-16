@@ -37,6 +37,11 @@
       <button id="newInvoice" class="btn-sm" type="button" data-i18n-title="btn_new_invoice">
         <span data-i18n="btn_new_invoice_short"></span>
       </button>
+      <div id="newInvoiceConfirm" class="confirm-inline" hidden>
+        <span data-i18n="confirm_discard_invoice"></span>
+        <button id="newInvoiceYes" class="link-accent" type="button" data-i18n="confirm_yes"></button>
+        <button id="newInvoiceNo" class="link-muted" type="button" data-i18n="confirm_no"></button>
+      </div>
       <button id="duplicateLast" class="btn-sm" type="button" data-i18n-title="btn_duplicate_last">
         <span data-i18n="btn_duplicate_short"></span> <kbd class="kbd-hint">⌘D</kbd>
       </button>
@@ -44,7 +49,7 @@
       <button id="openStats" class="btn-sm" type="button" data-i18n="label_stats"></button>
       <button id="previewToggle" class="btn-icon preview-toggle" type="button"
               aria-pressed="true" data-i18n-title="aria_preview_toggle" data-i18n-aria-label="aria_preview_toggle">◎</button>
-      <button id="overflowToggle" class="btn-icon" type="button" aria-haspopup="true" aria-expanded="false" aria-label="More">⋯</button>
+      <button id="overflowToggle" class="btn-icon" type="button" aria-haspopup="true" aria-expanded="false" data-i18n-aria-label="aria_more_menu">⋯</button>
 
       <div class="overflow-menu" id="overflowMenu" hidden>
         <div class="menu-caption" data-i18n="menu_ui_language"></div>
@@ -173,7 +178,7 @@
           <div class="chip-row" id="recentCustomers"></div>
         </div>
 
-        <select id="buyerPicker" class="select-box" aria-label="Buyer profile">
+        <select id="buyerPicker" class="select-box" data-i18n-aria-label="aria_buyer_select">
           <option value="" data-i18n="f_buyer_picker"></option>
         </select>
 
@@ -520,7 +525,8 @@
     <button type="button" class="btn-outline" id="btnValidate" data-i18n="btn_validate"></button>
     <button type="button" class="btn-outline" id="btnEmbed" data-i18n="btn_embed_xml"></button>
 
-    <div class="validate-popover" id="validatePopover" hidden></div>
+    <div class="validate-popover" id="validatePopover" hidden
+         role="group" tabindex="-1" data-i18n-aria-label="validate_title"></div>
   </div>
 
 </div><!-- /.form-col -->
@@ -530,10 +536,12 @@
   <div class="preview-head">
     <span data-i18n="preview_title"></span>
     <span class="preview-status" id="previewStatus" hidden data-i18n="preview_updating"></span>
+    <span class="preview-status preview-status-error" id="previewError" hidden
+          role="status" data-i18n="preview_failed"></span>
   </div>
   <div class="preview-card">
     <div class="preview-empty" id="previewEmpty" data-i18n="preview_empty"></div>
-    <iframe class="preview-frame" id="previewFrame" title="Invoice preview" hidden></iframe>
+    <iframe class="preview-frame" id="previewFrame" data-i18n-title="aria_preview_frame" hidden></iframe>
   </div>
 </aside>
 
@@ -545,7 +553,7 @@
   <div class="modal-content stats-modal-content">
     <div class="modal-head">
       <h2 data-i18n="stats_title"></h2>
-      <button id="statsClose" class="modal-x" type="button" aria-label="Close">✕</button>
+      <button id="statsClose" class="modal-x" type="button" data-i18n-aria-label="aria_close">✕</button>
     </div>
 
     <div class="modal-controls stats-controls">
@@ -597,13 +605,13 @@
             <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
           </span>
         </label>
-        <button id="historyClose" class="modal-x" type="button" aria-label="Close">✕</button>
+        <button id="historyClose" class="modal-x" type="button" data-i18n-aria-label="aria_close">✕</button>
       </div>
     </div>
 
     <div class="history-filter-row">
       <input type="search" id="historySearch" data-i18n-placeholder="history_search_placeholder" autocomplete="off">
-      <select id="historyPeriod" class="select-sm" aria-label="Period">
+      <select id="historyPeriod" class="select-sm" data-i18n-aria-label="aria_history_period">
         <option value="all" selected data-i18n="stats_period_all"></option>
         <option value="ytd" data-i18n="stats_period_ytd"></option>
         <option value="last12" data-i18n="stats_period_last12"></option>
@@ -651,7 +659,7 @@
     <div class="help-content">
       <div class="help-content-head">
         <h2 id="helpTopicTitle"></h2>
-        <button id="helpClose" class="modal-x" type="button" aria-label="Close">✕</button>
+        <button id="helpClose" class="modal-x" type="button" data-i18n-aria-label="aria_close">✕</button>
       </div>
       <div id="helpBody" class="help-body"></div>
     </div>
@@ -663,7 +671,7 @@
   <div class="modal-content backup-modal-content">
     <div class="modal-head">
       <h2 data-i18n="backup_title"></h2>
-      <button id="backupClose" class="modal-x" type="button" aria-label="Close">✕</button>
+      <button id="backupClose" class="modal-x" type="button" data-i18n-aria-label="aria_close">✕</button>
     </div>
 
     <div class="backup-section">
@@ -765,7 +773,7 @@
   <div class="modal-content embed-modal-content">
     <div class="modal-head">
       <h2 data-i18n="embed_title"></h2>
-      <button id="embedClose" class="modal-x" type="button" aria-label="Close">✕</button>
+      <button id="embedClose" class="modal-x" type="button" data-i18n-aria-label="aria_close">✕</button>
     </div>
     <p class="modal-intro" data-i18n="embed_intro"></p>
     <div class="drop" id="drop">
@@ -784,7 +792,7 @@
   <div class="modal-content past-invoice-content">
     <div class="modal-head">
       <h2 data-i18n="past_modal_title"></h2>
-      <button id="pastCancel" class="modal-x" type="button" aria-label="Close">✕</button>
+      <button id="pastCancel" class="modal-x" type="button" data-i18n-aria-label="aria_close">✕</button>
     </div>
     <p class="modal-intro" data-i18n="past_modal_hint"></p>
     <div class="modal-grid">
@@ -836,7 +844,7 @@
   <div class="modal-content yoy-backfill-content">
     <div class="modal-head">
       <h2 data-i18n="yoy_modal_title"></h2>
-      <button id="yoyBackfillCancel" class="modal-x" type="button" aria-label="Close">✕</button>
+      <button id="yoyBackfillCancel" class="modal-x" type="button" data-i18n-aria-label="aria_close">✕</button>
     </div>
     <p class="modal-intro" data-i18n="yoy_modal_intro"></p>
 
