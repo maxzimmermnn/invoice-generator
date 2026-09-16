@@ -124,14 +124,16 @@ input, select, textarea, button {
   font-size: inherit;
   color: var(--text);
 }
-/* A colour-change border alone is not a sufficient focus indicator — pair it
-   with a real ring so focus survives both themes and forced-colours modes.
-   :focus-visible keeps the ring off mouse clicks into a text field. */
+/* Fields show focus as a border-colour change only, with no ring. A 2px
+   outline was tried and deliberately reverted: on the underline inputs that
+   make up most of this form it reads as a heavy box around every field you
+   touch, which is visually louder than the design tolerates. The trade-off
+   is accepted and known — a colour-only indicator is the weaker reading of
+   2.4.7 — and --accent-fg at least keeps the changed border well clear of
+   the surrounding contrast in both themes. Buttons and the non-field
+   controls below keep their rings, since a border change is not available
+   to them. */
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent-fg) !important; }
-input:focus-visible, select:focus-visible, textarea:focus-visible {
-  outline: 2px solid var(--accent-fg);
-  outline-offset: 1px;
-}
 button:focus-visible { outline: 2px solid var(--accent-fg); outline-offset: 2px; }
 
 kbd.kbd-hint {

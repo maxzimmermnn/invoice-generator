@@ -335,7 +335,9 @@ drop zone, and the modals, which take focus when they open, keep it inside
 while they are open, and hand it back when they close. A skip link jumps
 past the header to the form. Text, focus indicators and status colours meet
 AA contrast in both light and dark themes, and interactive targets are at
-least 24×24 px. Line-item fields, validation errors and the invoice total
+least 24×24 px. Form fields mark focus with a border-colour change rather
+than a ring, which is a deliberate visual choice over the stricter reading
+of WCAG 2.4.7. Line-item fields, validation errors and the invoice total
 are all exposed to screen readers.
 
 ---
