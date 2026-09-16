@@ -229,17 +229,16 @@ async function renderInvoiceDIN5008(pdfDoc, ctx) {
   drawText(senderMini, M_L, senderLineY, mono, senderSize, SOFT);
   drawRule(senderLineY - 2, 0.3, M_L, M_L + mm(85));
 
-  // Recipient block (Form B: starts at 50mm from top, max 9 lines). The
-  // postal address comes first because this block sits in the envelope
-  // window; optional contact lines are appended after it, never between.
+  // Recipient block (Form B: starts at 50mm from top, max 9 lines). This
+  // block doubles as the envelope address field, so it stays strictly
+  // postal — buyer email and phone print in the Modern and Typewriter
+  // address blocks, but are deliberately left out here.
   const recipientLines = [
     buyer.name,
     buyer.name2,
     buyer.line1,
     `${buyer.zip || ''} ${buyer.city || ''}`.trim(),
     (buyer.country && buyer.country !== seller.country) ? cn(buyer.country).toUpperCase() : '',
-    buyer.email,
-    buyer.phone,
   ].filter(Boolean);
   let y = PAGE_H - mm(52);
   for (const ln of recipientLines) { drawText(ln, M_L, y, mono, SIZE); y -= LINE; }

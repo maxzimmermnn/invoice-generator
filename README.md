@@ -116,8 +116,10 @@ Add, select, delete customers. Selecting a saved customer fills all buyer
 fields. An optional second name line (e.g. department or trading name)
 prints below the buyer name and is stored as BT-45 in the XML. Optional
 email and phone are saved with the customer, print in the buyer address
-block of all three layouts, and travel in the XML as the buyer contact
-group (BT-58 / BT-57). Buyer
+block of the Modern and Typewriter layouts, and travel in the XML as the
+buyer contact group (BT-58 / BT-57). DIN 5008 leaves them off the page —
+its recipient block is the envelope address field and stays postal-only.
+Buyer
 reference / Leitweg-ID is stored as BT-10 in the XML (required for German
 government clients). When you select a buyer the tool also shows the date
 and amount of the most recent invoice you sent them, so you have context
