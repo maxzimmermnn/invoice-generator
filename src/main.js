@@ -462,6 +462,7 @@ const I18N = {
     f_siret_placeholder: '9 oder 14 Ziffern',
     f_email: 'E-Mail',
     f_phone: 'Telefon (optional)',
+    f_phone_plain: 'Telefon',
     f_iban: 'IBAN',
     f_bic: 'BIC (optional)',
     f_bank: 'Bankname (optional)',
@@ -989,6 +990,7 @@ const I18N = {
     f_siret_placeholder: '9 or 14 digits',
     f_email: 'Email',
     f_phone: 'Phone (optional)',
+    f_phone_plain: 'Phone',
     f_iban: 'IBAN',
     f_bic: 'BIC (optional)',
     f_bank: 'Bank name (optional)',
@@ -1507,6 +1509,7 @@ const I18N = {
     f_siret_placeholder: '9 ou 14 chiffres',
     f_email: 'E-mail',
     f_phone: 'Téléphone (optionnel)',
+    f_phone_plain: 'Téléphone',
     f_iban: 'IBAN',
     f_bic: 'BIC (optionnel)',
     f_bank: 'Nom de la banque (optionnel)',
@@ -2146,6 +2149,8 @@ function collectBuyer() {
     city: $('b_city').value.trim(),
     country: $('b_country').value.trim().toUpperCase(),
     vat: $('b_vat').value.trim(),
+    email: $('b_email').value.trim(),
+    phone: $('b_phone').value.trim(),
     siret: $('b_siret').value.trim(),
     reference: $('b_reference').value.trim(),
   };
@@ -2158,6 +2163,8 @@ function applyBuyer(b) {
   $('b_city').value = nz(b.city);
   $('b_country').value = nz(b.country, 'FR');
   $('b_vat').value = nz(b.vat);
+  $('b_email').value = nz(b.email);
+  $('b_phone').value = nz(b.phone);
   $('b_siret').value = nz(b.siret);
   $('b_reference').value = nz(b.reference);
   if (typeof refreshInlineValidation === 'function') refreshInlineValidation();
@@ -2171,6 +2178,8 @@ function clearBuyer() {
   $('b_city').value = '';
   $('b_country').value = 'FR';
   $('b_vat').value = '';
+  $('b_email').value = '';
+  $('b_phone').value = '';
   $('b_siret').value = '';
   $('b_reference').value = '';
 }
@@ -2284,6 +2293,8 @@ function buyerAddressEmpty() {
     && !$('b_zip').value.trim()
     && !$('b_city').value.trim()
     && !$('b_vat').value.trim()
+    && !$('b_email').value.trim()
+    && !$('b_phone').value.trim()
     && !$('b_siret').value.trim()
     && !$('b_reference').value.trim();
 }
@@ -5310,6 +5321,12 @@ function buildXML() {
           <ram:ID schemeID="${buyer.siret.replace(/\s/g, '').length === 14 ? '0002' : '0009'}">${esc(buyer.siret.replace(/\s/g, ''))}</ram:ID>` : ''}${buyer.name2 ? `
           <ram:TradingBusinessName>${esc(buyer.name2)}</ram:TradingBusinessName>` : ''}
         </ram:SpecifiedLegalOrganization>` : ''}
+        ${buyer.phone || buyer.email ? `
+        <ram:DefinedTradeContact>
+          <ram:PersonName>${esc(buyer.name)}</ram:PersonName>
+          ${buyer.phone ? `<ram:TelephoneUniversalCommunication><ram:CompleteNumber>${esc(buyer.phone)}</ram:CompleteNumber></ram:TelephoneUniversalCommunication>` : ''}
+          ${buyer.email ? `<ram:EmailURIUniversalCommunication><ram:URIID>${esc(buyer.email)}</ram:URIID></ram:EmailURIUniversalCommunication>` : ''}
+        </ram:DefinedTradeContact>` : ''}
         <ram:PostalTradeAddress>
           <ram:PostcodeCode>${esc(buyer.zip)}</ram:PostcodeCode>
           <ram:LineOne>${esc(buyer.line1)}</ram:LineOne>
@@ -6543,7 +6560,7 @@ Pick a buyer (or add a new one), add line items, and hit Create PDF. The XML is 
 Everything runs offline in your browser. All data stays in \`localStorage\`; nothing is uploaded anywhere.` },
   { id: 'profiles', title: 'Seller & buyer profiles', md: `Your seller profile is a single business identity — edit it any time from the chip at the top of the form. Master data (address, VAT ID, IBAN, BIC, bank, optional SIRET) is stored locally.
 
-Buyers are saved as reusable profiles. Save, update, or delete them from the Buyer tab; recent customers appear as one-click chips. An optional second name line prints below the buyer name (BT-45), and the buyer reference / Leitweg-ID (BT-10) is required for German government clients.
+Buyers are saved as reusable profiles. Save, update, or delete them from the Buyer tab; recent customers appear as one-click chips. An optional second name line prints below the buyer name (BT-45), and the buyer reference / Leitweg-ID (BT-10) is required for German government clients. Optional buyer email and phone are saved with the customer and travel in the XML as the buyer contact group (BT-58 / BT-57) — they are not printed on the PDF.
 
 When you pick a buyer the tool shows the date and amount of the most recent invoice you sent them.` },
   { id: 'numbering', title: 'Invoice numbering', md: `Numbers follow a pattern with tokens, set during first-run setup. Default: \`{yyyy}-{counter:5}\` e.g. \`2026-00042\`. An internal counter increments after each invoice.

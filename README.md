@@ -114,7 +114,9 @@ shortcut to the two-step onboarding.
 ### Customer database
 Add, select, delete customers. Selecting a saved customer fills all buyer
 fields. An optional second name line (e.g. department or trading name)
-prints below the buyer name and is stored as BT-45 in the XML. Buyer
+prints below the buyer name and is stored as BT-45 in the XML. Optional
+email and phone are saved with the customer and written to the XML as the
+buyer contact group (BT-58 / BT-57); they do not print on the PDF. Buyer
 reference / Leitweg-ID is stored as BT-10 in the XML (required for German
 government clients). When you select a buyer the tool also shows the date
 and amount of the most recent invoice you sent them, so you have context
