@@ -1,3 +1,47 @@
+## [2.0.6] - 2026-09-16
+
+The rest of the accessibility review: the help modal speaks German and
+French, and the keyboard reaches everything.
+
+### Added
+
+- **The help modal is translated.** All eight topics — getting started,
+  profiles, numbering, tax modes, PDF/A-3 & Factur-X, filename patterns,
+  history & statistics, shortcuts — now exist in German and French as
+  well as English. The sidebar search matches whichever language is
+  active. This was the last untranslated English in the interface, in a
+  tool built around German e-invoicing obligations.
+- **Arrow-key navigation on the tabs.** ← / → move between Buyer, Items
+  and Invoice info, with Home and End jumping to the ends. The tablist
+  is now a single tab stop instead of three, so Tab from it lands in the
+  panel rather than on the next tab.
+- **A skip link** past the header controls, straight to the form, and
+  the invoice card is a `<main>` landmark. Neither existed before.
+- **The invoice total is announced to screen readers** once the typing
+  settles, and only when it actually changed — the figures recompute on
+  every keystroke, which is far too noisy to announce directly.
+
+### Changed
+
+- **The PDF drop zone in "Embed XML" is keyboard-operable.** It was a
+  plain div with a click handler, so there was no way to reach the file
+  picker without a mouse. It takes a tab stop, a name, and Enter/Space
+  now. Both drop zones also gained focus rings; the backup one wraps an
+  invisible file input that could take focus with nothing to show.
+- **The tabs expose their panels properly**, with `aria-controls` and
+  `aria-labelledby` wired both ways.
+
+### Fixed
+
+- **Interactive targets below the 24×24 px minimum.** The tooltip
+  buttons were 14×14, the modal close buttons 26×18, the text-preset
+  delete roughly 20×16 and the line-item remove 20×20. The tooltip keeps
+  its small dot — it belongs beside its label — but its clickable area is
+  padded out invisibly. The quantity steppers stay smaller by necessity,
+  since two stacked 24 px buttons are taller than the row; they meet the
+  rule's equivalent-control exception, the quantity being a text field
+  you can type into with ↑/↓ stepping it.
+
 ## [2.0.5] - 2026-09-16
 
 Accessibility pass, and the export now reports every problem at once.

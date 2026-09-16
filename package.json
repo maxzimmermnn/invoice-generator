@@ -1,7 +1,7 @@
 {
   "name": "e-rechnung",
   "private": true,
-  "version": "2.0.5",
+  "version": "2.0.6",
   "description": "ZUGFeRD / Factur-X compliant invoice generator. Runs fully offline in the browser.",
   "type": "module",
   "repository": {
