@@ -1,3 +1,20 @@
+## [2.0.7] - 2026-09-16
+
+### Changed
+
+- **Form fields mark focus with a border-colour change again**, not a
+  ring. The 2px outline added in 2.0.5 sat on top of the existing border
+  change and, on a form built almost entirely from underline inputs,
+  read as a heavy box around whatever field you were in. Reverted on
+  purpose, with the trade-off understood — a colour-only indicator is
+  the weaker reading of WCAG 2.4.7.
+
+  The dark-mode colour fix from 2.0.5 stays: the focused border still
+  uses the lifted accent, so it remains clearly visible where the
+  original value measured 2.21:1. Buttons, the skip link, the history
+  autosave switch and the two drop zones keep their rings, having no
+  border to change instead.
+
 ## [2.0.6] - 2026-09-16
 
 The rest of the accessibility review: the help modal speaks German and
