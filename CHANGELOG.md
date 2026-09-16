@@ -1,3 +1,33 @@
+## [2.0.4] - 2026-09-16
+
+Buyer contact details, and two item-entry conveniences.
+
+### Added
+
+- **Optional buyer email and phone.** New fields below country and VAT
+  ID in the Buyer tab. They are saved with the customer profile, come
+  back with a history reload, print in the buyer address block of the
+  Modern and Typewriter layouts, and travel in the XML as the buyer
+  contact group — `ram:DefinedTradeContact` on `BuyerTradeParty` with
+  BT-57 (phone) and BT-58 (email), mirroring the seller block. DIN 5008
+  leaves them off the page on purpose: its recipient block doubles as
+  the Form B envelope address field and stays strictly postal.
+
+### Changed
+
+- **Enter adds a line item from the description and unit price fields**,
+  not just from the VAT select. It inserts a row below and jumps to its
+  description. Quantity keeps Enter free, since ↑/↓ step there.
+- **The buyer's optional second name line moved out of the "More"
+  section** to directly under company / name line 1 — where the seller
+  form already had it — and is marked with an "optional" placeholder.
+
+### Fixed
+
+- **⌘/Ctrl + Enter inside a line item** now only creates the PDF. It
+  also inserted a new row, because the Enter handler didn't check for
+  modifier keys.
+
 ## [2.0.3] - 2026-09-14
 
 Code-review follow-up to 2.0.2.
