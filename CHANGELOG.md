@@ -1,3 +1,60 @@
+## [2.0.5] - 2026-09-16
+
+Accessibility pass, and the export now reports every problem at once.
+
+### Added
+
+- **A confirmation on "New invoice."** It discards the buyer, every line
+  item and the free-text fields with nothing to undo it, so it now arms
+  the same inline yes/no that Delete customer and Clear history use. Esc
+  cancels, and a form that is already pristine skips the prompt.
+- **Jump-to-field from the validation checklist.** Every problem that
+  names a field is clickable and takes you there — switching tabs, or
+  opening the seller dropdown into edit mode, as needed.
+
+### Changed
+
+- **"Create PDF" pre-flights the same checklist the Validate button
+  shows.** It used to stop at whatever `buildXML()` threw on first and
+  report it as one auto-dismissing toast, which could name a field on
+  another tab or inside the closed seller dropdown. It now lists every
+  blocking problem at once and puts the cursor in the first one.
+  Advisory items — a recommended VAT ID, a malformed IBAN — are shown
+  but never block. One source of truth feeds both paths, so the
+  checklist and the export can no longer disagree.
+- **Modals behave like dialogs.** They declare `role="dialog"`, take
+  focus when they open, keep Tab inside them, mark the page behind
+  `inert`, and hand focus back to whatever opened them. Nested cases
+  (statistics into YoY backfill, history into add-past-invoice) stack
+  correctly.
+- **Line-item fields have real labels.** On narrow screens, where the
+  column header row is hidden, each field now shows its own caption
+  instead of leaving three unlabelled numbers.
+- **A failed preview render says so** instead of leaving the previous
+  PDF on screen looking current.
+
+### Fixed
+
+- **Dark-mode contrast.** The accent colour was never overridden for
+  dark mode and measured 2.21:1 against the card — below AA for link
+  text and below the 3:1 a focus indicator needs, which made the
+  keyboard focus ring effectively invisible. It could not simply be
+  lightened, because the same value fills buttons that carry white text,
+  so it is split: one token for fills, one for text, borders and rings.
+  Link hover had the same bug at roughly 1.6:1.
+- **Muted text failed AA in both themes** at 4.28:1 light and 3.94:1
+  dark. It is used for placeholders, small print and inactive tab
+  labels. Warning and success text in light mode failed too.
+- **Form fields showed focus only as a border-colour change**, with the
+  outline suppressed. They get a real focus ring now, as does the
+  history autosave switch, whose checkbox is invisible by design.
+- **Screen readers announced invalid fields without the reason.** The
+  inline error message was rendered but never linked to its field with
+  `aria-describedby`.
+- **11 interface labels only screen readers see were hardcoded English**
+  and ignored the language switch — every modal's close button among
+  them.
+
 ## [2.0.4] - 2026-09-16
 
 Buyer contact details, and two item-entry conveniences.
