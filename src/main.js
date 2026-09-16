@@ -431,6 +431,9 @@ const I18N = {
     preview_toggle_label: 'Vorschau',
     aria_preview_toggle: 'Live-Vorschau umschalten',
     aria_close: 'Schließen',
+    skip_to_form: 'Zum Rechnungsformular springen',
+    aria_total_announce: 'Gesamtbetrag {total}',
+    drop_pdf_aria: 'PDF auswählen oder hierher ziehen',
     aria_more_menu: 'Weitere Optionen',
     aria_buyer_select: 'Kundenprofil wählen',
     aria_history_period: 'Zeitraum',
@@ -972,6 +975,9 @@ const I18N = {
     preview_toggle_label: 'Preview',
     aria_preview_toggle: 'Toggle live preview',
     aria_close: 'Close',
+    skip_to_form: 'Skip to the invoice form',
+    aria_total_announce: 'Total {total}',
+    drop_pdf_aria: 'Choose a PDF, or drop one here',
     aria_more_menu: 'More options',
     aria_buyer_select: 'Select customer profile',
     aria_history_period: 'Period',
@@ -1501,6 +1507,9 @@ const I18N = {
     preview_toggle_label: 'Aperçu',
     aria_preview_toggle: 'Basculer l\'aperçu en direct',
     aria_close: 'Fermer',
+    skip_to_form: 'Aller au formulaire de facture',
+    aria_total_announce: 'Total {total}',
+    drop_pdf_aria: 'Choisir un PDF ou le déposer ici',
     aria_more_menu: 'Plus d\'options',
     aria_buyer_select: 'Choisir un profil client',
     aria_history_period: 'Période',
@@ -4966,6 +4975,29 @@ function updateItemsFreshHint() {
   hint.hidden = !(fresh && state.history.length > 0);
 }
 
+// Screen readers get no notification when the totals recompute, but the
+// figures change on every keystroke — announcing each intermediate value
+// would be unusable. Wait for the typing to settle, then say the total
+// once, and only if it actually moved.
+const TOTAL_ANNOUNCE_DELAY_MS = 900;
+let _totalAnnounceTimer = null;
+let _lastAnnouncedTotal = null;
+function announceTotal(text) {
+  const host = document.getElementById('totalsAnnounce');
+  if (!host) return;
+  // The first call is whatever the form loaded with, not a change the user
+  // made. Record it as the baseline and stay quiet, so nobody is greeted by
+  // "Total 0.00" on page load.
+  if (_lastAnnouncedTotal === null) { _lastAnnouncedTotal = text; return; }
+  if (_totalAnnounceTimer) clearTimeout(_totalAnnounceTimer);
+  _totalAnnounceTimer = setTimeout(() => {
+    _totalAnnounceTimer = null;
+    if (text === _lastAnnouncedTotal) return;
+    _lastAnnouncedTotal = text;
+    host.textContent = t('aria_total_announce', { total: text });
+  }, TOTAL_ANNOUNCE_DELAY_MS);
+}
+
 function calcTotals() {
   // EN 16931 canonical computation. Single source of truth for the screen
   // totals, history snapshots, the XML monetary summation, and the PDF.
@@ -5015,6 +5047,8 @@ function calcTotals() {
   const taxLabel = $('t_tax_label');
   if (taxLabel) taxLabel.textContent = t('total_tax_' + mode) || t('total_tax_S');
 
+  announceTotal(`${fmt(grand)} ${sym}`);
+
   // Amber tax-mode note (Items tab): visible only for non-standard modes.
   const noteEl = $('taxNote');
   const noteBox = document.getElementById('taxNoteBox');
@@ -5043,6 +5077,13 @@ const drop = $('drop');
 const fileInput = $('file');
 
 drop.addEventListener('click', () => fileInput.click());
+// role="button" carries no behaviour of its own — a real button would, but
+// its content model rules out the two <div>s inside. Wire the keys by hand.
+drop.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  fileInput.click();
+});
 drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
 drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
 drop.addEventListener('drop', e => {
@@ -6730,42 +6771,47 @@ function isSellerConfigured() {
 // bundle size, so the help body stays English even when the UI is de/fr.
 // The "Keyboard shortcuts" topic must stay in sync with the actual keydown
 // bindings in setupKeyboardShortcuts().
-const HELP_TOPICS = [
-  { id: 'start', title: 'Getting started', md: `Set up your seller profile once — it appears on every invoice you create. It lives behind the identity chip at the top of the form.
+// Help content, per UI language. The modal is the only place in the app
+// that carried untranslated English, which in a tool built around German
+// e-invoicing obligations was the wrong place for it. helpTopics() picks
+// the current language and falls back to English.
+const HELP_TOPICS = {
+  en: [
+    { id: 'start', title: 'Getting started', md: `Set up your seller profile once — it appears on every invoice you create. It lives behind the identity chip at the top of the form.
 
 Pick a buyer (or add a new one), add line items, and hit Create PDF. The XML is embedded automatically for ZUGFeRD 2.3 / Factur-X (EN 16931 Comfort) compliance.
 
 Everything runs offline in your browser. All data stays in \`localStorage\`; nothing is uploaded anywhere.` },
-  { id: 'profiles', title: 'Seller & buyer profiles', md: `Your seller profile is a single business identity — edit it any time from the chip at the top of the form. Master data (address, VAT ID, IBAN, BIC, bank, optional SIRET) is stored locally.
+    { id: 'profiles', title: 'Seller & buyer profiles', md: `Your seller profile is a single business identity — edit it any time from the chip at the top of the form. Master data (address, VAT ID, IBAN, BIC, bank, optional SIRET) is stored locally.
 
 Buyers are saved as reusable profiles. Save, update, or delete them from the Buyer tab; recent customers appear as one-click chips. An optional second name line prints below the buyer name (BT-45), and the buyer reference / Leitweg-ID (BT-10) is required for German government clients. Optional buyer email and phone are saved with the customer, print in the buyer address block of the Modern and Typewriter layouts, and travel in the XML as the buyer contact group (BT-58 / BT-57). DIN 5008 leaves them off the page, because its recipient block is the envelope address field.
 
 When you pick a buyer the tool shows the date and amount of the most recent invoice you sent them.` },
-  { id: 'numbering', title: 'Invoice numbering', md: `Numbers follow a pattern with tokens, set during first-run setup. Default: \`{yyyy}-{counter:5}\` e.g. \`2026-00042\`. An internal counter increments after each invoice.
+    { id: 'numbering', title: 'Invoice numbering', md: `Numbers follow a pattern with tokens, set during first-run setup. Default: \`{yyyy}-{counter:5}\` e.g. \`2026-00042\`. An internal counter increments after each invoice.
 
 - Available tokens: \`{yyyy}\`, \`{yy}\`, \`{mm}\`, \`{dd}\`, \`{counter}\`, \`{counter:N}\`.
 - Change the pattern any time from Invoice info → Numbering & dates → edit pattern.
 - The ↻ chip always previews the next number before you apply it.` },
-  { id: 'tax', title: 'Tax modes', md: `Choose Standard (S), Reverse charge (AE), Zero-rated (Z), Exempt (E), or Out of scope (O) in Invoice info → Currency & tax.
+    { id: 'tax', title: 'Tax modes', md: `Choose Standard (S), Reverse charge (AE), Zero-rated (Z), Exempt (E), or Out of scope (O) in Invoice info → Currency & tax.
 
 Non-standard modes replace the per-line VAT calculation with a contextual note printed on the invoice and encoded in the XML (EN 16931 BT-95/BT-96). For reverse charge, the legal note per Art. 196 of Council Directive 2006/112/EC is inserted automatically into both PDF and XML.` },
-  { id: 'compliance', title: 'PDF/A-3 & Factur-X', md: `Every generated PDF embeds a machine-readable Factur-X XML attachment (\`factur-x.xml\`) and conforms to PDF/A-3 for long-term archiving. Profile: EN 16931 (Comfort), \`urn:cen.eu:en16931:2017\`.
+    { id: 'compliance', title: 'PDF/A-3 & Factur-X', md: `Every generated PDF embeds a machine-readable Factur-X XML attachment (\`factur-x.xml\`) and conforms to PDF/A-3 for long-term archiving. Profile: EN 16931 (Comfort), \`urn:cen.eu:en16931:2017\`.
 
-Use Validate XML before sending to check required fields, IBAN checksum, and VAT-ID plausibility — validation never blocks export.
+Use Validate XML before sending to check required fields, IBAN checksum, and VAT-ID plausibility — validation never blocks export. Every problem that names a field is clickable and takes you straight to it. Create PDF runs the same checklist first: if something mandatory is missing it lists every problem at once rather than stopping at the first, and puts the cursor in the first offending field.
 
 Already have a designed PDF (e.g. from InDesign)? Embed XML… retrofits it with the invoice XML. Generated files pass Quba Viewer, Mustang, ELSTER, and strict verapdf validation.` },
-  { id: 'filenames', title: 'Filename patterns', md: `Build your own filename using tokens in Invoice info → Filename pattern. The pattern is a real text field — type freely, or click a token chip to append one.
+    { id: 'filenames', title: 'Filename patterns', md: `Build your own filename using tokens in Invoice info → Filename pattern. The pattern is a real text field — type freely, or click a token chip to append one.
 
 - Tokens: \`{nr}\`, \`{buyer}\`, \`{project}\`, \`{date}\`, \`{category}\`, \`{seller}\`, \`{layout}\`.
 - A live preview below shows the resolved filename with its \`.pdf\` suffix.
 - The pattern is saved automatically as you type.` },
-  { id: 'history', title: 'History & statistics', md: `Every generated invoice is saved automatically (up to 1000 entries, oldest dropped first) — toggleable via the Auto-save switch in the History modal.
+    { id: 'history', title: 'History & statistics', md: `Every generated invoice is saved automatically (up to 1000 entries, oldest dropped first) — toggleable via the Auto-save switch in the History modal.
 
 - **Reload** a past invoice back into the form. All fields including buyer, items, tax mode, language, font and layout are restored; the number is auto-assigned.
 - **Add past invoice** backfills records that predate this tool so statistics cover full periods.
 - Statistics summarizes revenue, invoice counts, averages, a monthly chart and top buyers (click one to drill down), per currency. The Quarters tab shows Q1–Q4 with a year selector, and YoY comparison can be backfilled manually.
 - Export CSV dumps the current view as UTF-8 with semicolon separators.` },
-  { id: 'shortcuts', title: 'Keyboard shortcuts', md: `Shortcuts work anywhere in the app except while typing in a field (Esc always works).
+    { id: 'shortcuts', title: 'Keyboard shortcuts', md: `Shortcuts work anywhere in the app except while typing in a field (Esc always works).
 
 - ⌘/Ctrl + Enter — Create PDF
 - ⌘/Ctrl + D — Duplicate last invoice
@@ -6773,12 +6819,114 @@ Already have a designed PDF (e.g. from InDesign)? Embed XML… retrofits it with
 - ? — Open this Help panel
 - Esc — Close the current menu, modal, or panel, or cancel a pending confirmation
 - Tab — Inside a modal, cycles within it; the form behind stays out of reach until it closes
+- ← / → on the tabs — Move between Buyer, Items and Invoice info
 
 These keys work *inside* a line item, where the ones above stay out of the way:
 
 - ↑ / ↓ in a quantity field — step by whole units (\`2.5\` up becomes \`3\`). The same two arrows appear at the right edge of the field while it has focus.
 - Enter in the description, unit price or VAT field — insert a row below and jump to its description` },
-];
+  ],
+  de: [
+    { id: 'start', title: 'Erste Schritte', md: `Lege dein Verkäuferprofil einmal an — es erscheint auf jeder Rechnung, die du erstellst. Du findest es hinter dem Identitäts-Chip oben im Formular.
+
+Wähle einen Kunden (oder lege einen neuen an), erfasse die Positionen und klicke auf „PDF erstellen“. Das XML wird automatisch eingebettet, konform zu ZUGFeRD 2.3 / Factur-X (EN 16931 Comfort).
+
+Alles läuft offline in deinem Browser. Sämtliche Daten bleiben im \`localStorage\`; nichts wird irgendwohin hochgeladen.` },
+    { id: 'profiles', title: 'Verkäufer- & Kundenprofile', md: `Dein Verkäuferprofil ist eine einzelne Geschäftsidentität — bearbeite es jederzeit über den Chip oben im Formular. Die Stammdaten (Anschrift, USt-IdNr., IBAN, BIC, Bank, optionale SIRET) liegen lokal.
+
+Kunden werden als wiederverwendbare Profile gespeichert. Anlegen, aktualisieren und löschen kannst du sie im Tab „Käufer“; zuletzt genutzte Kunden erscheinen als Chips für einen Klick. Eine optionale zweite Namenszeile wird unter dem Käufernamen gedruckt (BT-45), und die Käuferreferenz bzw. Leitweg-ID (BT-10) ist für deutsche öffentliche Auftraggeber Pflicht. Optionale E-Mail und Telefonnummer des Käufers werden mit dem Kunden gespeichert, im Adressblock der Layouts „Modern“ und „Typewriter“ gedruckt und als Käufer-Kontaktgruppe ins XML übernommen (BT-58 / BT-57). DIN 5008 lässt sie auf dem Papier weg, weil dessen Empfängerblock das Anschriftenfeld für das Fensterkuvert ist.
+
+Wenn du einen Kunden auswählst, zeigt das Tool Datum und Betrag der letzten Rechnung, die du ihm gestellt hast.` },
+    { id: 'numbering', title: 'Rechnungsnummern', md: `Nummern folgen einem Muster aus Platzhaltern, das bei der Ersteinrichtung festgelegt wird. Standard: \`{yyyy}-{counter:5}\`, also z. B. \`2026-00042\`. Ein interner Zähler wird nach jeder Rechnung erhöht.
+
+- Verfügbare Platzhalter: \`{yyyy}\`, \`{yy}\`, \`{mm}\`, \`{dd}\`, \`{counter}\`, \`{counter:N}\`.
+- Das Muster lässt sich jederzeit ändern: Rechnungsdaten → Nummerierung & Daten → Muster bearbeiten.
+- Der ↻-Chip zeigt immer die nächste Nummer, bevor du sie übernimmst.` },
+    { id: 'tax', title: 'Steuerfälle', md: `Wähle Regelbesteuerung (S), Reverse Charge (AE), Nullsatz (Z), Steuerbefreit (E) oder Nicht steuerbar (O) unter Rechnungsdaten → Währung & Steuer.
+
+Alle Fälle außer der Regelbesteuerung ersetzen die zeilenweise MwSt-Berechnung durch einen passenden Hinweis, der auf der Rechnung gedruckt und im XML kodiert wird (EN 16931 BT-95/BT-96). Beim Reverse Charge wird der rechtliche Hinweis nach Art. 196 der Richtlinie 2006/112/EG automatisch in PDF und XML eingefügt.` },
+    { id: 'compliance', title: 'PDF/A-3 & Factur-X', md: `Jedes erzeugte PDF enthält einen maschinenlesbaren Factur-X-XML-Anhang (\`factur-x.xml\`) und entspricht PDF/A-3 für die Langzeitarchivierung. Profil: EN 16931 (Comfort), \`urn:cen.eu:en16931:2017\`.
+
+Nutze „XML prüfen“ vor dem Versand, um Pflichtfelder, IBAN-Prüfsumme und Plausibilität der USt-IdNr. zu kontrollieren — die Prüfung blockiert den Export nie. Jeder Punkt, der ein Feld benennt, ist anklickbar und bringt dich direkt dorthin. „PDF erstellen“ führt dieselbe Prüfung vorab aus: Fehlt etwas Pflichtiges, werden alle Punkte auf einmal aufgelistet statt nur der erste, und der Cursor landet im ersten betroffenen Feld.
+
+Du hast bereits ein gestaltetes PDF, etwa aus InDesign? „XML einbetten…“ rüstet es mit dem Rechnungs-XML nach. Die erzeugten Dateien bestehen Quba Viewer, Mustang, ELSTER und die strenge verapdf-Prüfung.` },
+    { id: 'filenames', title: 'Dateinamen-Muster', md: `Baue deinen eigenen Dateinamen aus Platzhaltern unter Rechnungsdaten → Dateiname. Das Muster ist ein echtes Textfeld — tippe frei, oder klicke einen Platzhalter-Chip an, um ihn anzuhängen.
+
+- Platzhalter: \`{nr}\`, \`{buyer}\`, \`{project}\`, \`{date}\`, \`{category}\`, \`{seller}\`, \`{layout}\`.
+- Eine Live-Vorschau darunter zeigt den aufgelösten Dateinamen samt \`.pdf\`-Endung.
+- Das Muster wird beim Tippen automatisch gespeichert.` },
+    { id: 'history', title: 'Verlauf & Statistik', md: `Jede erzeugte Rechnung wird automatisch gespeichert (bis zu 1000 Einträge, die ältesten fallen zuerst heraus) — abschaltbar über den Schalter „Automatisch speichern“ im Verlaufs-Dialog.
+
+- **Neu laden** holt eine frühere Rechnung zurück ins Formular. Alle Felder werden wiederhergestellt, inklusive Käufer, Positionen, Steuerfall, Sprache, Schrift und Layout; die Nummer wird neu vergeben.
+- **Frühere Rechnung erfassen** trägt Vorgänge nach, die älter sind als dieses Tool, damit die Statistik ganze Zeiträume abdeckt.
+- Die Statistik fasst Umsatz, Rechnungsanzahl, Durchschnitte, ein Monatsdiagramm und die wichtigsten Kunden zusammen (anklicken für Details), getrennt nach Währung. Der Tab „Quartale“ zeigt Q1–Q4 mit Jahresauswahl, und der Jahresvergleich lässt sich manuell nachtragen.
+- „CSV exportieren“ gibt die aktuelle Ansicht als UTF-8 mit Semikolon als Trennzeichen aus.` },
+    { id: 'shortcuts', title: 'Tastenkürzel', md: `Die Kürzel wirken überall in der App, außer während du in einem Feld tippst (Esc wirkt immer).
+
+- ⌘/Strg + Enter — PDF erstellen
+- ⌘/Strg + D — Letzte Rechnung duplizieren
+- 1 / 2 / 3 — Zu Käufer / Positionen / Rechnungsdaten springen
+- ? — Diese Hilfe öffnen
+- Esc — Aktuelles Menü, Fenster oder Panel schließen, oder eine offene Rückfrage abbrechen
+- Tab — In einem Dialog bleibt der Fokus darin; das Formular dahinter ist bis zum Schließen nicht erreichbar
+- ← / → auf den Tabs — Zwischen Käufer, Positionen und Rechnungsdaten wechseln
+
+Diese Tasten wirken *innerhalb* einer Position, wo die obigen sich zurückhalten:
+
+- ↑ / ↓ im Mengenfeld — in ganzen Einheiten schrittweise ändern (aus \`2,5\` wird nach oben \`3\`). Dieselben zwei Pfeile erscheinen am rechten Rand des Feldes, solange es den Fokus hat.
+- Enter in Beschreibung, Einzelpreis oder MwSt-Feld — fügt darunter eine Zeile ein und springt in deren Beschreibung` },
+  ],
+  fr: [
+    { id: 'start', title: 'Premiers pas', md: `Renseigne ton profil vendeur une seule fois — il apparaît sur chaque facture que tu crées. Il se trouve derrière la puce d'identité en haut du formulaire.
+
+Choisis un client (ou ajoutes-en un), saisis les lignes, puis clique sur « Créer le PDF ». Le XML est intégré automatiquement, conformément à ZUGFeRD 2.3 / Factur-X (EN 16931 Comfort).
+
+Tout fonctionne hors ligne dans ton navigateur. Toutes les données restent dans le \`localStorage\` ; rien n'est envoyé nulle part.` },
+    { id: 'profiles', title: 'Profils vendeur & client', md: `Ton profil vendeur est une identité d'entreprise unique — modifie-le à tout moment depuis la puce en haut du formulaire. Les données de base (adresse, numéro de TVA, IBAN, BIC, banque, SIRET facultatif) sont stockées localement.
+
+Les clients sont enregistrés comme profils réutilisables. Enregistre-les, mets-les à jour ou supprime-les depuis l'onglet « Client » ; les clients récents apparaissent sous forme de puces accessibles en un clic. Une deuxième ligne de nom facultative s'imprime sous le nom du client (BT-45), et la référence client / Leitweg-ID (BT-10) est obligatoire pour les administrations allemandes. L'e-mail et le téléphone facultatifs du client sont enregistrés avec lui, imprimés dans le bloc d'adresse des mises en page « Modern » et « Typewriter », et transmis dans le XML comme groupe de contact acheteur (BT-58 / BT-57). DIN 5008 les omet volontairement, son bloc destinataire servant de zone d'adresse pour l'enveloppe à fenêtre.
+
+Quand tu choisis un client, l'outil affiche la date et le montant de la dernière facture que tu lui as adressée.` },
+    { id: 'numbering', title: 'Numérotation des factures', md: `Les numéros suivent un motif à jetons, défini lors de la configuration initiale. Par défaut : \`{yyyy}-{counter:5}\`, par exemple \`2026-00042\`. Un compteur interne s'incrémente après chaque facture.
+
+- Jetons disponibles : \`{yyyy}\`, \`{yy}\`, \`{mm}\`, \`{dd}\`, \`{counter}\`, \`{counter:N}\`.
+- Le motif se modifie à tout moment : Détails de la facture → Numérotation & dates → modifier le motif.
+- La puce ↻ prévisualise toujours le prochain numéro avant que tu l'appliques.` },
+    { id: 'tax', title: 'Régimes de TVA', md: `Choisis Régime normal (S), Autoliquidation (AE), Taux zéro (Z), Exonéré (E) ou Hors champ (O) dans Détails de la facture → Devise & TVA.
+
+Tous les régimes autres que le régime normal remplacent le calcul de TVA ligne par ligne par une mention adaptée, imprimée sur la facture et encodée dans le XML (EN 16931 BT-95/BT-96). Pour l'autoliquidation, la mention légale au titre de l'art. 196 de la directive 2006/112/CE est insérée automatiquement dans le PDF et dans le XML.` },
+    { id: 'compliance', title: 'PDF/A-3 & Factur-X', md: `Chaque PDF généré intègre une pièce jointe XML Factur-X lisible par machine (\`factur-x.xml\`) et respecte PDF/A-3 pour l'archivage à long terme. Profil : EN 16931 (Comfort), \`urn:cen.eu:en16931:2017\`.
+
+Utilise « Valider le XML » avant l'envoi pour contrôler les champs obligatoires, la clé de l'IBAN et la plausibilité du numéro de TVA — la validation ne bloque jamais l'export. Chaque point qui nomme un champ est cliquable et t'y emmène directement. « Créer le PDF » lance la même liste au préalable : s'il manque quelque chose d'obligatoire, tous les points sont listés d'un coup au lieu du premier seulement, et le curseur se place dans le premier champ concerné.
+
+Tu as déjà un PDF mis en page, par exemple depuis InDesign ? « Intégrer le XML… » y ajoute le XML de la facture. Les fichiers produits passent Quba Viewer, Mustang, ELSTER et la validation stricte verapdf.` },
+    { id: 'filenames', title: 'Motifs de nom de fichier', md: `Compose ton propre nom de fichier à partir de jetons, dans Détails de la facture → Nom de fichier. Le motif est un vrai champ texte — écris librement, ou clique sur une puce de jeton pour l'ajouter.
+
+- Jetons : \`{nr}\`, \`{buyer}\`, \`{project}\`, \`{date}\`, \`{category}\`, \`{seller}\`, \`{layout}\`.
+- Un aperçu en direct, juste en dessous, montre le nom résolu avec son extension \`.pdf\`.
+- Le motif est enregistré automatiquement au fil de la frappe.` },
+    { id: 'history', title: 'Historique & statistiques', md: `Chaque facture générée est enregistrée automatiquement (jusqu'à 1000 entrées, les plus anciennes disparaissant en premier) — désactivable via l'interrupteur « Enregistrement automatique » dans la fenêtre Historique.
+
+- **Recharger** ramène une facture passée dans le formulaire. Tous les champs sont restaurés, y compris client, lignes, régime de TVA, langue, police et mise en page ; le numéro est réattribué.
+- **Ajouter une facture passée** permet de saisir après coup des documents antérieurs à cet outil, pour que les statistiques couvrent des périodes complètes.
+- Les statistiques résument le chiffre d'affaires, le nombre de factures, les moyennes, un graphique mensuel et les principaux clients (clique sur l'un d'eux pour le détail), par devise. L'onglet « Trimestres » affiche T1–T4 avec un sélecteur d'année, et la comparaison annuelle peut être complétée manuellement.
+- « Exporter en CSV » produit la vue courante en UTF-8 avec point-virgule comme séparateur.` },
+    { id: 'shortcuts', title: 'Raccourcis clavier', md: `Les raccourcis fonctionnent partout dans l'application, sauf pendant la saisie dans un champ (Échap fonctionne toujours).
+
+- ⌘/Ctrl + Entrée — Créer le PDF
+- ⌘/Ctrl + D — Dupliquer la dernière facture
+- 1 / 2 / 3 — Aller à Client / Lignes / Détails de la facture
+- ? — Ouvrir cette aide
+- Échap — Fermer le menu, la fenêtre ou le panneau courant, ou annuler une confirmation en attente
+- Tab — Dans une fenêtre modale, le focus y reste ; le formulaire derrière est hors d'atteinte jusqu'à sa fermeture
+- ← / → sur les onglets — Passer de Client à Lignes puis Détails de la facture
+
+Ces touches agissent *à l'intérieur* d'une ligne, là où les précédentes s'effacent :
+
+- ↑ / ↓ dans un champ quantité — incrémente par unités entières (\`2,5\` vers le haut devient \`3\`). Les deux mêmes flèches apparaissent au bord droit du champ tant qu'il a le focus.
+- Entrée dans la description, le prix unitaire ou la TVA — insère une ligne en dessous et saute dans sa description` },
+  ],
+};
 
 
 // Render a small subset of Markdown to HTML. Handles: # headings, lists,
@@ -6983,10 +7131,15 @@ document.addEventListener('keydown', (e) => {
 let helpTopicId = 'start';
 let helpSearchTerm = '';
 
+function helpTopics() {
+  return HELP_TOPICS[CURRENT_LANG] || HELP_TOPICS.en;
+}
+
 function filteredHelpTopics() {
+  const topics = helpTopics();
   const term = helpSearchTerm.trim().toLowerCase();
-  if (!term) return HELP_TOPICS;
-  return HELP_TOPICS.filter(tp =>
+  if (!term) return topics;
+  return topics.filter(tp =>
     tp.title.toLowerCase().includes(term) || tp.md.toLowerCase().includes(term));
 }
 
@@ -7133,19 +7286,41 @@ function injectUIFontFaces() {
 }
 
 // --- Tabs (Buyer / Items / Invoice info) ---
-function setActiveTab(key) {
+const TAB_KEYS = ['buyer', 'items', 'details'];
+
+function setActiveTab(key, focusTab) {
   document.querySelectorAll('#tabs .tab').forEach(btn => {
     const active = btn.dataset.tab === key;
     btn.classList.toggle('active', active);
     btn.setAttribute('aria-selected', String(active));
+    // Roving tabindex: one stop for the whole tablist, Arrow keys move
+    // within it. Tab from the tablist lands in the panel, not on tab two.
+    btn.tabIndex = active ? 0 : -1;
+    if (active && focusTab) btn.focus();
   });
-  ['buyer', 'items', 'details'].forEach(k => {
+  TAB_KEYS.forEach(k => {
     const panel = document.getElementById('tab-' + k);
     if (panel) panel.hidden = k !== key;
   });
 }
 document.querySelectorAll('#tabs .tab').forEach(btn => {
   btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
+});
+// Arrow/Home/End navigation, per the ARIA tabs pattern. Selection follows
+// focus, which is the right call here: switching a tab has no cost beyond
+// showing a different panel.
+document.getElementById('tabs').addEventListener('keydown', (e) => {
+  const current = document.querySelector('#tabs .tab.active');
+  if (!current) return;
+  const i = TAB_KEYS.indexOf(current.dataset.tab);
+  let next = null;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (i + 1) % TAB_KEYS.length;
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (i - 1 + TAB_KEYS.length) % TAB_KEYS.length;
+  else if (e.key === 'Home') next = 0;
+  else if (e.key === 'End') next = TAB_KEYS.length - 1;
+  if (next === null) return;
+  e.preventDefault();
+  setActiveTab(TAB_KEYS[next], true);
 });
 
 // --- Overflow menu (⋯) ---

@@ -148,6 +148,27 @@ details > summary::-webkit-details-marker { display: none; }
    override the UA's `[hidden] { display: none }` — force it. */
 [hidden] { display: none !important; }
 
+/* Offscreen until focused, then parked over the top-left of the card. */
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -60px;
+  z-index: 100;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--accent-fg);
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--shadow-menu);
+  transition: top 0.12s ease;
+}
+.skip-link:focus-visible {
+  top: 8px;
+  outline: 2px solid var(--accent-fg);
+  outline-offset: 2px;
+}
+
 .visually-hidden {
   position: absolute !important;
   width: 1px; height: 1px;
@@ -497,6 +518,9 @@ details > summary::-webkit-details-marker { display: none; }
    (handoff updates #4 + #5) — the card height stays constant across tabs. */
 .tab-panels { flex: 1; min-height: 0; overflow-y: auto; }
 .tab-panel { padding: 24px 30px; }
+/* tabindex=0 makes the panel reachable after the tablist (ARIA tabs pattern)
+   and is the skip link's target — neither should paint a focus ring. */
+.tab-panels:focus, .tab-panel:focus { outline: none; }
 .panel-inner { display: flex; flex-direction: column; gap: 16px; }
 /* All three tabs fill the full column width (the old 520/560px caps made
    Buyer/Invoice info narrower than the Items grid — handoff update #1). */
@@ -620,7 +644,11 @@ textarea {
 }
 
 .label-with-tip { display: inline-flex; align-items: center; gap: 5px; }
+/* The dot stays 14px so it sits quietly next to its label, but WCAG 2.5.8
+   measures the *target*, not the ink — a centred pseudo-element pads the hit
+   area out to 24x24 without moving anything on screen. */
 .tooltip-btn {
+  position: relative;
   width: 14px; height: 14px;
   border-radius: 50%;
   border: 1px solid var(--border-strong);
@@ -631,6 +659,13 @@ textarea {
   padding: 0;
   cursor: help;
   text-transform: none;
+}
+.tooltip-btn::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px; height: 24px;
 }
 
 
@@ -763,10 +798,17 @@ textarea {
 
 /* Touch devices: same focus rule, but a target big enough to hit with a
    fingertip (the gutter widens to match, so the arrows still never overlap
-   the number). */
+   the number).
+
+   These stay under the 24x24 of WCAG 2.5.8 and cannot reach it: two stacked
+   24px buttons are taller than the row. They qualify for the criterion's
+   equivalent-control exception instead — the quantity is a text field you
+   can simply type into, and ArrowUp/ArrowDown step it from the keyboard.
+   The arrows are a convenience on top of both, and are aria-hidden and
+   out of the tab order for exactly that reason. */
 @media (hover: none) {
-  .qty-step button { width: 18px; height: 13px; font-size: 9px; }
-  .item-row .qty-field input.num { padding-left: 18px; padding-right: 18px; }
+  .qty-step button { width: 24px; height: 15px; font-size: 10px; }
+  .item-row .qty-field input.num { padding-left: 24px; padding-right: 24px; }
 }
 .item-row select { font-size: 13px; }
 .item-row .line-total { font-weight: 600; text-align: center; }
@@ -779,6 +821,9 @@ textarea {
   cursor: pointer;
   padding: 4px;
   white-space: nowrap;
+  /* 2.5.8 minimum; the grid column is 28px, so this fits without reflow. */
+  min-width: 24px;
+  min-height: 24px;
 }
 .item-row .remove:hover { color: var(--accent-fg); }
 .item-row .remove.confirming { color: var(--accent-fg); font-weight: 600; }
@@ -931,7 +976,14 @@ summary.section-caption::after {
   gap: 10px;
 }
 .text-block-preset { display: flex; align-items: center; gap: 6px; }
-.preset-delete { padding: 2px 4px; }
+.preset-delete {
+  padding: 0;
+  min-width: 24px;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 .preset-save-row { display: flex; flex-direction: column; gap: 6px; }
 .preset-save-row .preset-save-link { align-self: flex-start; font-size: 11px; }
 .preset-naming { display: flex; gap: 8px; align-items: center; }
@@ -1247,7 +1299,14 @@ summary.section-caption::after {
   background: transparent;
   border: none;
   cursor: pointer;
-  padding: 2px 6px;
+  padding: 0;
+  /* 2.5.8 minimum. It was 26x18, which missed on the short axis. */
+  min-width: 24px;
+  min-height: 24px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .modal-x:hover { color: var(--text); }
 
@@ -1696,6 +1755,9 @@ summary.section-caption::after {
   text-align: center;
 }
 .backup-drop:hover { border-color: var(--text-faint); }
+/* The file input inside is .visually-hidden, so it can take focus with
+   nothing to show for it — put the ring on the label it sits in. */
+.backup-drop:focus-within { outline: 2px solid var(--accent-fg); outline-offset: 2px; }
 
 .backup-pending {
   display: flex;
@@ -1775,6 +1837,7 @@ summary.section-caption::after {
   cursor: pointer;
 }
 .drop.dragover, .drop:hover { border-color: var(--accent-fg); color: var(--text-muted); }
+.drop:focus-visible { outline: 2px solid var(--accent-fg); outline-offset: 2px; }
 .drop.has-file { border-style: solid; border-color: var(--success-text); color: var(--text); }
 .drop .fname { margin-top: 6px; font-weight: 600; color: var(--success-text); }
 .embed-actions { display: flex; justify-content: flex-end; }

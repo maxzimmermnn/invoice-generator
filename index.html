@@ -25,8 +25,10 @@
   This tool requires JavaScript. Please enable it.
 </noscript>
 
+<a class="skip-link" href="#tabPanels" data-i18n="skip_to_form"></a>
+
 <div class="app-shell">
-<div class="app-card" id="appCard">
+<main class="app-card" id="appCard">
 
 <!-- ===== Left column: form ===== -->
 <div class="form-col wrap">
@@ -162,16 +164,19 @@
   </div>
 
   <!-- Tabs -->
-  <nav class="tabs" id="tabs" role="tablist">
-    <button class="tab active" type="button" role="tab" aria-selected="true" data-tab="buyer" data-i18n="tab_buyer"></button>
-    <button class="tab" type="button" role="tab" aria-selected="false" data-tab="items" data-i18n="tab_items"></button>
-    <button class="tab" type="button" role="tab" aria-selected="false" data-tab="details" data-i18n="tab_details"></button>
-  </nav>
+  <!-- role="tablist" replaces the <nav> landmark semantics, so this is a
+       plain div — a navigation landmark that is not navigation is worse
+       than none. Roving tabindex + Arrow keys are wired in setActiveTab. -->
+  <div class="tabs" id="tabs" role="tablist">
+    <button class="tab active" type="button" role="tab" id="tab-btn-buyer" aria-controls="tab-buyer" aria-selected="true" data-tab="buyer" data-i18n="tab_buyer"></button>
+    <button class="tab" type="button" role="tab" id="tab-btn-items" aria-controls="tab-items" aria-selected="false" tabindex="-1" data-tab="items" data-i18n="tab_items"></button>
+    <button class="tab" type="button" role="tab" id="tab-btn-details" aria-controls="tab-details" aria-selected="false" tabindex="-1" data-tab="details" data-i18n="tab_details"></button>
+  </div>
 
-  <div class="tab-panels">
+  <div class="tab-panels" id="tabPanels" tabindex="-1">
 
     <!-- ===== BUYER TAB ===== -->
-    <section class="tab-panel" id="tab-buyer" role="tabpanel">
+    <section class="tab-panel" id="tab-buyer" role="tabpanel" aria-labelledby="tab-btn-buyer" tabindex="-1">
       <div class="panel-inner narrow-panel">
         <div class="field-stack">
           <label class="mini-label" data-i18n="recent_customers"></label>
@@ -246,7 +251,7 @@
     </section>
 
     <!-- ===== ITEMS TAB ===== -->
-    <section class="tab-panel" id="tab-items" role="tabpanel" hidden>
+    <section class="tab-panel" id="tab-items" role="tabpanel" aria-labelledby="tab-btn-items" tabindex="-1" hidden>
       <div class="panel-inner">
         <div class="items-head" id="itemsHead">
           <div data-i18n="th_desc"></div>
@@ -269,6 +274,10 @@
           <div class="totals-row"><span id="t_tax_label">VAT</span><span id="t_tax">0,00</span></div>
           <div class="totals-row grand"><span data-i18n="total_grand"></span><span id="t_total">0,00</span></div>
         </div>
+        <!-- The totals above change on every keystroke, which is far too
+             noisy to mark up as a live region directly. This one is updated
+             on a debounce with the settled figure instead. -->
+        <div id="totalsAnnounce" class="visually-hidden" role="status" aria-live="polite"></div>
 
         <div class="warn-banner" id="taxNoteBox" hidden><span id="taxNote"></span></div>
 
@@ -277,7 +286,7 @@
     </section>
 
     <!-- ===== INVOICE INFO TAB ===== -->
-    <section class="tab-panel" id="tab-details" role="tabpanel" hidden>
+    <section class="tab-panel" id="tab-details" role="tabpanel" aria-labelledby="tab-btn-details" tabindex="-1" hidden>
       <div class="panel-inner narrow-panel">
 
         <!-- 1. Numbering & dates (always open) -->
@@ -545,7 +554,7 @@
   </div>
 </aside>
 
-</div><!-- /.app-card -->
+</main><!-- /.app-card -->
 </div><!-- /.app-shell -->
 
 <!-- ===== Stats modal ===== -->
@@ -776,7 +785,8 @@
       <button id="embedClose" class="modal-x" type="button" data-i18n-aria-label="aria_close">✕</button>
     </div>
     <p class="modal-intro" data-i18n="embed_intro"></p>
-    <div class="drop" id="drop">
+    <div class="drop" id="drop" role="button" tabindex="0"
+         data-i18n-aria-label="drop_pdf_aria">
       <div data-i18n="drop_pdf"></div>
       <div class="fname" id="fname"></div>
     </div>

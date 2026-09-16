@@ -324,7 +324,19 @@ contrast for text, focus rings and status colours.
 "Help & docs" in the overflow menu (or the `?` key) opens a two-pane help
 modal with a searchable topic sidebar (getting started, profiles,
 numbering, tax modes, PDF/A-3 & Factur-X, filename patterns, history &
-statistics, keyboard shortcuts). No internet required.
+statistics, keyboard shortcuts). All eight topics exist in all three UI
+languages, and the search matches whichever one is active. No internet
+required.
+
+### Accessibility
+The interface targets WCAG 2.1 AA. Every control is reachable and operable
+from the keyboard, including the tabs (← / → move between them), the PDF
+drop zone, and the modals, which take focus when they open, keep it inside
+while they are open, and hand it back when they close. A skip link jumps
+past the header to the form. Text, focus indicators and status colours meet
+AA contrast in both light and dark themes, and interactive targets are at
+least 24×24 px. Line-item fields, validation errors and the invoice total
+are all exposed to screen readers.
 
 ---
 
