@@ -6560,7 +6560,7 @@ Pick a buyer (or add a new one), add line items, and hit Create PDF. The XML is 
 Everything runs offline in your browser. All data stays in \`localStorage\`; nothing is uploaded anywhere.` },
   { id: 'profiles', title: 'Seller & buyer profiles', md: `Your seller profile is a single business identity — edit it any time from the chip at the top of the form. Master data (address, VAT ID, IBAN, BIC, bank, optional SIRET) is stored locally.
 
-Buyers are saved as reusable profiles. Save, update, or delete them from the Buyer tab; recent customers appear as one-click chips. An optional second name line prints below the buyer name (BT-45), and the buyer reference / Leitweg-ID (BT-10) is required for German government clients. Optional buyer email and phone are saved with the customer and travel in the XML as the buyer contact group (BT-58 / BT-57) — they are not printed on the PDF.
+Buyers are saved as reusable profiles. Save, update, or delete them from the Buyer tab; recent customers appear as one-click chips. An optional second name line prints below the buyer name (BT-45), and the buyer reference / Leitweg-ID (BT-10) is required for German government clients. Optional buyer email and phone are saved with the customer, print in the buyer address block of every layout, and travel in the XML as the buyer contact group (BT-58 / BT-57). In DIN 5008 they sit after the postal address, so they also appear in the envelope window.
 
 When you pick a buyer the tool shows the date and amount of the most recent invoice you sent them.` },
   { id: 'numbering', title: 'Invoice numbering', md: `Numbers follow a pattern with tokens, set during first-run setup. Default: \`{yyyy}-{counter:5}\` e.g. \`2026-00042\`. An internal counter increments after each invoice.

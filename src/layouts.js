@@ -229,13 +229,17 @@ async function renderInvoiceDIN5008(pdfDoc, ctx) {
   drawText(senderMini, M_L, senderLineY, mono, senderSize, SOFT);
   drawRule(senderLineY - 2, 0.3, M_L, M_L + mm(85));
 
-  // Recipient block (Form B: starts at 50mm from top, max 9 lines)
+  // Recipient block (Form B: starts at 50mm from top, max 9 lines). The
+  // postal address comes first because this block sits in the envelope
+  // window; optional contact lines are appended after it, never between.
   const recipientLines = [
     buyer.name,
     buyer.name2,
     buyer.line1,
     `${buyer.zip || ''} ${buyer.city || ''}`.trim(),
     (buyer.country && buyer.country !== seller.country) ? cn(buyer.country).toUpperCase() : '',
+    buyer.email,
+    buyer.phone,
   ].filter(Boolean);
   let y = PAGE_H - mm(52);
   for (const ln of recipientLines) { drawText(ln, M_L, y, mono, SIZE); y -= LINE; }
@@ -548,7 +552,7 @@ async function renderInvoiceModern(pdfDoc, ctx) {
   if (seller.name)  { drawText(seller.name,  colR, yR2, monoBold, SIZE_BODY); yR2 -= LINE; }
   if (seller.name2) { drawText(seller.name2, colR, yR2, monoBold, SIZE_BODY); yR2 -= LINE; }
 
-  const buyerLines  = formatPartyAddress(buyer,  cn, { includeReference: true });
+  const buyerLines  = formatPartyAddress(buyer,  cn, { includeContact: true, includeReference: true });
   const sellerLines = formatPartyAddress(seller, cn, { includeContact: true });
   const buyerColW  = contentW * 0.55 - 12;
   const sellerColW = contentW * 0.45 - 12;
@@ -796,7 +800,7 @@ async function renderInvoiceTypewriter(pdfDoc, ctx) {
   let y = PAGE_H - M_T;
   const topY = y;
 
-  const buyerAddr  = formatPartyAddress(buyer,  cn, { includeReference: true });
+  const buyerAddr  = formatPartyAddress(buyer,  cn, { includeContact: true, includeReference: true });
   const sellerAddr = formatPartyAddress(seller, cn, { includeContact: true });
 
   const colBuyerX = M_L;
