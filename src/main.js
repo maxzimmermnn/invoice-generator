@@ -2240,12 +2240,20 @@ async function persistBuyers() {
   const ok = await store.set(BUYERS_KEY, JSON.stringify(state.buyers));
   if (!ok) toast(t('msg_save_failed'), 'err');
 }
+// state.buyers stays in insertion order — the recent-customer chips key off
+// that — so the alphabetical order lives in the pickers: entries are sorted by
+// name for display while each option keeps its original array index as value.
+function buyersByName() {
+  return state.buyers
+    .map((b, i) => ({ b, i }))
+    .sort((x, y) => (x.b.name || '').localeCompare(y.b.name || '', undefined, { sensitivity: 'base', numeric: true }));
+}
 function renderBuyerPicker() {
   const picker = $('buyerPicker');
   const current = picker.value;
   picker.innerHTML = `<option value="">${esc(t('f_buyer_picker'))}</option>` +
-    state.buyers
-      .map((b, i) => `<option value="${i}">${esc(b.name || t('msg_buyer_unnamed'))}${b.city ? ' · ' + esc(b.city) : ''}</option>`)
+    buyersByName()
+      .map(({ b, i }) => `<option value="${i}">${esc(b.name || t('msg_buyer_unnamed'))}${b.city ? ' · ' + esc(b.city) : ''}</option>`)
       .join('');
   if (current && state.buyers[current]) picker.value = current;
   renderRecentCustomerChips();
@@ -3153,7 +3161,7 @@ function renderHistoryPicker() {
          <button class="link-faint history-delete-btn" type="button" data-idx="${i}">${esc(t('btn_delete'))}</button>`;
     li.innerHTML = `
       <div class="h-num">${esc(e.number || '—')}</div>
-      <div class="h-buyer">${esc(e.buyerName || '—')}<span class="status-pill ${status}">${esc(statusLabel)}</span></div>
+      <div class="h-buyer"><span class="h-buyer-name">${esc(e.buyerName || '—')}</span><span class="status-pill ${status}">${esc(statusLabel)}</span></div>
       <div class="h-date">${esc(formatDate(e.date))}</div>
       <div class="h-total">${esc(formatTotal(e.total, e.currency))}</div>
       <div class="history-row-actions">${actions}</div>
@@ -3388,8 +3396,8 @@ function openPastInvoiceModal() {
   const buyerSel = $('past_buyer_select');
   const placeholder = t('past_field_buyer_select');
   const opts = [`<option value="">${esc(placeholder)}</option>`];
-  for (let i = 0; i < state.buyers.length; i++) {
-    opts.push(`<option value="${i}">${esc(state.buyers[i].name || '—')}</option>`);
+  for (const { b, i } of buyersByName()) {
+    opts.push(`<option value="${i}">${esc(b.name || '—')}</option>`);
   }
   buyerSel.innerHTML = opts.join('');
   buyerSel.value = '';

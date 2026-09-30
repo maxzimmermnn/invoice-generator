@@ -1,3 +1,35 @@
+## [2.0.8] - 2026-09-30
+
+### Fixed
+
+- **The "Exportiert" status pill was invisible on most history rows.** It
+  sits inside the buyer cell, which truncates with
+  `overflow: hidden; text-overflow: ellipsis; white-space: nowrap` — and
+  the nowrap applied to the whole cell, so the pill was laid out inline
+  after the full, un-wrapped buyer name. Any name wider than the ~168px
+  column pushed the pill past the right edge, where overflow clipping
+  erased it; measured 431px outside the cell for a 60-character company
+  name. Nothing hinted at it either, since the clipped content was the
+  pill rather than the text.
+
+  This read as a status bug — exported invoices showing no tag while
+  manually backfilled ones kept theirs — but it was purely name length:
+  the short names in hand-typed entries left room, real client names did
+  not. The buyer cell is now a flex row, so truncation is scoped to the
+  name and the pill keeps its intrinsic width. Draft rows with long names
+  were losing their pill the same way.
+
+### Changed
+
+- **The customer database lists alphabetically.** Both the buyer profile
+  picker and the "existing customer" select in the past-invoice modal now
+  sort by name, case-insensitively and umlaut-folded, so Ökotech sorts
+  with O rather than after Z, and "Kunde 2" precedes "Kunde 10". The
+  stored array keeps its insertion order — the recent-customer chips take
+  the last four entries, so that order is their recency signal — and each
+  option carries its original index, leaving selection, update and delete
+  untouched.
+
 ## [2.0.7] - 2026-09-16
 
 ### Changed

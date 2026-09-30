@@ -1594,8 +1594,13 @@ summary.section-caption::after {
   align-items: center;
 }
 .history-row .h-num   { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.history-row .h-buyer { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.history-row .h-buyer .status-pill { margin-left: 6px; }
+/* The status pill sits next to the buyer name in the same grid cell. It must
+   not share the name's truncation context, or a long buyer name clips the
+   pill away entirely — so the cell is a flex row: the name truncates, the
+   pill keeps its intrinsic width. */
+.history-row .h-buyer { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.history-row .h-buyer .h-buyer-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-row .h-buyer .status-pill { flex: 0 0 auto; }
 .history-row .h-date, .history-row .h-total { color: var(--text-muted); white-space: nowrap; }
 .history-row-actions {
   display: flex;
