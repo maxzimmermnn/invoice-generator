@@ -1,3 +1,16 @@
+## [2.0.9] - 2026-10-23
+
+### Fixed
+
+- **Typewriter layout: notes no longer stretch short lines.** The payment
+  note and the note below the totals are justified, but line breaks were
+  flattened before justifying, so only the very last row of the whole
+  block stayed left-aligned. A one-line paragraph followed by another
+  paragraph, and the last row of every paragraph but the final one, were
+  spread across the full width. Justification now runs per paragraph: a
+  paragraph that fits on one row stays left-aligned, and a wrapped
+  paragraph is justified on every row except its last.
+
 ## [2.0.8] - 2026-09-30
 
 ### Fixed
