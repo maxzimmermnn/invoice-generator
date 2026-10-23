@@ -105,6 +105,20 @@ function drawJustifiedLines({
   return yy;
 }
 
+// Wrap and justify `text` paragraph by paragraph (split on hard line
+// breaks), so each paragraph's last row stays left-aligned and a paragraph
+// that fits on one row isn't stretched. Blank paragraphs keep their row.
+// Consumes the same number of rows as wrapText(text, ...).length.
+function drawJustifiedParagraphs({ text, wrapText, ...opts }) {
+  let yy = opts.yStart;
+  for (const para of String(text).split('\n')) {
+    if (!para) { yy -= opts.lineHeight; continue; }
+    const lines = wrapText(para, opts.font, opts.size, opts.contentW);
+    yy = drawJustifiedLines({ ...opts, lines, yStart: yy });
+  }
+  return yy;
+}
+
 
 // -------- Multi-page support --------
 //
@@ -987,18 +1001,16 @@ async function renderInvoiceTypewriter(pdfDoc, ctx) {
     }
 
     if (footnote) {
-      const footLines = wrapText(footnote, mono, SIZE_BODY - 1, contentW);
-      yy = drawJustifiedLines({
-        lines: footLines, x: M_L, yStart: yy, contentW, lineHeight: LINE_TIGHT,
+      yy = drawJustifiedParagraphs({
+        text: footnote, wrapText, x: M_L, yStart: yy, contentW, lineHeight: LINE_TIGHT,
         font: mono, size: SIZE_BODY - 1, color: SOFT, drawText, widthAt,
       });
       yy -= LINE_H * 0.8;
     } else { yy -= LINE_H * 0.2; }
 
     if (paymentNote) {
-      const payLines = wrapText(paymentNote, mono, SIZE_BODY, contentW);
-      yy = drawJustifiedLines({
-        lines: payLines, x: M_L, yStart: yy, contentW, lineHeight: LINE_H,
+      yy = drawJustifiedParagraphs({
+        text: paymentNote, wrapText, x: M_L, yStart: yy, contentW, lineHeight: LINE_H,
         font: mono, size: SIZE_BODY, drawText, widthAt,
       });
       yy -= LINE_H * 0.8;
