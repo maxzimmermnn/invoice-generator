@@ -1787,6 +1787,17 @@ summary.section-caption::after {
   padding-top: 10px;
 }
 
+/* --- Update modal (desktop app) --- */
+.update-modal-content { width: 480px; gap: 14px; }
+.update-notes {
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.update-notes > :last-child { margin-bottom: 0; }
+
 /* --- Onboarding modal --- */
 .onboarding-modal { z-index: 60; background: rgba(0, 0, 0, 0.45); }
 .onboarding-content {
@@ -1803,6 +1814,15 @@ summary.section-caption::after {
   color: var(--text);
 }
 .ob-intro { margin: 6px 0 0; font-size: 13px; color: var(--text-muted); }
+.ob-import {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  align-items: baseline;
+}
 
 .ob-stepper { display: flex; align-items: center; gap: 10px; }
 .ob-dot {

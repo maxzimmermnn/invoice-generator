@@ -291,6 +291,19 @@ const I18N = {
     menu_help: 'Hilfe & Doku',
     menu_backup: 'Backup / Wiederherstellen…',
     menu_rerun_setup: 'Ersteinrichtung erneut ausführen…',
+    menu_check_updates: 'Nach Updates suchen…',
+    ob_import_hint: 'Schon mit der Browser-Version gearbeitet?',
+    ob_import_btn: 'Backup importieren…',
+    update_title: 'Update verfügbar',
+    update_available: 'Version {version} ist verfügbar — installiert ist {current}.',
+    update_install: 'Installieren & neu starten',
+    update_installing: 'Wird geladen… {pct}',
+    update_later: 'Später',
+    msg_update_checking: 'Suche nach Updates…',
+    msg_update_none: 'Du hast die neueste Version ({version}).',
+    msg_update_check_failed: 'Update-Prüfung fehlgeschlagen:',
+    msg_update_install_failed: 'Update konnte nicht installiert werden:',
+    msg_file_save_failed: 'Datei konnte nicht gespeichert werden:',
     seller_profile_caption: 'Verkäuferprofil',
     seller_edit_title: 'Verkäuferprofil bearbeiten',
     seller_chip_empty: 'Verkäufer einrichten…',
@@ -839,6 +852,19 @@ const I18N = {
     menu_help: 'Help & docs',
     menu_backup: 'Backup / restore data…',
     menu_rerun_setup: 'Rerun setup…',
+    menu_check_updates: 'Check for updates…',
+    ob_import_hint: 'Already used the browser version?',
+    ob_import_btn: 'Import a backup…',
+    update_title: 'Update available',
+    update_available: 'Version {version} is available — you have {current}.',
+    update_install: 'Install & restart',
+    update_installing: 'Downloading… {pct}',
+    update_later: 'Later',
+    msg_update_checking: 'Checking for updates…',
+    msg_update_none: 'You’re on the latest version ({version}).',
+    msg_update_check_failed: 'Update check failed:',
+    msg_update_install_failed: 'Update could not be installed:',
+    msg_file_save_failed: 'Could not save the file:',
     seller_profile_caption: 'Seller profile',
     seller_edit_title: 'Edit seller profile',
     seller_chip_empty: 'Set up seller…',
@@ -1371,6 +1397,19 @@ const I18N = {
     menu_help: 'Aide & docs',
     menu_backup: 'Sauvegarde / restauration…',
     menu_rerun_setup: 'Relancer la configuration initiale…',
+    menu_check_updates: 'Rechercher des mises à jour…',
+    ob_import_hint: 'Vous utilisiez déjà la version navigateur ?',
+    ob_import_btn: 'Importer une sauvegarde…',
+    update_title: 'Mise à jour disponible',
+    update_available: 'La version {version} est disponible — vous avez la {current}.',
+    update_install: 'Installer et redémarrer',
+    update_installing: 'Téléchargement… {pct}',
+    update_later: 'Plus tard',
+    msg_update_checking: 'Recherche de mises à jour…',
+    msg_update_none: 'Vous avez la dernière version ({version}).',
+    msg_update_check_failed: 'Échec de la recherche de mises à jour :',
+    msg_update_install_failed: 'La mise à jour n’a pas pu être installée :',
+    msg_file_save_failed: 'Impossible d’enregistrer le fichier :',
     seller_profile_caption: 'Profil vendeur',
     seller_edit_title: 'Modifier le profil vendeur',
     seller_chip_empty: 'Configurer le vendeur…',
@@ -4560,7 +4599,7 @@ function csvNum(n) {
 }
 
 // Export the current overview view: all snapshots in the active period.
-function exportOverviewCSV() {
+async function exportOverviewCSV() {
   const period = $('statsPeriod').value;
   const filtered = filterByPeriod(state.history, period);
   if (filtered.length === 0) { toast(t('msg_csv_no_data'), 'err'); return; }
@@ -4590,13 +4629,13 @@ function exportOverviewCSV() {
   const csv = buildCSV(headers, rows);
   const ts = todayLocalISO();
   const periodLabel = period.replace(/[^a-z0-9]/gi, '_');
-  downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }),
-    `erechnung-stats-${periodLabel}-${ts}.csv`);
+  if (!(await downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }),
+    `erechnung-stats-${periodLabel}-${ts}.csv`))) return;
   toast(t('msg_csv_exported'), 'ok');
 }
 
 // Export the quarterly tax breakdown for the selected year.
-function exportQuartersCSV() {
+async function exportQuartersCSV() {
   const inYear = state.history.filter(s => {
     if (!s.date) return false;
     const d = parseInvoiceDate(s.date);
@@ -4625,13 +4664,13 @@ function exportQuartersCSV() {
     ]);
   }
   const csv = buildCSV(headers, rows);
-  downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }),
-    `erechnung-quarters-${statsYear}.csv`);
+  if (!(await downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }),
+    `erechnung-quarters-${statsYear}.csv`))) return;
   toast(t('msg_csv_exported'), 'ok');
 }
 
 // Export the buyer drill-down: all invoices for the currently-drilled buyer.
-function exportBuyerCSV() {
+async function exportBuyerCSV() {
   if (!statsBuyerDrillDown) { toast(t('msg_csv_no_data'), 'err'); return; }
   const target = statsBuyerDrillDown.toLowerCase().trim();
   const matched = state.history.filter(s =>
@@ -4661,8 +4700,8 @@ function exportBuyerCSV() {
   const csv = buildCSV(headers, rows);
   // Sanitize buyer name for filename
   const slug = statsBuyerDrillDown.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
-  downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }),
-    `erechnung-buyer-${slug || 'export'}.csv`);
+  if (!(await downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }),
+    `erechnung-buyer-${slug || 'export'}.csv`))) return;
   toast(t('msg_csv_exported'), 'ok');
 }
 
@@ -5692,19 +5731,26 @@ function applyPreviewEnabledUI() {
   if (btn) btn.setAttribute('aria-pressed', String(previewEnabled));
 }
 
-function downloadBlob(blob, filename) {
+// Hands a finished file to the user. Resolves true once it is saved, false
+// if the user cancelled the desktop save dialog or the write failed (already
+// toasted) — callers must not record the invoice number or a history entry
+// for a file that never landed. The browser path cannot observe the download,
+// so it always reports success.
+async function downloadBlob(blob, filename) {
+  if (IS_DESKTOP) return saveBlobDesktop(blob, filename);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 200);
+  return true;
 }
 
-$('btnXML').addEventListener('click', () => {
+$('btnXML').addEventListener('click', async () => {
   try {
     const xml = buildXML();
     const number = $('r_number').value.trim() || 'rechnung';
-    downloadBlob(new Blob([xml], { type: 'application/xml' }), `${number}.xml`);
+    if (!(await downloadBlob(new Blob([xml], { type: 'application/xml' }), `${number}.xml`))) return;
     toast(t('msg_xml_done'), 'ok');
   } catch (e) {
     toast(t('msg_error') + ' ' + e.message, 'err');
@@ -6276,7 +6322,7 @@ $('btnPDF').addEventListener('click', async () => {
 
     const outBytes = await pdfDoc.save({ useObjectStreams: false });
     const blob = new Blob([outBytes], { type: 'application/pdf' });
-    downloadBlob(blob, outName);
+    if (!(await downloadBlob(blob, outName))) return;
     // Record this invoice number so the next suggestion increments correctly
     await recordInvoiceNumber($('r_number').value);
     // Save snapshot to history (no-op when disabled)
@@ -6429,7 +6475,7 @@ async function exportData() {
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const ts = todayLocalISO();
-  downloadBlob(blob, `erechnung-backup-${ts}.json`);
+  if (!(await downloadBlob(blob, `erechnung-backup-${ts}.json`))) return;
   toast(`${t('msg_backup_export')} 1 ${t('msg_backup_seller')}, ${payload.buyers.length} ${t('msg_backup_buyers')}, ${payload.footnotes.length} ${t('msg_backup_footnotes')}.`, 'ok');
 }
 
@@ -7248,7 +7294,7 @@ async function runEmbedXML() {
     // identical PDF structure for downstream validators.
     const finalBytes = await pdfDoc.save({ useObjectStreams: false });
     const blob = new Blob([finalBytes], { type: 'application/pdf' });
-    downloadBlob(blob, outName);
+    if (!(await downloadBlob(blob, outName))) return;
 
     await recordHistoryEntry();
     closeEmbedModal();
@@ -7642,6 +7688,15 @@ document.getElementById('obFinish').addEventListener('click', async () => {
   toast(t('msg_setup_done'), 'ok');
 });
 
+// Returning users (e.g. moving from the browser build to the desktop app,
+// whose storage starts empty) restore everything from a backup instead.
+let backupFromOnboarding = false;
+document.getElementById('obImportBackup').addEventListener('click', () => {
+  closeOnboarding();
+  backupFromOnboarding = true;
+  openBackupModal();
+});
+
 // --- Overflow menu items ---
 document.getElementById('rerunSetup').addEventListener('click', () => {
   closeOverflowMenu();
@@ -7666,6 +7721,12 @@ function openBackupModal() {
 function closeBackupModal() {
   const modal = $('backupModal');
   closeModal(modal);
+  // Opened from onboarding's "Import a backup…": if nothing usable was
+  // restored, put the user back into setup rather than an unconfigured app.
+  if (backupFromOnboarding) {
+    backupFromOnboarding = false;
+    if (!isSellerConfigured()) openOnboarding();
+  }
 }
 document.getElementById('openBackup').addEventListener('click', () => {
   closeOverflowMenu();
@@ -7696,6 +7757,119 @@ document.getElementById('helpSearch').addEventListener('input', (e) => {
 ['r_intro', 'r_payment_note', 'r_greeting', 'r_signature', 'r_footnote'].forEach(id => {
   $(id).addEventListener('input', scheduleBoilerplateSave);
 });
+
+// -------- Desktop app (Tauri shell): native save, self-update --------
+// The same bundle runs as the single-file browser build and inside the Tauri
+// shell in src-tauri/. Everything here is gated on IS_DESKTOP; the browser
+// build never touches window.__TAURI__ and makes no network calls. The shell
+// injects window.__TAURI__ (withGlobalTauri), so no @tauri-apps/* package is
+// bundled into the browser artifact.
+const IS_DESKTOP = typeof window !== 'undefined' && !!window.__TAURI__;
+
+// WKWebView drops <a download> clicks, so the desktop app saves through the
+// native save panel instead. A bare filename lets macOS open the panel in the
+// last-used folder. The dialog plugin adds the chosen path to the fs scope.
+async function saveBlobDesktop(blob, filename) {
+  try {
+    const path = await window.__TAURI__.dialog.save({ defaultPath: filename });
+    if (!path) return false;
+    await window.__TAURI__.fs.writeFile(path, new Uint8Array(await blob.arrayBuffer()));
+    return true;
+  } catch (e) {
+    console.error(e);
+    toast(t('msg_file_save_failed') + ' ' + (e && e.message ? e.message : e), 'err');
+    return false;
+  }
+}
+
+// Updates come from the GitHub Releases feed configured in tauri.conf.json
+// (latest.json → signed .app.tar.gz). The updater verifies the signature
+// against the embedded public key before installing.
+let pendingUpdate = null;
+let updateInstalling = false;
+
+async function checkForUpdates({ quiet }) {
+  if (!quiet) toast(t('msg_update_checking'));
+  try {
+    const update = await window.__TAURI__.updater.check();
+    if (!update) {
+      if (!quiet) {
+        const version = await window.__TAURI__.app.getVersion();
+        toast(t('msg_update_none', { version }), 'ok');
+      }
+      return;
+    }
+    openUpdateModal(update);
+  } catch (e) {
+    // A launch-time check that fails (offline, GitHub down) stays silent.
+    console.warn('[erechnung] Update check failed:', e);
+    if (!quiet) toast(t('msg_update_check_failed') + ' ' + (e && e.message ? e.message : e), 'err');
+  }
+}
+
+function openUpdateModal(update) {
+  pendingUpdate = update;
+  $('updateSummary').textContent = t('update_available', {
+    version: update.version, current: update.currentVersion,
+  });
+  const notes = $('updateNotes');
+  const body = (update.body || '').trim();
+  notes.innerHTML = body ? renderMarkdown(body) : '';
+  notes.hidden = !body;
+  $('updateError').hidden = true;
+  $('updateInstall').disabled = false;
+  $('updateInstall').textContent = t('update_install');
+  openModal($('updateModal'));
+}
+function closeUpdateModal() {
+  if (updateInstalling) return;
+  pendingUpdate = null;
+  closeModal($('updateModal'));
+}
+
+async function installPendingUpdate() {
+  if (!pendingUpdate || updateInstalling) return;
+  updateInstalling = true;
+  const btn = $('updateInstall');
+  btn.disabled = true;
+  btn.textContent = t('update_installing', { pct: '' });
+  let total = 0, received = 0;
+  try {
+    await pendingUpdate.downloadAndInstall((event) => {
+      if (event.event === 'Started') total = event.data.contentLength || 0;
+      if (event.event === 'Progress') {
+        received += event.data.chunkLength;
+        if (total) btn.textContent = t('update_installing', { pct: Math.round(received / total * 100) + ' %' });
+      }
+    });
+    await window.__TAURI__.process.relaunch();
+  } catch (e) {
+    console.error(e);
+    updateInstalling = false;
+    btn.disabled = false;
+    btn.textContent = t('update_install');
+    const err = $('updateError');
+    err.textContent = t('msg_update_install_failed') + ' ' + (e && e.message ? e.message : e);
+    err.hidden = false;
+  }
+}
+
+function setupDesktopShell() {
+  const item = $('checkUpdates');
+  item.hidden = false;
+  item.addEventListener('click', () => {
+    closeOverflowMenu();
+    checkForUpdates({ quiet: false });
+  });
+  $('updateClose').addEventListener('click', closeUpdateModal);
+  $('updateLater').addEventListener('click', closeUpdateModal);
+  $('updateInstall').addEventListener('click', installPendingUpdate);
+  $('updateModal').addEventListener('click', (e) => {
+    if (e.target === $('updateModal')) closeUpdateModal();
+  });
+  // Give the first render a head start; an update prompt can wait a moment.
+  setTimeout(() => checkForUpdates({ quiet: true }), 3000);
+}
 
 // -------- Init --------
 document.getElementById('addItem').addEventListener('click', () => addItem());
@@ -7914,6 +8088,7 @@ document.addEventListener('keydown', (e) => {
     if (typeof isOverflowMenuOpen === 'function' && isOverflowMenuOpen()) { closeOverflowMenu(); return; }
     if (typeof isSellerMenuOpen === 'function' && isSellerMenuOpen()) { closeSellerMenu(); return; }
     if (isOpen('onboardingModal')) { closeOnboarding(); return; }
+    if (isOpen('updateModal')) { closeUpdateModal(); return; }
     if (isOpen('backupModal')) { closeBackupModal(); return; }
     if (isOpen('yoyBackfillModal')) { closeYoYBackfillModal(); return; }
     if (isOpen('pastInvoiceModal')) { closePastInvoiceModal(); return; }
@@ -8163,6 +8338,9 @@ async function init() {
   await loadPreviewEnabled();
   setupPreviewListeners();
   schedulePreviewRender();
+
+  // 12. Desktop app only: update menu entry + quiet check on launch.
+  if (IS_DESKTOP) setupDesktopShell();
 }
 
 init().catch(err => {

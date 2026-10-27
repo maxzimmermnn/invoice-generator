@@ -69,6 +69,7 @@
         <button id="openHelp" class="menu-item menu-item-divided" type="button" data-i18n="menu_help"></button>
         <button id="openBackup" class="menu-item" type="button" data-i18n="menu_backup"></button>
         <button id="rerunSetup" class="menu-item" type="button" data-i18n="menu_rerun_setup"></button>
+        <button id="checkUpdates" class="menu-item" type="button" data-i18n="menu_check_updates" hidden></button>
       </div>
     </div>
   </header>
@@ -714,6 +715,23 @@
   </div>
 </div>
 
+<!-- ===== Update modal (desktop app only) ===== -->
+<div class="modal" id="updateModal" hidden>
+  <div class="modal-content update-modal-content">
+    <div class="modal-head">
+      <h2 data-i18n="update_title"></h2>
+      <button id="updateClose" class="modal-x" type="button" data-i18n-aria-label="aria_close">✕</button>
+    </div>
+    <p class="backup-section-body" id="updateSummary"></p>
+    <div class="update-notes" id="updateNotes" hidden></div>
+    <div class="warn-banner" id="updateError" hidden></div>
+    <div class="backup-pending-actions">
+      <button type="button" class="btn-outline" id="updateLater" data-i18n="update_later"></button>
+      <button type="button" class="btn-accent" id="updateInstall" data-i18n="update_install"></button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== Onboarding modal (first-run setup) ===== -->
 <div class="modal onboarding-modal" id="onboardingModal" hidden>
   <div class="modal-content onboarding-content">
@@ -726,6 +744,10 @@
     <div id="obStep1">
       <h2 data-i18n="ob_title_seller"></h2>
       <p class="ob-intro" data-i18n="ob_body_seller"></p>
+      <p class="ob-import">
+        <span data-i18n="ob_import_hint"></span>
+        <button type="button" class="link-accent" id="obImportBackup" data-i18n="ob_import_btn"></button>
+      </p>
       <div class="menu-grid">
         <label class="full"><span data-i18n="f_company"></span>
           <input type="text" id="ob_company" autocomplete="off" data-i18n-placeholder="ob_company_placeholder">

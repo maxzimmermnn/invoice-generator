@@ -7,6 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm install` — install deps (Node ≥20).
 - `npm run dev` — Vite dev server with hot reload (serves `index.html`).
 - `npm run build` — produce the single distributable. Output is renamed by a post-build hook in `vite.config.js` to `dist/invoice-generator-v<package.json version>.html`. Bump the version in `package.json` before building a release.
+- `npm run app:dev` / `npm run app:build` — Tauri desktop shell (needs Rust). `build:app` (`vite build --mode app`) writes an un-renamed `dist-app/index.html` for Tauri.
+- `npm run app:release` — signed macOS build; stages `.dmg`, `.app.tar.gz` and `latest.json` in `dist-release/` for attaching to the GitHub release. Signing key: `~/.tauri/invoice-generator.key` (not in the repo).
 
 There are no tests and no lint config. There is no CI.
 
@@ -15,9 +17,18 @@ There are no tests and no lint config. There is no CI.
 This is a **single-file offline browser app**. The build inlines all JS/CSS/fonts into one HTML so the artifact runs straight from the filesystem with no network access. The implications shape the codebase:
 
 - **No dynamic imports / no code splitting** — enforced by `vite-plugin-singlefile` + `assetsInlineLimit: 100000000` + `inlineDynamicImports: true` in `vite.config.js`. Don't introduce lazy chunks or fetched assets.
-- **No runtime network calls.** All fonts (`src/fonts.js`, ~225 KB base64 WOFFs) and libraries (pdf-lib, fontkit, pako) are bundled. Never add a CDN URL or `fetch()` for assets.
+- **No runtime network calls** (except the desktop app's update check, see below). All fonts (`src/fonts.js`, ~225 KB base64 WOFFs) and libraries (pdf-lib, fontkit, pako) are bundled. Never add a CDN URL or `fetch()` for assets.
 - **No framework.** Plain DOM, `$ = document.getElementById`. UI markup lives in `index.html`; logic attaches by id.
 - **All state in `localStorage`**, keys namespaced `erechnung:*:v1` (see top of `src/main.js`). The version suffix is the migration boundary — bump it and write a migration if you change a schema.
+
+### Desktop app (`src-tauri/`)
+
+A thin Tauri v2 shell around the same bundle (macOS, Apple Silicon). The Rust side only registers plugins (dialog, fs, updater, process); all logic stays in `main.js`, in the "Desktop app" section, gated on `IS_DESKTOP` (`window.__TAURI__`, injected via `withGlobalTauri` — no `@tauri-apps/*` npm package is bundled). It does two things:
+
+- `downloadBlob()` is async and routes to a native save panel on desktop (WKWebView ignores `<a download>`). It resolves `false` on cancel — callers must bail before recording the invoice number / history entry.
+- Self-update: `tauri-plugin-updater` polls `releases/latest/download/latest.json`; the update modal (`#updateModal`) shows the changelog section as notes. This is the **only** network call, desktop-only. The version comes from `package.json` (`"version": "../package.json"` in `tauri.conf.json`).
+
+The app has its own `localStorage` (separate from any browser), so onboarding offers "Import a backup…". The bundle identifier `cool.zimmermann.invoice-generator` scopes that storage — changing it orphans users' data. `dragDropEnabled: false` is required or Tauri swallows HTML5 file drops (PDF embed, backup).
 
 ### Module layout
 

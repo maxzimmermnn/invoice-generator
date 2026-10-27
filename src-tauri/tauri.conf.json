@@ -1,0 +1,55 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Invoice Generator",
+  "version": "../package.json",
+  "identifier": "cool.zimmermann.invoice-generator",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "npm run build:app",
+    "frontendDist": "../dist-app"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Invoice Generator",
+        "width": 1600,
+        "height": 1000,
+        "minWidth": 900,
+        "minHeight": 600,
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "createUpdaterArtifacts": true,
+    "category": "Business",
+    "copyright": "© Max Zimmermann · MIT License",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.png"
+    ],
+    "macOS": {
+      "signingIdentity": "-",
+      "minimumSystemVersion": "11.0"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdGMjYyNjJDN0EwNzAxQjAKUldTd0FRZDZMQ1ltZnlFNHhXZGwwckpLREtoUGZQbUd5eGZVZVZWamE0Nkx3OHNIdWNBcGVlMkMK",
+      "endpoints": [
+        "https://github.com/maxzimmermnn/invoice-generator/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

@@ -1,3 +1,26 @@
+## [2.0.10] - 2026-10-27
+
+### Added
+
+- **Desktop app for macOS (Apple Silicon).** The invoice generator now also
+  ships as a native app (`Invoice-Generator_2.0.10_aarch64.dmg`), built with
+  Tauri around the same single-file bundle. PDFs, XML, CSV exports and
+  backups are saved through the native macOS save dialog; cancelling the
+  dialog no longer counts the invoice number or writes a history entry.
+- **Self-updating.** The app checks this repository's GitHub Releases on
+  launch and via menu → Check for updates…, shows the release notes, and
+  installs signature-verified updates before restarting itself. This is
+  the app's only network request; the browser version still makes none.
+- **Import a backup from the setup screen.** First-run setup now offers
+  "Import a backup…", so moving from the browser version (whose data the
+  app can't see) to the app is one step. If nothing usable is restored,
+  setup comes back.
+
+### Changed
+
+- The app isn't notarized: on first launch, right-click it → Open once.
+  The browser HTML is unchanged in how it is used.
+
 ## [2.0.9] - 2026-10-23
 
 ### Fixed

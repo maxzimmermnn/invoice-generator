@@ -2,3 +2,7 @@ node_modules/
 dist/
 .DS_Store
 *.log
+dist-app/
+dist-release/
+src-tauri/target/
+src-tauri/gen/schemas/

@@ -61,6 +61,26 @@ The file is around 1.8 MB because pdf-lib, fontkit, five invoice fonts and
 the UI assets are embedded. In return: works without internet, without
 external dependencies, without any account.
 
+### Desktop app (macOS)
+
+The same tool also ships as a small native macOS app (Apple Silicon).
+Download `Invoice-Generator_<version>_aarch64.dmg` from the
+[Releases page](../../releases), open it and drag the app into
+Applications. The app isn't notarized, so on first launch macOS refuses
+to open it: right-click the app → **Open** (or allow it under System
+Settings → Privacy & Security), once.
+
+Differences from the browser version:
+
+- **Separate storage.** The app keeps its own data, separate from your
+  browser. To carry over your seller profile, customers and history,
+  export a backup in the browser version (menu → Backup / restore data…)
+  and choose **Import a backup…** on the app's first-run screen.
+- **Native save dialogs** for PDFs, XML, CSV and backups.
+- **Updates.** The app checks GitHub for a new release on launch, and
+  on demand via menu → Check for updates…. Updates are signature-checked
+  before they install; the app then restarts itself.
+
 ---
 
 ## Features
@@ -365,6 +385,9 @@ are all exposed to screen readers.
 - **Local data only**: All input (including the invoice history) is
   stored in `localStorage`. Backup export produces a JSON file you
   download yourself; nothing is transmitted.
+- **Desktop app exception:** the macOS app makes one request on launch
+  (and when you click Check for updates…) to fetch `latest.json` from
+  this repository's GitHub Releases. No invoice data is sent.
 
 ---
 
@@ -388,6 +411,18 @@ The result is a single `dist/index.html` ready to use.
 
 Hot-reload dev server.
 
+### Desktop app
+
+Requires Rust (stable) in addition to Node.js.
+
+    npm run app:dev       # Tauri window on top of the Vite dev server
+    npm run app:build     # unsigned-for-updates local build
+    npm run app:release   # signed build + latest.json in dist-release/
+
+`app:release` signs the updater payload with the key at
+`~/.tauri/invoice-generator.key` (or `TAURI_SIGNING_PRIVATE_KEY`); its
+public half is embedded in `src-tauri/tauri.conf.json`.
+
 ### Project structure
 
 - `index.html` - markup shell
@@ -397,6 +432,8 @@ Hot-reload dev server.
 - `src/styles.css` - UI styling
 - `src/layouts.js` - invoice layout renderers
 - `vite.config.js` - Vite build config (single-file output)
+- `src-tauri/` - Tauri desktop shell (window, updater, save dialogs)
+- `scripts/release-app.mjs` - builds and stages the desktop release assets
 
 ## Example invoices
 
