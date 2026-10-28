@@ -31,13 +31,14 @@ carries machine-readable XML data per EN 16931 (ZUGFeRD 2.3 / Factur-X 1.0,
 Comfort profile) embedded inside it, making it compliant with German
 e-invoicing law (§14 UStG, in force since 2025) and valid as a Factur-X
 invoice for French customers. Three UI languages (German, English, French),
-five fonts, three layouts, per-language storage of default texts, a live
-side-by-side PDF preview on desktop, a searchable invoice history with
-cloning and status pills (and the option to backfill older invoices
+five fonts, three layouts, per-language storage of default texts and
+named text presets, a live side-by-side PDF preview, a searchable invoice
+history with status pills (and the option to backfill older invoices
 manually), non-blocking inline validation for IBAN/VAT/date fields, a
-first-run setup wizard with demo data, and a full statistics view with
-quarterly tax breakdowns, year-over-year comparison, buyer drill-down,
-and CSV export.
+first-run setup with demo data or backup import, and a full statistics
+view with quarterly tax breakdowns, year-over-year comparison, buyer
+drill-down, and CSV export. Available as a single HTML file for any
+browser and as a native macOS app.
 
 ## Layouts
 
@@ -52,7 +53,7 @@ layouts.
 
 ## Quick start (no installation)
 
-Download the latest `invoice-generator.html` from the
+Download the latest `invoice-generator-v<version>.html` from the
 [Releases page](../../releases) and open it in a browser. That's it. The
 file is self-contained and works straight from the filesystem, no web server
 needed, no internet required at runtime.
@@ -85,43 +86,46 @@ Differences from the browser version:
 
 ## Features
 
-### First-run experience
-On a fresh start (empty `localStorage`), a prominent setup card guides you
-to fill in the seller stammdaten before anything else. A secondary "Start
-with demo data" link populates the form with a realistic DE-to-FR
-reverse-charge example (placeholder IBAN with a valid mod-97 checksum so
-nothing accidentally points to a real account); nothing is persisted
-until you save explicitly.
+### The form
+The app is one card: the form on the left, the live PDF preview on the
+right. The form is split into three tabs, **Buyer**, **Items** and
+**Invoice info** (keys `1` / `2` / `3`), with a sticky action bar at
+the bottom (Create PDF, XML only, Validate, Embed XML). **New invoice** clears
+the current invoice after an inline confirm. Language, theme, help,
+backup and setup live in the `⋯` menu.
 
-Once the seller is configured, a second card appears for the
-invoice-number scheme: pick the pattern (default `{yyyy}-{counter:5}`)
-and the start value, with a live preview of the next number. It shows
-only when neither the pattern nor the counter has ever been written,
-so existing users see no change.
+### First-run experience
+On a fresh start (empty `localStorage`), a two-step setup dialog opens.
+Step 1 asks for the seller basics (company, VAT ID, country, IBAN).
+"Start with demo data" fills the form with a realistic DE-to-FR
+reverse-charge example instead (placeholder IBAN with a valid mod-97
+checksum so nothing accidentally points to a real account), and
+"Import a backup…" restores an existing setup, e.g. when moving from the
+browser to the desktop app. Step 2 sets the invoice-number scheme: pick
+the pattern (default `{yyyy}-{counter:5}`) and the start value, with a
+live preview of the next numbers. "Reset & re-run setup" in the menu
+or the seller dropdown brings the dialog back.
 
 A `?` next to a few key fields (service date, VAT mode, IBAN) opens a
 short tooltip explaining when to pick what. Tooltips close on Esc,
 outside-click, or a second click on the same `?`.
 
 ### Live preview
-On viewports of 1024 px or wider, a sticky preview pane on the right
+On viewports of 1024 px or wider, a 500 px preview pane on the right
 shows the rendered PDF and refreshes 300 ms after the last form change.
 Re-renders pause while the cursor is over the pane so you can scroll
 the embedded PDF without it reloading underneath; pending updates
-flush as soon as you move the cursor back to the form. The pane has
-two width tiers (compact below 1400 px, roomy above) so a single-page
-A4 invoice fits without inner scrolling at either size.
+flush as soon as you move the cursor back to the form.
 
 The preview path skips the expensive Factur-X post-processing (XML
 embedding, PDF/A-3 output intent, XMP metadata, trailer ID) and
 reuses the cached fonts, so updates cost milliseconds. The full
 export pipeline still runs when you actually click Create PDF.
 
-A toggle in the top bar turns the pane on or off and the choice is
+A toggle in the header (◎) turns the pane on or off and the choice is
 remembered. Default is on for first-time visitors on wide screens;
 the toggle is hidden on smaller viewports where the pane would
-crowd the form. The pane stays light-themed regardless of dark mode
-so the PDF rendition is always readable.
+crowd the form.
 
 ### Seller profile
 Master data (address, VAT ID, IBAN, BIC, bank, optional SIRET) is stored
@@ -132,8 +136,10 @@ with the profile summary, an edit form, and a "Reset & re-run setup"
 shortcut to the two-step onboarding.
 
 ### Customer database
-Add, select, delete customers. Selecting a saved customer fills all buyer
-fields. An optional second name line (e.g. department or trading name)
+Add, select, update, delete customers on the Buyer tab. The picker lists
+them alphabetically, and the four most recently added appear as chips
+above it for one-click selection. Selecting a saved customer fills all
+buyer fields. An optional second name line (e.g. department or trading name)
 prints below the buyer name and is stored as BT-45 in the XML. Optional
 email and phone are saved with the customer, print in the buyer address
 block of the Modern and Typewriter layouts, and travel in the XML as the
@@ -160,9 +166,11 @@ from another tool and want to continue an existing series.
 
 ### Date fields
 - Invoice date
-- Due date (with quick chips +14 / +30 / +60 / +90 days)
+- Due date, picked with chips (+14 / +30 / +60 / +90 days after the
+  invoice date). The chosen term is remembered and follows the invoice
+  date when it changes.
 - Service date (required for e-invoicing)
-- Service date end (optional, for date ranges; encoded as
+- Service date end (optional, "make it a period"; encoded as
   BillingSpecifiedPeriod in the XML)
 
 ### Tax modes
@@ -208,21 +216,24 @@ a row.
 
 ### Default texts (boilerplate)
 Intro, payment note, greeting, signature and footnote are stored
-**per invoice language**, separately. The `{due}` placeholder in the
-payment note is replaced with the actual due date at PDF time.
+**per invoice language**, separately, and saved automatically as you
+type. The `{due}` placeholder in the payment note is replaced with the
+actual due date at PDF time.
 
-### Footnote presets
-Frequently-used explanations can be saved as named presets and inserted
-from a dropdown. If the chosen preset reads like a reverse-charge note
+### Text presets
+The intro, payment note and footnote each have their own list of named
+presets: write a text, "Save as preset", and pick it from the dropdown
+next time. If the chosen footnote reads like a reverse-charge note
 (matched on keywords like "reverse charge", "autoliquidation",
 "Steuerschuldnerschaft"), the precise Art. 196 legal sentence is
 automatically prepended in the active invoice language, unless the
 citation is already present.
 
 ### Language selectors
-Two independent dropdowns:
-- **UI language**: the tool's interface language
-- **Invoice language**: language of the generated PDF / XML
+- **UI language**: the tool's interface language (DE / EN / FR in the
+  `⋯` menu)
+- **Invoice language**: language of the generated PDF / XML (Invoice
+  info tab), either fixed or following the UI language
 
 The two are independent. You can keep the UI in German and still generate
 English invoices, for example.
@@ -242,8 +253,8 @@ filename.
 A **History** button in the header opens a modal with all generated invoices
 (up to 1000 entries, oldest dropped first). Once at least one invoice
 exists, a header button offers **Duplicate last invoice** (⌘/Ctrl+D)
-as a one-click shortcut (same effect as opening the modal and cloning
-the topmost entry).
+as a one-click shortcut (same effect as opening the modal and
+reloading the topmost entry).
 
 Inside the modal:
 
@@ -251,19 +262,20 @@ Inside the modal:
   buyer name, formatted total, project, and category. A **period
   filter** narrows the list by time range (YTD, last 12 / 6 / 3 months,
   last 30 days, last year, all). The list updates live as you type.
-- The entries render as a scrollable list (no dropdowns) with per-row
-  **Clone** and **Delete** buttons. Clone restores buyer, items,
-  project, category, tax mode, language, font and layout, sets the
+- The entries render as a scrollable list with per-row **Reload** and
+  **Delete** buttons. Reload loads buyer, items, project, category,
+  tax mode, language, font and layout back into the form, sets the
   date to today, auto-assigns the next invoice number, and closes the
-  modal. Delete uses the same two-step inline confirm as the line
-  items (first click turns into "delete?", Esc or 3 s cancels).
+  modal; the history entry itself is left untouched. Delete uses the
+  same two-step inline confirm as the line items (first click turns
+  into "delete?", Esc or 3 s cancels).
 - A **status pill** on each row distinguishes manually backfilled
-  entries (neutral "Entwurf") from tool-generated invoices ("Exportiert"
-  in blue). The schema reserves room for a future "paid" stage.
+  entries ("Draft") from tool-generated invoices ("Exported", in
+  blue). The schema reserves room for a future "paid" stage.
 - **Add past invoice** to backfill older invoices generated elsewhere,
   so the statistics view can cover a complete period. A small form
   captures the minimum fields (date, buyer, total, currency, tax mode);
-  these entries are flagged as Entwurf in the list.
+  these entries are flagged as Draft in the list.
 - **Delete all** to clear the history with a confirmation prompt.
 - **Save invoices to history** toggle. When off, new invoices won't be
   saved, but existing entries remain accessible.
@@ -330,8 +342,9 @@ XML attached. The form fields in the tool fill the XML side, the PDF
 visual is whatever you uploaded.
 
 ### Backup
-Export / import the entire tool state as a JSON file, including history,
-buyer database, footnote presets and YoY backfill data. The migration
+Export / import the entire tool state as a JSON file (menu → Backup /
+restore data…), including history, buyer database, text presets, due
+term and YoY backfill data. The migration
 path handles older backup versions automatically; older backups without
 history or YoY data import cleanly, leaving the existing values
 untouched.
@@ -403,7 +416,8 @@ Requires [Node.js](https://nodejs.org/) (v20 or newer).
     npm install
     npm run build
 
-The result is a single `dist/index.html` ready to use.
+The result is a single `dist/invoice-generator-v<version>.html` ready to
+use (the version comes from `package.json`).
 
 ### Development
 
@@ -439,9 +453,9 @@ public half is embedded in `src-tauri/tauri.conf.json`.
 
 Three PDFs built with this tool, all showing the same fictional invoice, one per layout:
 
-- `example_modern.pdf` - Modern layout
-- `example_din5008.pdf` - DIN 5008 layout
-- `example_typewriter.pdf` - Typewriter layout
+- [`examples/example_modern.pdf`](examples/example_modern.pdf) - Modern layout
+- [`examples/example_din5008.pdf`](examples/example_din5008.pdf) - DIN 5008 layout
+- [`examples/example_typewriter.pdf`](examples/example_typewriter.pdf) - Typewriter layout
 
 ---
 
@@ -449,9 +463,9 @@ Three PDFs built with this tool, all showing the same fictional invoice, one per
 
 Embedded fonts (all licensed under the SIL Open Font License):
 
-- [Inconsolata](https://github.com/googlefonts/Inconsolata) - UI mono / invoice option
+- [IBM Plex Mono](https://github.com/IBM/plex) - UI font / invoice option
 - [Courier Prime](https://github.com/quoteunquoteapps/CourierPrime)
-- [IBM Plex Mono](https://github.com/IBM/plex)
+- [Inconsolata](https://github.com/googlefonts/Inconsolata)
 - [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono)
 - [Space Mono](https://github.com/googlefonts/spacemono)
 
